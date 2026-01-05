@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="SUS.EOS.NeoWallet.Pages.EsrSigningPopupPage"
+    Title="Signing Request"
+    BackgroundColor="{DynamicResource PageBackgroundColor}"
+    Shell.PresentationMode="ModalAnimated">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            
+            <!-- Header -->
+            <Border 
+                BackgroundColor="{DynamicResource Primary}"
+                StrokeShape="RoundRectangle 12"
+                StrokeThickness="0"
+                Padding="20">
+                <VerticalStackLayout Spacing="8">
+                    <Label 
+                        Text="🔐" 
+                        FontSize="36" 
+                        HorizontalOptions="Center" />
+                    <Label 
+                        x:Name="TitleLabel"
+                        Text="Signing Request"
+                        FontSize="22"
+                        FontAttributes="Bold"
+                        TextColor="White"
+                        HorizontalOptions="Center" />
+                    <Label 
+                        x:Name="SubtitleLabel"
+                        Text="An application is requesting your signature"
+                        FontSize="14"
+                        TextColor="White"
+                        Opacity="0.8"
+                        HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- dApp Info Card -->
+            <Border
+                BackgroundColor="{DynamicResource Card}"
+                Stroke="{DynamicResource Border}"
+                StrokeShape="RoundRectangle 12"
+                Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Label 
+                        Text="REQUEST FROM" 
+                        FontSize="10" 
+                        FontAttributes="Bold" 
+                        TextColor="{DynamicResource TextSecondary}" />
+                    
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Border 
+                            Grid.Column="0"
+                            BackgroundColor="{DynamicResource Surface}"
+                            StrokeShape="RoundRectangle 8"
+                            StrokeThickness="0"
+                            WidthRequest="48"
+                            HeightRequest="48">
+                            <Label 
+                                x:Name="DAppIconLabel"
+                                Text="🌐" 
+                                FontSize="24" 
+                                HorizontalOptions="Center" 
+                                VerticalOptions="Center" />
+                        </Border>
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                            <Label 
+                                x:Name="DAppNameLabel"
+                                Text="Unknown Application"
+                                FontSize="16"
+                                FontAttributes="Bold"
+                                TextColor="{DynamicResource TextPrimary}" />
+                            <Label 
+                                x:Name="DAppChainLabel"
+                                Text="WAX Mainnet"
+                                FontSize="12"
+                                TextColor="{DynamicResource TextSecondary}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Account Card -->
+            <Border
+                BackgroundColor="{DynamicResource Card}"
+                Stroke="{DynamicResource Border}"
+                StrokeShape="RoundRectangle 12"
+                Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Label 
+                        Text="SIGNING AS" 
+                        FontSize="10" 
+                        FontAttributes="Bold" 
+                        TextColor="{DynamicResource TextSecondary}" />
+                    
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Border 
+                            Grid.Column="0"
+                            BackgroundColor="{DynamicResource Primary}"
+                            StrokeShape="RoundRectangle 8"
+                            StrokeThickness="0"
+                            WidthRequest="48"
+                            HeightRequest="48">
+                            <Label 
+                                Text="👤" 
+                                FontSize="24" 
+                                HorizontalOptions="Center" 
+                                VerticalOptions="Center"
+                                TextColor="White" />
+                        </Border>
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                            <Label 
+                                x:Name="AccountNameLabel"
+                                Text="myaccount"
+                                FontSize="16"
+                                FontAttributes="Bold"
+                                TextColor="{DynamicResource TextPrimary}" />
+                            <Label 
+                                x:Name="AccountPermissionLabel"
+                                Text="@active"
+                                FontSize="12"
+                                TextColor="{DynamicResource TextSecondary}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Actions Card -->
+            <Border
+                BackgroundColor="{DynamicResource Card}"
+                Stroke="{DynamicResource Border}"
+                StrokeShape="RoundRectangle 12"
+                Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label 
+                            Text="TRANSACTION DETAILS" 
+                            FontSize="10" 
+                            FontAttributes="Bold" 
+                            TextColor="{DynamicResource TextSecondary}" />
+                        <Label 
+                            Grid.Column="1"
+                            x:Name="ActionCountLabel"
+                            Text="1 Action"
+                            FontSize="10"
+                            TextColor="{DynamicResource Primary}" />
+                    </Grid>
+                    
+                    <!-- Action List -->
+                    <CollectionView x:Name="ActionsCollectionView" SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border 
+                                    BackgroundColor="{DynamicResource Surface}"
+                                    StrokeShape="RoundRectangle 8"
+                                    StrokeThickness="0"
+                                    Padding="12"
+                                    Margin="0,4">
+                                    <VerticalStackLayout Spacing="8">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <HorizontalStackLayout Spacing="8">
+                                                <Label 
+                                                    Text="{Binding Contract}"
+                                                    FontSize="14"
+                                                    FontAttributes="Bold"
+                                                    TextColor="{DynamicResource TextPrimary}" />
+                                                <Label 
+                                                    Text="::"
+                                                    FontSize="14"
+                                                    TextColor="{DynamicResource TextSecondary}" />
+                                                <Label 
+                                                    Text="{Binding Action}"
+                                                    FontSize="14"
+                                                    TextColor="{DynamicResource Primary}" />
+                                            </HorizontalStackLayout>
+                                        </Grid>
+                                        
+                                        <!-- Action Data Preview -->
+                                        <Label 
+                                            Text="{Binding DataPreview}"
+                                            FontSize="11"
+                                            TextColor="{DynamicResource TextSecondary}"
+                                            FontFamily="Consolas"
+                                            LineBreakMode="TailTruncation"
+                                            MaxLines="3" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Raw Transaction Toggle -->
+            <Border
+                BackgroundColor="{DynamicResource Card}"
+                Stroke="{DynamicResource Border}"
+                StrokeShape="RoundRectangle 12"
+                Padding="16">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label 
+                            Text="View Raw Transaction" 
+                            FontSize="14" 
+                            TextColor="{DynamicResource TextPrimary}"
+                            VerticalOptions="Center" />
+                        <Switch 
+                            x:Name="ShowRawSwitch"
+                            Grid.Column="1"
+                            Toggled="OnShowRawToggled"
+                            ThumbColor="{DynamicResource Primary}" />
+                    </Grid>
+                    
+                    <Border 
+                        x:Name="RawTransactionBorder"
+                        BackgroundColor="{DynamicResource Surface}"
+                        StrokeShape="RoundRectangle 8"
+                        StrokeThickness="0"
+                        Padding="12"
+                        IsVisible="False">
+                        <ScrollView MaximumHeightRequest="200">
+                            <Label 
+                                x:Name="RawTransactionLabel"
+                                Text="{}{}"
+                                FontSize="10"
+                                TextColor="{DynamicResource TextSecondary}"
+                                FontFamily="Consolas" />
+                        </ScrollView>
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Warning Card (if applicable) -->
+            <Border
+                x:Name="WarningBorder"
+                BackgroundColor="#FFF3E0"
+                StrokeShape="RoundRectangle 12"
+                StrokeThickness="0"
+                Padding="16"
+                IsVisible="False">
+                <HorizontalStackLayout Spacing="12">
+                    <Label Text="⚠️" FontSize="20" VerticalOptions="Center" />
+                    <Label 
+                        x:Name="WarningLabel"
+                        Text="This transaction includes sensitive operations"
+                        FontSize="13"
+                        TextColor="#E65100"
+                        VerticalOptions="Center" />
+                </HorizontalStackLayout>
+            </Border>
+
+            <!-- Action Buttons -->
+            <Grid ColumnDefinitions="*,16,*" Margin="0,8,0,0">
+                <Button
+                    Grid.Column="0"
+                    x:Name="CancelButton"
+                    Text="Cancel"
+                    BackgroundColor="{DynamicResource Surface}"
+                    TextColor="{DynamicResource TextPrimary}"
+                    FontAttributes="Bold"
+                    HeightRequest="52"
+                    CornerRadius="12"
+                    Clicked="OnCancelClicked" />
+                
+                <Button
+                    Grid.Column="2"
+                    x:Name="SignButton"
+                    Text="Sign"
+                    BackgroundColor="{DynamicResource Success}"
+                    TextColor="White"
+                    FontAttributes="Bold"
+                    HeightRequest="52"
+                    CornerRadius="12"
+                    Clicked="OnSignClicked" />
+            </Grid>
+
+            <!-- Loading Indicator -->
+            <ActivityIndicator 
+                x:Name="LoadingIndicator"
+                IsRunning="False"
+                IsVisible="False"
+                Color="{DynamicResource Primary}"
+                HeightRequest="40" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.ContractActionsPage"
+  Title="Contract Actions"
+>
+  <ScrollView>
+    <VerticalStackLayout Padding="24" Spacing="20">
+      <Label
+        Text="Contract Actions"
+        FontSize="28"
+        FontAttributes="Bold"
+        HorizontalTextAlignment="Center"
+      />
+      <Label
+        Text="Execute smart contract actions with custom parameters"
+        FontSize="14"
+        TextColor="{DynamicResource Gray600}"
+        HorizontalTextAlignment="Center"
+      />
+      <!-- Contract Configuration -->
+      <Border Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="20">
+        <VerticalStackLayout Spacing="16">
+          <Label Text="Contract Information" FontSize="18" FontAttributes="Bold" />
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Contract Account" FontSize="14" FontAttributes="Bold" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <Entry
+                x:Name="ContractEntry"
+                Grid.Column="0"
+                Placeholder="e.g., eosio.token"
+                Text="eosio.token"
+              />
+              <Button
+                Grid.Column="1"
+                Text="Load ABI"
+                Clicked="OnLoadAbiClicked"
+                BackgroundColor="{DynamicResource Primary}"
+                TextColor="White"
+              />
+            </Grid>
+            <Label
+              Text="Enter the contract account name to load available actions"
+              FontSize="12"
+              TextColor="{DynamicResource Gray600}"
+            />
+          </VerticalStackLayout>
+          <VerticalStackLayout Spacing="8" x:Name="ActionPickerSection" IsVisible="False">
+            <Label Text="Action" FontSize="14" FontAttributes="Bold" />
+            <Picker
+              x:Name="ActionPicker"
+              Title="Select action"
+              SelectedIndexChanged="OnActionSelected"
+            />
+            <Label
+              x:Name="ActionDescriptionLabel"
+              Text=""
+              FontSize="12"
+              TextColor="{DynamicResource Gray600}"
+              IsVisible="False"
+            />
+          </VerticalStackLayout>
+        </VerticalStackLayout>
+      </Border>
+      <!-- Loading Indicator -->
+      <ActivityIndicator
+        x:Name="LoadingIndicator"
+        IsRunning="False"
+        IsVisible="False"
+        Color="{DynamicResource Primary}"
+      />
+      <!-- Action Parameters -->
+      <Border
+        x:Name="ParametersBorder"
+        Stroke="{DynamicResource Gray200}"
+        StrokeShape="RoundRectangle 12"
+        Padding="20"
+        IsVisible="False"
+      >
+        <VerticalStackLayout Spacing="16">
+          <Label Text="Action Parameters" FontSize="18" FontAttributes="Bold" />
+          <Label
+            Text="Enter JSON parameters for the action"
+            FontSize="14"
+            TextColor="{DynamicResource Gray600}"
+          />
+          <ScrollView HeightRequest="200">
+            <Border BackgroundColor="{DynamicResource Gray100}" Padding="12" Shadow="True">
+              <Editor
+                x:Name="ParametersEditor"
+                FontFamily="Courier"
+                FontSize="12"
+                AutoSize="TextChanges"
+                MinimumHeightRequest="150"
+              />
+            </Border>
+          </ScrollView>
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Quick Templates" FontSize="14" FontAttributes="Bold" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" RowSpacing="8">
+              <Button
+                Grid.Row="0"
+                Grid.Column="0"
+                Text="Transfer"
+                Clicked="OnTemplateTransferClicked"
+                BackgroundColor="Transparent"
+                BorderColor="{DynamicResource Primary}"
+                BorderWidth="1"
+                TextColor="{DynamicResource Primary}"
+                FontSize="12"
+              />
+              <Button
+                Grid.Row="0"
+                Grid.Column="1"
+                Text="Issue"
+                Clicked="OnTemplateIssueClicked"
+                BackgroundColor="Transparent"
+                BorderColor="{DynamicResource Primary}"
+                BorderWidth="1"
+                TextColor="{DynamicResource Primary}"
+                FontSize="12"
+              />
+            </Grid>
+          </VerticalStackLayout>
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Actor (Your Account)" FontSize="14" FontAttributes="Bold" />
+            <Label
+              x:Name="ActorLabel"
+              Text="No account selected"
+              FontSize="14"
+              TextColor="{DynamicResource Gray600}"
+            />
+          </VerticalStackLayout>
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Permission" FontSize="14" FontAttributes="Bold" />
+            <Entry x:Name="PermissionEntry" Text="active" Placeholder="active" />
+          </VerticalStackLayout>
+          <Button
+            Text="Execute Action"
+            Clicked="OnExecuteActionClicked"
+            BackgroundColor="{DynamicResource Primary}"
+            TextColor="White"
+          />
+        </VerticalStackLayout>
+      </Border>
+      <!-- Result Display -->
+      <Border
+        x:Name="ResultBorder"
+        Stroke="{DynamicResource Gray200}"
+        StrokeShape="RoundRectangle 12"
+        Padding="20"
+        IsVisible="False"
+      >
+        <VerticalStackLayout Spacing="12">
+          <Label Text="Transaction Result" FontSize="18" FontAttributes="Bold" />
+          <Label
+            x:Name="ResultStatusLabel"
+            Text="Success"
+            FontSize="16"
+            FontAttributes="Bold"
+            TextColor="Green"
+          />
+          <Label x:Name="TransactionIdLabel" Text="" FontSize="12" LineBreakMode="WordWrap" />
+          <Button
+            Text="View on Bloks.io"
+            Clicked="OnViewTransactionClicked"
+            BackgroundColor="Transparent"
+            BorderColor="{DynamicResource Primary}"
+            BorderWidth="1"
+            TextColor="{DynamicResource Primary}"
+          />
+        </VerticalStackLayout>
+      </Border>
+      <!-- Quick Links -->
+      <Border Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="20">
+        <VerticalStackLayout Spacing="12">
+          <Label Text="Quick Links" FontSize="18" FontAttributes="Bold" />
+          <Button
+            Text="View Contract Tables"
+            Clicked="OnViewTablesClicked"
+            BackgroundColor="Transparent"
+            BorderColor="{DynamicResource Primary}"
+            BorderWidth="2"
+            TextColor="{DynamicResource Primary}"
+          />
+          <Button
+            Text="View Contract on Bloks.io"
+            Clicked="OnViewContractOnBloksClicked"
+            BackgroundColor="Transparent"
+            BorderColor="{DynamicResource Gray400}"
+            BorderWidth="1"
+            TextColor="{DynamicResource Gray700}"
+          />
+        </VerticalStackLayout>
+      </Border>
+      <Button
+        Text="← Back"
+        Clicked="OnBackClicked"
+        BackgroundColor="Transparent"
+        TextColor="{DynamicResource Gray600}"
+      />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

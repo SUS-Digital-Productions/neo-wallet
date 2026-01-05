@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.DashboardPage"
+  Title="Dashboard">
+  <ScrollView>
+    <VerticalStackLayout Padding="24" Spacing="20">
+      <!-- Account Header -->
+      <Border BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 16" Padding="20">
+        <VerticalStackLayout Spacing="12">
+          <Label Text="Total Balance" FontSize="16" TextColor="White" Opacity="0.8" />
+          <Label x:Name="TotalBalanceLabel" Text="$0.00 USD" FontSize="36" FontAttributes="Bold" TextColor="White" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Label Grid.Column="0" x:Name="NeoBalanceLabel" Text="0 NEO" FontSize="14" TextColor="White" Opacity="0.9" />
+            <Label Grid.Column="1" x:Name="GasBalanceLabel" Text="0 GAS" FontSize="14" TextColor="White" Opacity="0.9" HorizontalTextAlignment="End" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Quick Actions -->
+      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+        <Border Grid.Column="0" Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="16">
+          <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+            <Button Text="📤" FontSize="24" BackgroundColor="{DynamicResource Primary}" TextColor="White" WidthRequest="50" HeightRequest="50" CornerRadius="25" Clicked="OnSendClicked" />
+            <Label Text="Send" FontSize="12" HorizontalTextAlignment="Center" />
+          </VerticalStackLayout>
+        </Border>
+        <Border Grid.Column="1" Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="16">
+          <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+            <Button Text="📥" FontSize="24" BackgroundColor="{DynamicResource Secondary}" TextColor="White" WidthRequest="50" HeightRequest="50" CornerRadius="25" Clicked="OnReceiveClicked" />
+            <Label Text="Receive" FontSize="12" HorizontalTextAlignment="Center" />
+          </VerticalStackLayout>
+        </Border>
+        <Border Grid.Column="2" Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="16">
+          <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+            <Button Text="⚡" FontSize="24" BackgroundColor="{DynamicResource Tertiary}" TextColor="White" WidthRequest="50" HeightRequest="50" CornerRadius="25" Clicked="OnStakeClicked" />
+            <Label Text="Stake" FontSize="12" HorizontalTextAlignment="Center" />
+          </VerticalStackLayout>
+        </Border>
+      </Grid>
+
+      <!-- Recent Transactions -->
+      <VerticalStackLayout Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+          <Label Grid.Column="0" Text="Recent Transactions" FontSize="20" FontAttributes="Bold" />
+          <Label Grid.Column="1" Text="View All" FontSize="14" TextColor="{DynamicResource Primary}" VerticalOptions="Center">
+            <Label.GestureRecognizers>
+              <TapGestureRecognizer Tapped="OnViewAllTransactionsClicked" />
+            </Label.GestureRecognizers>
+          </Label>
+        </Grid>
+
+        <Border x:Name="TransactionsFrame" Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="16">
+          <VerticalStackLayout x:Name="TransactionsList" Spacing="12">
+            <Label Text="No transactions yet" FontSize="14" TextColor="{DynamicResource Gray600}" HorizontalTextAlignment="Center" />
+          </VerticalStackLayout>
+        </Border>
+      </VerticalStackLayout>
+
+      <!-- Assets -->
+      <VerticalStackLayout Spacing="12">
+        <Label Text="Your Assets" FontSize="20" FontAttributes="Bold" />
+        
+        <Border Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="0">
+          <VerticalStackLayout Spacing="0">
+            <!-- NEO -->
+            <Grid Padding="16" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+              <Border Grid.Column="0" BackgroundColor="{DynamicResource Gray100}" StrokeShape="RoundRectangle 20" WidthRequest="40" HeightRequest="40" Padding="0" HorizontalOptions="Center" VerticalOptions="Center">
+                <Label Text="N" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" />
+              </Border>
+              <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                <Label Text="NEO" FontSize="16" FontAttributes="Bold" />
+                <Label x:Name="NeoUsdLabel" Text="$0.00" FontSize="12" TextColor="{DynamicResource Gray600}" />
+              </VerticalStackLayout>
+              <VerticalStackLayout Grid.Column="2" Spacing="2" HorizontalOptions="End" VerticalOptions="Center">
+                <Label x:Name="NeoAmountLabel" Text="0 NEO" FontSize="16" FontAttributes="Bold" HorizontalTextAlignment="End" />
+                <Label x:Name="NeoChangeLabel" Text="+0.00%" FontSize="12" TextColor="{DynamicResource Success}" HorizontalTextAlignment="End" />
+              </VerticalStackLayout>
+            </Grid>
+
+            <BoxView HeightRequest="1" Color="{DynamicResource Gray200}" />
+
+            <!-- GAS -->
+            <Grid Padding="16" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+              <Border Grid.Column="0" BackgroundColor="{DynamicResource Gray100}" StrokeShape="RoundRectangle 20" WidthRequest="40" HeightRequest="40" Padding="0" HorizontalOptions="Center" VerticalOptions="Center">
+                <Label Text="G" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" />
+              </Border>
+              <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                <Label Text="GAS" FontSize="16" FontAttributes="Bold" />
+                <Label x:Name="GasUsdLabel" Text="$0.00" FontSize="12" TextColor="{DynamicResource Gray600}" />
+              </VerticalStackLayout>
+              <VerticalStackLayout Grid.Column="2" Spacing="2" HorizontalOptions="End" VerticalOptions="Center">
+                <Label x:Name="GasAmountLabel" Text="0 GAS" FontSize="16" FontAttributes="Bold" HorizontalTextAlignment="End" />
+                <Label x:Name="GasChangeLabel" Text="+0.00%" FontSize="12" TextColor="{DynamicResource Success}" HorizontalTextAlignment="End" />
+              </VerticalStackLayout>
+            </Grid>
+          </VerticalStackLayout>
+        </Border>
+      </VerticalStackLayout>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

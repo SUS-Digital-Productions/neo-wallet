@@ -1,0 +1,17 @@
+<Solution>
+  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.Droid/SUS.EOS.NeoWallet.Droid.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.iOS/SUS.EOS.NeoWallet.iOS.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.Mac/SUS.EOS.NeoWallet.Mac.csproj">
+    <Deploy Solution="Release|*" />
+  </Project>
+  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.WinUI/SUS.EOS.NeoWallet.WinUI.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj" />
+  <Project Path="SUS.EOS.Sharp.Tests/SUS.EOS.Sharp.Tests.csproj" />
+  <Project Path="SUS.EOS.Sharp/SUS.EOS.Sharp.csproj" />
+</Solution>

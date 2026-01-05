@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.ImportWalletPage"
+  Title="Import Keys"
+  BackgroundColor="{DynamicResource PageBackgroundColor}">
+  <ScrollView>
+    <VerticalStackLayout Padding="32" Spacing="24" MaximumWidthRequest="600" HorizontalOptions="Center">
+      
+      <!-- Header -->
+      <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+        <Border BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 24" StrokeThickness="0" WidthRequest="64" HeightRequest="64" HorizontalOptions="Center">
+          <Label Text="🔑" FontSize="28" HorizontalOptions="Center" VerticalOptions="Center" />
+        </Border>
+        <Label Text="Import Keys" FontSize="28" FontAttributes="Bold" HorizontalTextAlignment="Center" TextColor="{DynamicResource TextPrimary}" />
+        <Label Text="Add your private keys to access your accounts" FontSize="14" HorizontalTextAlignment="Center" TextColor="{DynamicResource TextSecondary}" />
+      </VerticalStackLayout>
+
+      <!-- Import Method Selection -->
+      <Grid x:Name="MethodSelectionGrid" ColumnDefinitions="*,*,*" ColumnSpacing="12">
+        <Border x:Name="PrivateKeyMethodBorder" Grid.Column="0" BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Primary}" StrokeThickness="2" Padding="16">
+          <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+            <Label Text="🔐" FontSize="24" HorizontalTextAlignment="Center" />
+            <Label x:Name="PrivateKeyMethodLabel" Text="Private Key" FontSize="14" FontAttributes="Bold" TextColor="White" HorizontalTextAlignment="Center" />
+          </VerticalStackLayout>
+          <Border.GestureRecognizers>
+            <TapGestureRecognizer Tapped="OnPrivateKeyMethodTapped" />
+          </Border.GestureRecognizers>
+        </Border>
+        
+        <Border x:Name="RecoveryMethodBorder" Grid.Column="1" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="16">
+          <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+            <Label Text="📝" FontSize="24" HorizontalTextAlignment="Center" />
+            <Label x:Name="RecoveryMethodLabel" Text="Recovery" FontSize="14" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" HorizontalTextAlignment="Center" />
+          </VerticalStackLayout>
+          <Border.GestureRecognizers>
+            <TapGestureRecognizer Tapped="OnRecoveryMethodTapped" />
+          </Border.GestureRecognizers>
+        </Border>
+        
+        <Border x:Name="FileMethodBorder" Grid.Column="2" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="16">
+          <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+            <Label Text="📁" FontSize="24" HorizontalTextAlignment="Center" />
+            <Label x:Name="FileMethodLabel" Text="File" FontSize="14" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" HorizontalTextAlignment="Center" />
+          </VerticalStackLayout>
+          <Border.GestureRecognizers>
+            <TapGestureRecognizer Tapped="OnFileMethodTapped" />
+          </Border.GestureRecognizers>
+        </Border>
+      </Grid>
+
+      <!-- ==================== PRIVATE KEY IMPORT WIZARD ==================== -->
+      <VerticalStackLayout x:Name="PrivateKeyWizard" Spacing="16" IsVisible="True">
+        
+        <!-- Step Indicator -->
+        <HorizontalStackLayout HorizontalOptions="Center" Spacing="8">
+          <Border x:Name="Step1Indicator" BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 12" StrokeThickness="0" WidthRequest="24" HeightRequest="24">
+            <Label Text="1" FontSize="12" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center" />
+          </Border>
+          <BoxView BackgroundColor="{DynamicResource Border}" WidthRequest="40" HeightRequest="2" VerticalOptions="Center" />
+          <Border x:Name="Step2Indicator" BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" WidthRequest="24" HeightRequest="24">
+            <Label x:Name="Step2Label" Text="2" FontSize="12" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" HorizontalOptions="Center" VerticalOptions="Center" />
+          </Border>
+          <BoxView BackgroundColor="{DynamicResource Border}" WidthRequest="40" HeightRequest="2" VerticalOptions="Center" />
+          <Border x:Name="Step3Indicator" BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" WidthRequest="24" HeightRequest="24">
+            <Label x:Name="Step3Label" Text="3" FontSize="12" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" HorizontalOptions="Center" VerticalOptions="Center" />
+          </Border>
+        </HorizontalStackLayout>
+
+        <!-- Step 1: Enter Private Key -->
+        <Border x:Name="Step1Content" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="True">
+          <VerticalStackLayout Spacing="16">
+            <Label Text="Step 1: Enter Private Key" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
+            <Label Text="Supported formats: WIF (5...), PVT_K1_..., PVT_R1_..., Hex (64 chars)" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto" ColumnSpacing="8">
+              <Entry
+                x:Name="PrivateKeyEntry"
+                Grid.Column="0"
+                Placeholder="Enter private key in any format"
+                IsPassword="True"
+                FontFamily="Consolas"
+                TextChanged="OnPrivateKeyChanged" />
+              <Button
+                x:Name="TogglePrivateKeyButton"
+                Grid.Column="1"
+                Text="👁"
+                FontSize="16"
+                BackgroundColor="Transparent"
+                WidthRequest="44"
+                HeightRequest="44"
+                Clicked="OnTogglePrivateKeyClicked" />
+            </Grid>
+
+            <!-- Format Detection -->
+            <Border x:Name="FormatDetectionBorder" BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12" IsVisible="False">
+              <HorizontalStackLayout Spacing="8">
+                <Label x:Name="FormatIconLabel" Text="✓" FontSize="14" TextColor="{DynamicResource Success}" VerticalOptions="Center" />
+                <Label x:Name="FormatLabel" Text="WIF format detected" FontSize="13" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+              </HorizontalStackLayout>
+            </Border>
+
+            <!-- Public Key Preview -->
+            <Border x:Name="PublicKeyPreviewBorder" BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12" IsVisible="False">
+              <VerticalStackLayout Spacing="4">
+                <Label Text="Public Key" FontSize="11" TextColor="{DynamicResource TextSecondary}" />
+                <Label x:Name="PublicKeyPreviewLabel" Text="" FontSize="12" FontFamily="Consolas" TextColor="{DynamicResource TextPrimary}" LineBreakMode="CharacterWrap" />
+              </VerticalStackLayout>
+            </Border>
+
+            <Label x:Name="PrivateKeyError" Text="" TextColor="{DynamicResource Error}" FontSize="12" IsVisible="False" />
+
+            <Button
+              x:Name="ContinueToStep2Button"
+              Text="Continue →"
+              BackgroundColor="{DynamicResource Primary}"
+              TextColor="White"
+              HeightRequest="50"
+              CornerRadius="12"
+              FontAttributes="Bold"
+              IsEnabled="False"
+              Clicked="OnContinueToStep2Clicked" />
+          </VerticalStackLayout>
+        </Border>
+
+        <!-- Step 2: Set Password -->
+        <Border x:Name="Step2Content" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="False">
+          <VerticalStackLayout Spacing="16">
+            <Label Text="Step 2: Secure Your Wallet" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
+            <Label Text="Create a password to encrypt your private keys" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+
+            <VerticalStackLayout Spacing="4">
+              <Label Text="Password" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+              <Entry x:Name="PasswordEntry" Placeholder="Enter password" IsPassword="True" TextChanged="OnPasswordChanged" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="4">
+              <Label Text="Confirm Password" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+              <Entry x:Name="ConfirmPasswordEntry" Placeholder="Confirm password" IsPassword="True" TextChanged="OnPasswordChanged" />
+            </VerticalStackLayout>
+
+            <!-- Password Strength -->
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
+              <Border x:Name="Strength1" BackgroundColor="{DynamicResource Gray300}" StrokeShape="RoundRectangle 2" HeightRequest="4" StrokeThickness="0" />
+              <Border x:Name="Strength2" BackgroundColor="{DynamicResource Gray300}" StrokeShape="RoundRectangle 2" HeightRequest="4" StrokeThickness="0" Grid.Column="1" />
+              <Border x:Name="Strength3" BackgroundColor="{DynamicResource Gray300}" StrokeShape="RoundRectangle 2" HeightRequest="4" StrokeThickness="0" Grid.Column="2" />
+              <Border x:Name="Strength4" BackgroundColor="{DynamicResource Gray300}" StrokeShape="RoundRectangle 2" HeightRequest="4" StrokeThickness="0" Grid.Column="3" />
+            </Grid>
+            <Label x:Name="PasswordStrengthLabel" Text="" FontSize="11" TextColor="{DynamicResource TextSecondary}" />
+
+            <Label x:Name="PasswordError" Text="" TextColor="{DynamicResource Error}" FontSize="12" IsVisible="False" />
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+              <Button
+                Text="← Back"
+                BackgroundColor="Transparent"
+                TextColor="{DynamicResource TextSecondary}"
+                BorderColor="{DynamicResource Border}"
+                BorderWidth="1"
+                HeightRequest="50"
+                CornerRadius="12"
+                Clicked="OnBackToStep1Clicked" />
+              <Button
+                x:Name="ContinueToStep3Button"
+                Grid.Column="1"
+                Text="Continue →"
+                BackgroundColor="{DynamicResource Primary}"
+                TextColor="White"
+                HeightRequest="50"
+                CornerRadius="12"
+                FontAttributes="Bold"
+                IsEnabled="False"
+                Clicked="OnContinueToStep3Clicked" />
+            </Grid>
+          </VerticalStackLayout>
+        </Border>
+
+        <!-- Step 3: Find & Select Accounts -->
+        <Border x:Name="Step3Content" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="False">
+          <VerticalStackLayout Spacing="16">
+            <Label Text="Step 3: Select Accounts" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
+            <Label Text="Select the accounts you want to import with this key" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+
+            <!-- Network Selection -->
+            <VerticalStackLayout Spacing="4">
+              <Label Text="Network" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+              <Border BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 8" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="12">
+                <Grid ColumnDefinitions="*,Auto">
+                  <Label x:Name="SelectedNetworkLabel" Text="Select Network" FontSize="14" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+                  <Label Grid.Column="1" Text="▼" FontSize="12" TextColor="{DynamicResource TextSecondary}" VerticalOptions="Center" />
+                </Grid>
+                <Border.GestureRecognizers>
+                  <TapGestureRecognizer Tapped="OnNetworkSelectorTapped" />
+                </Border.GestureRecognizers>
+              </Border>
+            </VerticalStackLayout>
+
+            <!-- Loading Indicator -->
+            <ActivityIndicator x:Name="LoadingAccountsIndicator" IsRunning="False" IsVisible="False" Color="{DynamicResource Primary}" />
+            <Label x:Name="LoadingAccountsLabel" Text="Searching for accounts..." FontSize="12" TextColor="{DynamicResource TextSecondary}" IsVisible="False" HorizontalTextAlignment="Center" />
+
+            <!-- Found Accounts List -->
+            <VerticalStackLayout x:Name="FoundAccountsContainer" Spacing="8" IsVisible="False">
+              <Label Text="Found Accounts:" FontSize="14" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
+              <CollectionView x:Name="FoundAccountsCollection" SelectionMode="Multiple" SelectionChanged="OnAccountSelectionChanged">
+                <CollectionView.ItemTemplate>
+                  <DataTemplate>
+                    <Border BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 8" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="12" Margin="0,4">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <CheckBox Grid.Column="0" IsChecked="True" Color="{DynamicResource Primary}" VerticalOptions="Center" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="2" Margin="8,0">
+                          <Label Text="{Binding AccountName}" FontSize="14" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
+                          <Label Text="{Binding Permission}" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="2" Text="✓" FontSize="16" TextColor="{DynamicResource Success}" VerticalOptions="Center" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </CollectionView.ItemTemplate>
+                <CollectionView.EmptyView>
+                  <VerticalStackLayout Padding="20" Spacing="8">
+                    <Label Text="No accounts found" FontSize="14" TextColor="{DynamicResource TextSecondary}" HorizontalTextAlignment="Center" />
+                    <Label Text="This key may not be linked to any accounts on this network" FontSize="12" TextColor="{DynamicResource TextTertiary}" HorizontalTextAlignment="Center" />
+                  </VerticalStackLayout>
+                </CollectionView.EmptyView>
+              </CollectionView>
+            </VerticalStackLayout>
+
+            <!-- Manual Account Entry -->
+            <Border BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12">
+              <VerticalStackLayout Spacing="8">
+                <Label Text="Or enter account name manually:" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <Entry x:Name="ManualAccountEntry" Placeholder="accountname" FontFamily="Consolas" />
+                  <Button x:Name="AddManualAccountButton" Text="Add" BackgroundColor="{DynamicResource Secondary}" TextColor="White" HeightRequest="44" WidthRequest="80" CornerRadius="8" Clicked="OnAddManualAccountClicked" />
+                </Grid>
+              </VerticalStackLayout>
+            </Border>
+
+            <!-- Added Accounts -->
+            <VerticalStackLayout x:Name="ManualAccountsContainer" Spacing="4" IsVisible="False">
+              <Label Text="Accounts to import:" FontSize="12" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
+              <VerticalStackLayout x:Name="ManualAccountsList" Spacing="4" />
+            </VerticalStackLayout>
+
+            <Label x:Name="Step3Error" Text="" TextColor="{DynamicResource Error}" FontSize="12" IsVisible="False" />
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+              <Button
+                Text="← Back"
+                BackgroundColor="Transparent"
+                TextColor="{DynamicResource TextSecondary}"
+                BorderColor="{DynamicResource Border}"
+                BorderWidth="1"
+                HeightRequest="50"
+                CornerRadius="12"
+                Clicked="OnBackToStep2Clicked" />
+              <Button
+                x:Name="ImportButton"
+                Grid.Column="1"
+                Text="Import ✓"
+                BackgroundColor="{DynamicResource Success}"
+                TextColor="White"
+                HeightRequest="50"
+                CornerRadius="12"
+                FontAttributes="Bold"
+                IsEnabled="False"
+                Clicked="OnImportClicked" />
+            </Grid>
+          </VerticalStackLayout>
+        </Border>
+      </VerticalStackLayout>
+
+      <!-- ==================== RECOVERY PHRASE IMPORT ==================== -->
+      <Border x:Name="RecoveryPhraseSection" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="False">
+        <VerticalStackLayout Spacing="16">
+          <Label Text="Recovery Phrase Import" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
+          <Label Text="Enter your 12-word BIP39 recovery phrase" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+
+          <Editor
+            x:Name="RecoveryPhraseEntry"
+            Placeholder="word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"
+            HeightRequest="100"
+            BackgroundColor="{DynamicResource Surface}"
+            TextChanged="OnRecoveryPhraseChanged" />
+
+          <HorizontalStackLayout Spacing="8">
+            <Label x:Name="WordCountLabel" Text="0/12 words" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+          </HorizontalStackLayout>
+
+          <Label x:Name="RecoveryPhraseError" Text="" TextColor="{DynamicResource Error}" FontSize="12" IsVisible="False" />
+
+          <Button
+            x:Name="ImportFromPhraseButton"
+            Text="Import from Recovery Phrase"
+            BackgroundColor="{DynamicResource Primary}"
+            TextColor="White"
+            HeightRequest="50"
+            CornerRadius="12"
+            FontAttributes="Bold"
+            IsEnabled="False"
+            Clicked="OnImportFromPhraseClicked" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- ==================== FILE IMPORT ==================== -->
+      <Border x:Name="FileImportSection" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="False">
+        <VerticalStackLayout Spacing="16">
+          <Label Text="Import from File" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
+          <Label Text="Import wallet from encrypted backup file" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+
+          <Button
+            x:Name="SelectFileButton"
+            Text="📂  Select Wallet File"
+            BackgroundColor="Transparent"
+            TextColor="{DynamicResource Primary}"
+            BorderColor="{DynamicResource Primary}"
+            BorderWidth="1"
+            HeightRequest="50"
+            CornerRadius="12"
+            Clicked="OnSelectFileClicked" />
+
+          <Label x:Name="SelectedFileName" Text="" FontSize="12" TextColor="{DynamicResource TextSecondary}" IsVisible="False" />
+
+          <VerticalStackLayout x:Name="FilePasswordSection" Spacing="4" IsVisible="False">
+            <Label Text="File Password" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+            <Entry x:Name="FilePasswordEntry" Placeholder="Enter file password" IsPassword="True" />
+          </VerticalStackLayout>
+
+          <Button
+            x:Name="ImportFromFileButton"
+            Text="Import from File"
+            BackgroundColor="{DynamicResource Primary}"
+            TextColor="White"
+            HeightRequest="50"
+            CornerRadius="12"
+            FontAttributes="Bold"
+            IsVisible="False"
+            Clicked="OnImportFromFileClicked" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Cancel Button -->
+      <Button
+        x:Name="CancelButton"
+        Text="Cancel"
+        BackgroundColor="Transparent"
+        TextColor="{DynamicResource TextSecondary}"
+        BorderColor="{DynamicResource Border}"
+        BorderWidth="1"
+        HeightRequest="50"
+        CornerRadius="12"
+        Clicked="OnCancelClicked" />
+        
+      <!-- Help Text -->
+      <Label Text="🔒 Your private keys are encrypted and stored locally on your device" FontSize="11" TextColor="{DynamicResource TextSecondary}" HorizontalTextAlignment="Center" />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

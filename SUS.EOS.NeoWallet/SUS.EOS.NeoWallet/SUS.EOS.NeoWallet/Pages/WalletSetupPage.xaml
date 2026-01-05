@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.WalletSetupPage"
+  Title="Wallet Setup">
+  <ScrollView>
+    <VerticalStackLayout Padding="24" Spacing="20">
+      <!-- Progress Indicator -->
+      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" Margin="0,0,0,20">
+        <Border x:Name="Step1Frame" Grid.Column="0" BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 4" HeightRequest="4" />
+        <Border x:Name="Step2Frame" Grid.Column="1" BackgroundColor="{DynamicResource Gray300}" StrokeShape="RoundRectangle 4" HeightRequest="4" />
+        <Border x:Name="Step3Frame" Grid.Column="2" BackgroundColor="{DynamicResource Gray300}" StrokeShape="RoundRectangle 4" HeightRequest="4" />
+      </Grid>
+
+      <!-- Step Content Container -->
+      <Border
+        x:Name="ContentFrame"
+        Stroke="{DynamicResource Gray200}"
+        StrokeShape="RoundRectangle 12"
+        Padding="20"
+        Shadow="{Shadow Radius=10, Opacity=0.1, Offset='0,2'}">
+        <VerticalStackLayout x:Name="StepContainer" Spacing="16">
+          <!-- Step 1: Generate Seed Phrase -->
+          <VerticalStackLayout x:Name="Step1Content" Spacing="12">
+            <Label
+              Text="Step 1: Secure Your Wallet"
+              FontSize="24"
+              FontAttributes="Bold" />
+
+            <Label
+              x:Name="WalletInfoLabel"
+              Text=""
+              FontSize="12"
+              TextColor="{DynamicResource Gray600}"
+              HorizontalTextAlignment="Center" />
+
+            <Label
+              Text="Write down your 12-word recovery phrase and store it securely. You'll need it to recover your wallet."
+              FontSize="14"
+              TextColor="{DynamicResource Gray600}"
+              Margin="0,0,0,12" />
+
+            <!-- Seed Phrase Display -->
+            <Border
+              BackgroundColor="{DynamicResource Gray100}"
+              Stroke="{DynamicResource Gray300}"
+              StrokeShape="RoundRectangle 8"
+              Padding="16">
+              <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,*,*" RowSpacing="12" ColumnSpacing="12">
+                <Label x:Name="Word1" Grid.Row="0" Grid.Column="0" Text="1. word" FontAttributes="Bold" />
+                <Label x:Name="Word2" Grid.Row="0" Grid.Column="1" Text="2. word" FontAttributes="Bold" />
+                <Label x:Name="Word3" Grid.Row="0" Grid.Column="2" Text="3. word" FontAttributes="Bold" />
+                <Label x:Name="Word4" Grid.Row="1" Grid.Column="0" Text="4. word" FontAttributes="Bold" />
+                <Label x:Name="Word5" Grid.Row="1" Grid.Column="1" Text="5. word" FontAttributes="Bold" />
+                <Label x:Name="Word6" Grid.Row="1" Grid.Column="2" Text="6. word" FontAttributes="Bold" />
+                <Label x:Name="Word7" Grid.Row="2" Grid.Column="0" Text="7. word" FontAttributes="Bold" />
+                <Label x:Name="Word8" Grid.Row="2" Grid.Column="1" Text="8. word" FontAttributes="Bold" />
+                <Label x:Name="Word9" Grid.Row="2" Grid.Column="2" Text="9. word" FontAttributes="Bold" />
+                <Label x:Name="Word10" Grid.Row="3" Grid.Column="0" Text="10. word" FontAttributes="Bold" />
+                <Label x:Name="Word11" Grid.Row="3" Grid.Column="1" Text="11. word" FontAttributes="Bold" />
+                <Label x:Name="Word12" Grid.Row="3" Grid.Column="2" Text="12. word" FontAttributes="Bold" />
+              </Grid>
+            </Border>
+
+            <Button
+              x:Name="CopyPhraseButton"
+              Text="Copy to Clipboard"
+              BackgroundColor="Transparent"
+              TextColor="{DynamicResource Primary}"
+              BorderColor="{DynamicResource Primary}"
+              BorderWidth="1"
+              HeightRequest="45"
+              CornerRadius="8"
+              Clicked="OnCopyPhraseClicked" />
+
+            <Label
+              Text="⚠️ Never share your recovery phrase with anyone. Store it in a secure location."
+              FontSize="12"
+              TextColor="{DynamicResource Warning}"
+              HorizontalTextAlignment="Center" />
+          </VerticalStackLayout>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Navigation Buttons -->
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,20,0,0">
+        <Button
+          x:Name="BackButton"
+          Grid.Column="0"
+          Text="Back"
+          BackgroundColor="Transparent"
+          TextColor="{DynamicResource Gray700}"
+          BorderColor="{DynamicResource Gray300}"
+          BorderWidth="1"
+          HeightRequest="50"
+          CornerRadius="10"
+          Clicked="OnBackClicked" />
+
+        <Button
+          x:Name="NextButton"
+          Grid.Column="1"
+          Text="Next"
+          BackgroundColor="{DynamicResource Primary}"
+          TextColor="White"
+          HeightRequest="50"
+          CornerRadius="10"
+          Clicked="OnNextClicked" />
+      </Grid>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

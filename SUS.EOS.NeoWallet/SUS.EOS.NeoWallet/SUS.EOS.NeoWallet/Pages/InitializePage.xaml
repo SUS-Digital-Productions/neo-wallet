@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.InitializePage"
+  Title="Welcome">
+  <ScrollView>
+    <VerticalStackLayout Padding="24" Spacing="20">
+      <!-- Logo Section -->
+      <Image
+        Source="dotnet_bot.png"
+        WidthRequest="150"
+        HeightRequest="150"
+        HorizontalOptions="Center"
+        Margin="0,40,0,20" />
+
+      <!-- Welcome Message -->
+      <Label
+        Text="Welcome to Neo Wallet"
+        FontSize="32"
+        FontAttributes="Bold"
+        HorizontalTextAlignment="Center" />
+
+      <Label
+        Text="A secure, cross-platform wallet for managing your Antelope blockchain assets (WAX, EOS, Telos, and more)"
+        FontSize="16"
+        HorizontalTextAlignment="Center"
+        TextColor="{DynamicResource Gray600}"
+        Margin="0,0,0,40" />
+
+      <!-- Main Actions Card -->
+      <Frame
+        BorderColor="{DynamicResource Gray200}"
+        CornerRadius="12"
+        Padding="20"
+        HasShadow="True">
+        <VerticalStackLayout Spacing="16">
+          <Label
+            Text="Get Started"
+            FontSize="20"
+            FontAttributes="Bold"
+            HorizontalTextAlignment="Center" />
+          
+          <Label
+            Text="Create a new wallet or import an existing one"
+            FontSize="14"
+            TextColor="{DynamicResource Gray600}"
+            HorizontalTextAlignment="Center"
+            Margin="0,0,0,8" />
+
+          <Button
+            x:Name="CreateWalletButton"
+            Text="🔐 Create New Wallet"
+            BackgroundColor="{DynamicResource Primary}"
+            TextColor="White"
+            HeightRequest="55"
+            FontSize="16"
+            CornerRadius="10"
+            Clicked="OnCreateWalletClicked" />
+          
+          <Label
+            Text="Set up a password and get your 12-word recovery phrase"
+            FontSize="12"
+            TextColor="{DynamicResource Gray500}"
+            HorizontalTextAlignment="Center"
+            Margin="0,-8,0,8" />
+
+          <Button
+            x:Name="ImportWalletButton"
+            Text="📁 Import wallet.json"
+            BackgroundColor="{DynamicResource Secondary}"
+            TextColor="White"
+            HeightRequest="55"
+            FontSize="16"
+            CornerRadius="10"
+            Clicked="OnImportWalletClicked" />
+          
+          <Label
+            Text="Import an existing wallet backup file"
+            FontSize="12"
+            TextColor="{DynamicResource Gray500}"
+            HorizontalTextAlignment="Center"
+            Margin="0,-8,0,8" />
+
+          <Button
+            x:Name="RecoverWalletButton"
+            Text="🔑 Recover from Phrase"
+            BackgroundColor="Transparent"
+            TextColor="{DynamicResource Primary}"
+            BorderColor="{DynamicResource Primary}"
+            BorderWidth="2"
+            HeightRequest="55"
+            FontSize="16"
+            CornerRadius="10"
+            Clicked="OnRecoverWalletClicked" />
+          
+          <Label
+            Text="Restore your wallet using 12-word recovery phrase"
+            FontSize="12"
+            TextColor="{DynamicResource Gray500}"
+            HorizontalTextAlignment="Center"
+            Margin="0,-8,0,0" />
+        </VerticalStackLayout>
+      </Frame>
+
+      <!-- Footer -->
+      <Label
+        Text="Your keys, your crypto. We never have access to your private keys."
+        FontSize="12"
+        HorizontalTextAlignment="Center"
+        TextColor="{DynamicResource Gray500}"
+        Margin="0,20,0,0" />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

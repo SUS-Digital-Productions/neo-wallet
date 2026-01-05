@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.ContractTablesPage"
+  Title="Contract Tables">
+  <ScrollView>
+    <VerticalStackLayout Padding="24" Spacing="20">
+      <Label Text="Contract Tables Viewer" FontSize="28" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+      <Label Text="View on-chain smart contract table data (similar to bloks.io)" FontSize="14" TextColor="{DynamicResource Gray600}" HorizontalTextAlignment="Center" />
+
+      <!-- Contract Configuration -->
+      <Border Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="20">
+        <VerticalStackLayout Spacing="16">
+          <Label Text="Contract Configuration" FontSize="18" FontAttributes="Bold" />
+
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Contract Account" FontSize="14" FontAttributes="Bold" />
+            <Entry x:Name="ContractEntry" Placeholder="e.g., testingpoint" Text="testingpoint" />
+            <Label Text="The account name that deployed the contract" FontSize="12" TextColor="{DynamicResource Gray600}" />
+          </VerticalStackLayout>
+
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Scope" FontSize="14" FontAttributes="Bold" />
+            <Entry x:Name="ScopeEntry" Placeholder="e.g., testingpoint" Text="testingpoint" />
+            <Label Text="The scope to query (usually contract name or account)" FontSize="12" TextColor="{DynamicResource Gray600}" />
+          </VerticalStackLayout>
+
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Table Name" FontSize="14" FontAttributes="Bold" />
+            <Entry x:Name="TableEntry" Placeholder="e.g., boosts" Text="boosts" />
+            <Label Text="The name of the table to query" FontSize="12" TextColor="{DynamicResource Gray600}" />
+          </VerticalStackLayout>
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+            <VerticalStackLayout Grid.Column="0" Spacing="8">
+              <Label Text="Limit" FontSize="14" FontAttributes="Bold" />
+              <Entry x:Name="LimitEntry" Placeholder="10" Text="10" Keyboard="Numeric" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Grid.Column="1" Spacing="8">
+              <Label Text="Lower Bound" FontSize="14" FontAttributes="Bold" />
+              <Entry x:Name="LowerBoundEntry" Placeholder="Optional" />
+            </VerticalStackLayout>
+          </Grid>
+
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <VerticalStackLayout Grid.Column="0" Spacing="8">
+              <Label Text="Upper Bound" FontSize="14" FontAttributes="Bold" />
+              <Entry x:Name="UpperBoundEntry" Placeholder="Optional" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="End">
+              <Label Text="Reverse" FontSize="14" FontAttributes="Bold" />
+              <CheckBox x:Name="ReverseCheckBox" />
+            </VerticalStackLayout>
+          </Grid>
+
+          <Button Text="Load Table Data" Clicked="OnLoadTableClicked" BackgroundColor="{DynamicResource Primary}" TextColor="White" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Loading Indicator -->
+      <ActivityIndicator x:Name="LoadingIndicator" IsRunning="False" IsVisible="False" Color="{DynamicResource Primary}" />
+
+      <!-- Table Data Display -->
+      <Border x:Name="ResultsBorder" Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="20" IsVisible="False">
+        <VerticalStackLayout Spacing="16">
+          <Grid ColumnDefinitions="*,Auto">
+            <Label Grid.Column="0" Text="Table Data" FontSize="18" FontAttributes="Bold" />
+            <Button Grid.Column="1" Text="📋 Copy JSON" Clicked="OnCopyJsonClicked" BackgroundColor="Transparent" TextColor="{DynamicResource Primary}" />
+          </Grid>
+
+          <Label x:Name="RowCountLabel" Text="0 rows found" FontSize="14" TextColor="{DynamicResource Gray600}" />
+
+          <!-- Scrollable JSON Display -->
+          <ScrollView HeightRequest="400">
+            <Frame BackgroundColor="{DynamicResource Gray100}" Padding="12" HasShadow="False">
+              <Label x:Name="TableDataLabel" Text="{}{}" FontFamily="Courier" FontSize="12" LineBreakMode="WordWrap" />
+            </Frame>
+          </ScrollView>
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+            <Button Grid.Column="0" Text="⬅️ Previous" Clicked="OnPreviousPageClicked" IsEnabled="False" />
+            <Button Grid.Column="1" Text="Next ➡️" Clicked="OnNextPageClicked" IsEnabled="False" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Quick Actions -->
+      <Border Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="20">
+        <VerticalStackLayout Spacing="12">
+          <Label Text="Quick Links" FontSize="18" FontAttributes="Bold" />
+          
+          <Button Text="View Contract Actions" Clicked="OnViewActionsClicked" BackgroundColor="Transparent" BorderColor="{DynamicResource Primary}" BorderWidth="2" TextColor="{DynamicResource Primary}" />
+          <Button Text="View on Bloks.io" Clicked="OnViewOnBloksClicked" BackgroundColor="Transparent" BorderColor="{DynamicResource Gray400}" BorderWidth="1" TextColor="{DynamicResource Gray700}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <Button Text="← Back" Clicked="OnBackClicked" BackgroundColor="Transparent" TextColor="{DynamicResource Gray600}" />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.CreateAccountPage"
+  Title="Create Account"
+>
+  <ScrollView>
+    <VerticalStackLayout Padding="24" Spacing="20">
+      <Label
+        Text="Create New Account"
+        FontSize="28"
+        FontAttributes="Bold"
+        HorizontalTextAlignment="Center"
+      />
+      <Label
+        Text="Set up a secure password for your new wallet"
+        FontSize="16"
+        HorizontalTextAlignment="Center"
+        TextColor="{DynamicResource Gray600}"
+        Margin="0,0,0,20"
+      />
+      <!-- Password Setup Form -->
+      <Border
+        Stroke="{DynamicResource Gray200}"
+        StrokeShape="RoundRectangle 12"
+        Padding="20"
+        Shadow="{Shadow Radius=10, Opacity=0.1, Offset='0,2'}"
+      >
+        <VerticalStackLayout Spacing="16">
+          <!-- Account Name -->
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Account Name (Optional)" FontSize="14" FontAttributes="Bold" />
+            <Entry x:Name="AccountNameEntry" Placeholder="My Neo Wallet"></Entry>
+          </VerticalStackLayout>
+          <!-- Password -->
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Password" FontSize="14" FontAttributes="Bold" />
+            <Grid ColumnDefinitions="*,Auto">
+              <Entry
+                x:Name="PasswordEntry"
+                Grid.Column="0"
+                Placeholder="Enter password"
+                IsPassword="True"
+                TextChanged="OnPasswordChanged"
+              />
+              <Button
+                x:Name="TogglePasswordButton"
+                Grid.Column="1"
+                Text="👁"
+                FontSize="18"
+                BackgroundColor="Transparent"
+                Clicked="OnTogglePasswordClicked"
+              />
+            </Grid>
+            <!-- Password Strength Indicator -->
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
+              <Border
+                x:Name="Strength1"
+                Grid.Column="0"
+                StrokeShape="RoundRectangle 2"
+                HeightRequest="4"
+              />
+              <Border
+                x:Name="Strength2"
+                Grid.Column="1"
+                StrokeShape="RoundRectangle 2"
+                HeightRequest="4"
+              />
+              <Border
+                x:Name="Strength3"
+                Grid.Column="2"
+                StrokeShape="RoundRectangle 2"
+                HeightRequest="4"
+              />
+              <Border
+                x:Name="Strength4"
+                Grid.Column="3"
+                StrokeShape="RoundRectangle 2"
+                HeightRequest="4"
+              />
+            </Grid>
+            <Label
+              x:Name="PasswordStrengthLabel"
+              Text="Password strength: Weak"
+              FontSize="12"
+              TextColor="{DynamicResource Gray600}"
+            />
+          </VerticalStackLayout>
+          <!-- Confirm Password -->
+          <VerticalStackLayout Spacing="8">
+            <Label Text="Confirm Password" FontSize="14" FontAttributes="Bold" />
+            <Grid ColumnDefinitions="*,Auto">
+              <Entry
+                x:Name="ConfirmPasswordEntry"
+                Grid.Column="0"
+                Placeholder="Confirm password"
+                IsPassword="True"
+                TextChanged="OnConfirmPasswordChanged"
+              />
+              <Button
+                x:Name="ToggleConfirmPasswordButton"
+                Grid.Column="1"
+                Text="👁"
+                FontSize="18"
+                BackgroundColor="Transparent"
+                Clicked="OnToggleConfirmPasswordClicked"
+              />
+            </Grid>
+            <Label x:Name="PasswordMatchLabel" Text="" FontSize="12" IsVisible="False" />
+          </VerticalStackLayout>
+          <!-- Password Requirements -->
+          <Border Stroke="Transparent" Padding="12">
+            <VerticalStackLayout Spacing="4">
+              <Label Text="Password Requirements:" FontSize="12" FontAttributes="Bold" />
+              <Label x:Name="Req1" Text="✓ At least 8 characters" FontSize="11" />
+              <Label x:Name="Req2" Text="✓ Contains uppercase and lowercase" FontSize="11" />
+              <Label x:Name="Req3" Text="✓ Contains numbers" FontSize="11" />
+              <Label x:Name="Req4" Text="✓ Contains special characters" FontSize="11" />
+            </VerticalStackLayout>
+          </Border>
+        </VerticalStackLayout>
+      </Border>
+      <!-- Agreement Checkbox -->
+      <Border Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 8" Padding="12">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+          <CheckBox
+            x:Name="AgreementCheckBox"
+            Grid.Column="0"
+            CheckedChanged="OnAgreementChanged"
+          />
+          <Label Grid.Column="1" VerticalOptions="Center">
+            <Label.FormattedText>
+              <FormattedString>
+                <Span Text="I understand that I am responsible for keeping my wallet secure and that " />
+                <Span
+                  Text="I cannot recover my wallet without my password and recovery phrase"
+                  FontAttributes="Bold"
+                />
+                <Span Text="." />
+              </FormattedString>
+            </Label.FormattedText>
+          </Label>
+        </Grid>
+      </Border>
+      <!-- Action Buttons -->
+      <Button
+        x:Name="CreateButton"
+        Text="Create Wallet"
+        BackgroundColor="{DynamicResource Primary}"
+        TextColor="White"
+        HeightRequest="50"
+        CornerRadius="10"
+        IsEnabled="False"
+        Clicked="OnCreateClicked"
+      />
+      <Button
+        x:Name="CancelButton"
+        Text="Cancel"
+        BackgroundColor="Transparent"
+        TextColor="{DynamicResource Gray700}"
+        BorderColor="{DynamicResource Gray300}"
+        BorderWidth="1"
+        HeightRequest="50"
+        CornerRadius="10"
+        Clicked="OnCancelClicked"
+      />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

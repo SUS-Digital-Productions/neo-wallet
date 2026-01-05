@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>SUS.EOS.Sharp</RootNamespace>
+    <AssemblyName>SUS.EOS.Sharp</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    
+    <!-- NuGet Package Configuration -->
+    <IsPackable>true</IsPackable>
+    <PackageId>SUS.EOS.Sharp</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>SUS Projects</Authors>
+    <Company>SUS Projects</Company>
+    <Product>SUS.EOS.Sharp</Product>
+    <Description>Modern .NET 10 library for interacting with EOS-based blockchains. Built with records, async/await, and modern C# best practices.</Description>
+    <PackageTags>eos;blockchain;crypto;dotnet10;async;neo</PackageTags>
+    <PackageProjectUrl>https://github.com/susprojects/neo-wallet</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/susprojects/neo-wallet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Copyright>Copyright © 2026 SUS Projects</Copyright>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
+    <PackageReference Include="Cryptography.ECDSA.Secp256K1" Version="1.1.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
