@@ -522,7 +522,6 @@ public partial class ImportWalletPage : ContentPage
             {
                 Text = account,
                 FontSize = 14,
-                FontFamily = "Consolas",
                 TextColor = (Color)Application.Current!.Resources["TextPrimary"],
                 VerticalOptions = LayoutOptions.Center
             }, 0);

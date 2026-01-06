@@ -1,4 +1,8 @@
-using SUS.EOS.NeoWallet.Services;
+#pragma warning disable CS0618 // DisplayAlert/DisplayActionSheet obsolete warnings
+
+using System.Globalization;
+using SUS.EOS.EosioSigningRequest.Models;
+using SUS.EOS.EosioSigningRequest.Services;
 using SUS.EOS.NeoWallet.Services.Interfaces;
 using SUS.EOS.NeoWallet.Services.Models;
 using SUS.EOS.Sharp.Services;
@@ -43,15 +47,15 @@ public partial class MainPage : ContentPage
         _walletContext = walletContext;
         _serviceProvider = serviceProvider;
         _esrSessionManager = esrSessionManager;
-        
+
         // Subscribe to context changes
         _walletContext.ActiveAccountChanged += OnActiveAccountChanged;
         _walletContext.ActiveNetworkChanged += OnActiveNetworkChanged;
-        
+
         // Subscribe to ESR signing requests
         _esrSessionManager.SigningRequestReceived += OnEsrSigningRequestReceived;
         _esrSessionManager.StatusChanged += OnEsrStatusChanged;
-        
+
         System.Diagnostics.Trace.WriteLine("[MAINPAGE] Constructor completed");
     }
 
@@ -60,21 +64,23 @@ public partial class MainPage : ContentPage
         System.Diagnostics.Trace.WriteLine("[MAINPAGE] OnAppearing called");
         base.OnAppearing();
 
-        System.Diagnostics.Trace.WriteLine($"[MAINPAGE] Wallet unlocked: {_storageService.IsUnlocked}");
-        
+        System.Diagnostics.Trace.WriteLine(
+            $"[MAINPAGE] Wallet unlocked: {_storageService.IsUnlocked}"
+        );
+
         // Start ESR session manager to listen for signing requests
         await StartEsrListenerAsync();
-        
+
         // Initialize wallet context if not done
         if (!_walletContext.IsInitialized)
         {
             await _walletContext.InitializeAsync();
         }
-        
+
         // Update UI from context
         UpdateNetworkUI();
         UpdateAccountUI();
-        
+
         System.Diagnostics.Trace.WriteLine("[MAINPAGE] Loading wallet data");
         await LoadWalletDataAsync();
     }
@@ -126,9 +132,10 @@ public partial class MainPage : ContentPage
             AccountNameLabel.Text = account.Data.Account;
             AccountPermissionLabel.Text = $"@{account.Data.Authority}";
             AccountIconLabel.Text = "👤";
-            AddressLabel.Text = account.Data.PublicKey.Length > 24 
-                ? $"{account.Data.PublicKey[..12]}...{account.Data.PublicKey[^10..]}" 
-                : account.Data.PublicKey;
+            AddressLabel.Text =
+                account.Data.PublicKey.Length > 24
+                    ? $"{account.Data.PublicKey[..12]}...{account.Data.PublicKey[^10..]}"
+                    : account.Data.PublicKey;
         }
         else
         {
@@ -144,24 +151,31 @@ public partial class MainPage : ContentPage
         try
         {
             var accounts = await _walletContext.GetAccountsForActiveNetworkAsync();
-            
+
             if (!accounts.Any())
             {
-                await DisplayAlertAsync("No Accounts", "No accounts found on this network. Import a key first.", "OK");
+                await DisplayAlertAsync(
+                    "No Accounts",
+                    "No accounts found on this network. Import a key first.",
+                    "OK"
+                );
                 return;
             }
 
-            var accountNames = accounts.Select(a => $"{a.Data.Account}@{a.Data.Authority}").ToArray();
+            var accountNames = accounts
+                .Select(a => $"{a.Data.Account}@{a.Data.Authority}")
+                .ToArray();
             var result = await DisplayActionSheet("Select Account", "Cancel", null, accountNames);
-            
+
             if (!string.IsNullOrEmpty(result) && result != "Cancel")
             {
                 var parts = result.Split('@');
                 if (parts.Length == 2)
                 {
-                    var selectedAccount = accounts.FirstOrDefault(a => 
-                        a.Data.Account == parts[0] && a.Data.Authority == parts[1]);
-                    
+                    var selectedAccount = accounts.FirstOrDefault(a =>
+                        a.Data.Account == parts[0] && a.Data.Authority == parts[1]
+                    );
+
                     if (selectedAccount != null)
                     {
                         await _walletContext.SetActiveAccountAsync(selectedAccount);
@@ -181,16 +195,20 @@ public partial class MainPage : ContentPage
         {
             var networks = await _networkService.GetNetworksAsync();
             var networkList = networks.Values.Where(n => n.Enabled).ToList();
-            
+
             if (!networkList.Any())
             {
-                await DisplayAlertAsync("No Networks", "No networks are configured. Please add networks in Settings.", "OK");
+                await DisplayAlertAsync(
+                    "No Networks",
+                    "No networks are configured. Please add networks in Settings.",
+                    "OK"
+                );
                 return;
             }
 
             var networkNames = networkList.Select(n => n.Name).ToArray();
             var result = await DisplayActionSheet("Select Network", "Cancel", null, networkNames);
-            
+
             if (result != null && result != "Cancel")
             {
                 var selectedNetwork = networkList.FirstOrDefault(n => n.Name == result);
@@ -215,7 +233,9 @@ public partial class MainPage : ContentPage
             var wallet = await _storageService.LoadWalletAsync();
             if (wallet == null)
             {
-                System.Diagnostics.Trace.WriteLine("[MAINPAGE] Wallet is null, redirecting to InitializePage");
+                System.Diagnostics.Trace.WriteLine(
+                    "[MAINPAGE] Wallet is null, redirecting to InitializePage"
+                );
                 var serviceProvider = Application.Current!.Handler.MauiContext!.Services;
                 var initializePage = serviceProvider.GetRequiredService<InitializePage>();
                 var navPage = new NavigationPage(initializePage);
@@ -252,9 +272,16 @@ public partial class MainPage : ContentPage
 
                 if (balances.Any())
                 {
-                    var mainBalance = balances.First();
+                    var mainBalance = balances.First().Replace(",", ".");
                     var parts = mainBalance.Split(' ');
-                    var amount = decimal.TryParse(parts[0], out var amt) ? amt : 0;
+                    var amount = decimal.TryParse(
+                        parts[0],
+                        NumberStyles.Number,
+                        CultureInfo.InvariantCulture,
+                        out var amt
+                    )
+                        ? amt
+                        : 0;
                     var symbol = parts.Length > 1 ? parts[1] : "WAX";
 
                     // Get USD price
@@ -380,28 +407,44 @@ public partial class MainPage : ContentPage
             System.Diagnostics.Trace.WriteLine("[MAINPAGE] Starting ESR session manager...");
             await _esrSessionManager.ConnectAsync();
             _esrListenerStarted = true;
-            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] ESR session manager started. LinkId: {_esrSessionManager.LinkId}");
+            
+            var linkUrl = $"wss://cb.anchor.link/{_esrSessionManager.LinkId}";
+            System.Diagnostics.Trace.WriteLine(
+                $"[MAINPAGE] ESR session manager started. LinkId: {_esrSessionManager.LinkId}"
+            );
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] ========================================");
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] ANCHOR LINK URL: {linkUrl}");
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] ========================================");
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] To test with WAX Bloks:");
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] 1. Go to https://wax.bloks.io/");
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] 2. Open browser console (F12)");
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] 3. Run: localStorage.setItem('anchorLink', '{linkUrl}')");
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] 4. Refresh page and try 'Launch Anchor'");
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] ========================================");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] Failed to start ESR session manager: {ex.Message}");
+            System.Diagnostics.Trace.WriteLine(
+                $"[MAINPAGE] Failed to start ESR session manager: {ex.Message}"
+            );
         }
     }
 
     private void OnEsrStatusChanged(object? sender, EsrSessionStatusEventArgs e)
     {
         System.Diagnostics.Trace.WriteLine($"[MAINPAGE] ESR Status changed: {e.Status}");
-        
-        MainThread.BeginInvokeOnMainThread(() =>
-        {
+
+        MainThread.BeginInvokeOnMainThread(() => {
             // Could update UI to show connection status if needed
         });
     }
 
     private async void OnEsrSigningRequestReceived(object? sender, EsrSigningRequestEventArgs e)
     {
-        System.Diagnostics.Trace.WriteLine($"[MAINPAGE] ESR Signing request received from: {e.Session?.Name ?? "Unknown"}");
-        
+        System.Diagnostics.Trace.WriteLine(
+            $"[MAINPAGE] ESR Signing request received from: {e.Session?.Name ?? "Unknown"}"
+        );
+
         try
         {
             await MainThread.InvokeOnMainThreadAsync(async () =>
@@ -411,7 +454,9 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] Error handling ESR request: {ex.Message}");
+            System.Diagnostics.Trace.WriteLine(
+                $"[MAINPAGE] Error handling ESR request: {ex.Message}"
+            );
         }
     }
 
@@ -421,27 +466,32 @@ public partial class MainPage : ContentPage
         {
             System.Diagnostics.Trace.WriteLine("[MAINPAGE] Creating EsrSigningPopupPage...");
             var popupPage = _serviceProvider.GetRequiredService<EsrSigningPopupPage>();
-            
+
             // Get dApp name from session if available
             var dAppName = e.Session?.Name ?? "Unknown Application";
-            
+
             // Push the popup page modally
             System.Diagnostics.Trace.WriteLine("[MAINPAGE] Pushing signing popup modal...");
             await Navigation.PushModalAsync(popupPage);
-            
+
             System.Diagnostics.Trace.WriteLine("[MAINPAGE] Showing signing request...");
             var result = await popupPage.ShowSigningRequestAsync(
                 e.Request!,
                 rawPayload: e.RawPayload,
                 callbackUrl: e.Callback,
-                dAppName: dAppName);
-            
-            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] Signing result: Success={result.Success}, Cancelled={result.Cancelled}");
-            
+                dAppName: dAppName
+            );
+
+            System.Diagnostics.Trace.WriteLine(
+                $"[MAINPAGE] Signing result: Success={result.Success}, Cancelled={result.Cancelled}"
+            );
+
             if (result.Success && result.Signatures != null && result.Signatures.Count > 0)
             {
                 // Send callback response if needed
-                System.Diagnostics.Trace.WriteLine("[MAINPAGE] Signing successful, sending callback...");
+                System.Diagnostics.Trace.WriteLine(
+                    "[MAINPAGE] Signing successful, sending callback..."
+                );
                 var callback = new EsrCallbackPayload
                 {
                     Signature = result.Signatures.FirstOrDefault(),
@@ -449,7 +499,7 @@ public partial class MainPage : ContentPage
                     SignerActor = result.Account,
                     SignerPermission = result.Permission,
                     LinkChannel = _esrSessionManager.LinkId,
-                    BlockNum = 0 // Will be filled by actual block
+                    BlockNum = 0, // Will be filled by actual block
                 };
                 await _esrSessionManager.SendCallbackAsync(callback);
             }
@@ -464,8 +514,50 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] Error showing signing popup: {ex.Message}");
+            System.Diagnostics.Trace.WriteLine(
+                $"[MAINPAGE] Error showing signing popup: {ex.Message}"
+            );
             await DisplayAlert("Error", $"Failed to process signing request: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Handle ESR deep link from protocol activation (esr:// or anchor://)
+    /// </summary>
+    public async Task HandleDeepLinkEsrAsync(string esrUri)
+    {
+        try
+        {
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] HandleDeepLinkEsrAsync: {esrUri}");
+
+            // Parse the ESR
+            var esrService = _serviceProvider.GetRequiredService<IEsrService>();
+            var esrRequest = await esrService.ParseRequestAsync(esrUri);
+
+            System.Diagnostics.Trace.WriteLine(
+                $"[MAINPAGE] ESR parsed successfully. ChainId: {esrRequest.ChainId}"
+            );
+
+            // Create EventArgs to pass to signing popup
+            var eventArgs = new EsrSigningRequestEventArgs
+            {
+                Request = esrRequest,
+                Session = null, // No session for deep link ESR
+                Callback = null, // No callback URL in envelope for deep link ESR
+                IsIdentityRequest =
+                    !esrRequest.Payload.IsTransaction && !esrRequest.Payload.IsAction
+            };
+
+            // Show signing popup
+            await ShowSigningPopupAsync(eventArgs);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[MAINPAGE] Error handling deep link ESR: {ex.Message}"
+            );
+            System.Diagnostics.Trace.WriteLine($"[MAINPAGE] Stack trace: {ex.StackTrace}");
+            await DisplayAlert("Error", $"Failed to process ESR link: {ex.Message}", "OK");
         }
     }
 

@@ -1,28 +1,7 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using SUS.EOS.NeoWallet.Services.Interfaces;
 
 namespace SUS.EOS.NeoWallet.Services;
-
-/// <summary>
-/// Price feed service for cryptocurrency prices
-/// </summary>
-public interface IPriceFeedService
-{
-    /// <summary>
-    /// Get price for a symbol in USD
-    /// </summary>
-    Task<decimal?> GetPriceAsync(string symbol);
-
-    /// <summary>
-    /// Get prices for multiple symbols
-    /// </summary>
-    Task<Dictionary<string, decimal>> GetPricesAsync(params string[] symbols);
-
-    /// <summary>
-    /// Convert amount to USD value
-    /// </summary>
-    Task<decimal> ConvertToUsdAsync(string symbol, decimal amount);
-}
 
 /// <summary>
 /// Price feed service implementation using CoinGecko API
@@ -47,7 +26,7 @@ public class PriceFeedService : IPriceFeedService
         ["BTC"] = "bitcoin",
         ["ETH"] = "ethereum",
         ["USDT"] = "tether",
-        ["USDC"] = "usd-coin"
+        ["USDC"] = "usd-coin",
     };
 
     public PriceFeedService(HttpClient? httpClient = null)
@@ -73,14 +52,22 @@ public class PriceFeedService : IPriceFeedService
                 return null; // Unknown symbol
             }
 
-            var response = await _httpClient.GetAsync($"simple/price?ids={coinId}&vs_currencies=usd");
+            var response = await _httpClient.GetAsync(
+                $"simple/price?ids={coinId}&vs_currencies=usd"
+            );
             if (!response.IsSuccessStatusCode)
                 return null;
 
             var json = await response.Content.ReadAsStringAsync();
-            var data = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, decimal>>>(json);
+            var data = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, decimal>>>(
+                json
+            );
 
-            if (data != null && data.TryGetValue(coinId, out var prices) && prices.TryGetValue("usd", out var usdPrice))
+            if (
+                data != null
+                && data.TryGetValue(coinId, out var prices)
+                && prices.TryGetValue("usd", out var usdPrice)
+            )
             {
                 _priceCache[symbol] = usdPrice;
                 _lastUpdate = DateTime.UtcNow;
@@ -109,7 +96,7 @@ public class PriceFeedService : IPriceFeedService
                     result[symbol] = cachedPrice;
                 }
             }
-            
+
             if (result.Count == symbols.Length)
             {
                 return result; // All prices in cache
@@ -128,27 +115,33 @@ public class PriceFeedService : IPriceFeedService
                 return result;
 
             var idsParam = string.Join(",", coinIds);
-            var response = await _httpClient.GetAsync($"simple/price?ids={idsParam}&vs_currencies=usd");
-            
+            var response = await _httpClient.GetAsync(
+                $"simple/price?ids={idsParam}&vs_currencies=usd"
+            );
+
             if (!response.IsSuccessStatusCode)
                 return result;
 
             var json = await response.Content.ReadAsStringAsync();
-            var data = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, decimal>>>(json);
+            var data = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, decimal>>>(
+                json
+            );
 
             if (data != null)
             {
                 foreach (var symbol in symbols)
                 {
-                    if (_symbolMap.TryGetValue(symbol.ToUpperInvariant(), out var coinId) &&
-                        data.TryGetValue(coinId, out var prices) &&
-                        prices.TryGetValue("usd", out var usdPrice))
+                    if (
+                        _symbolMap.TryGetValue(symbol.ToUpperInvariant(), out var coinId)
+                        && data.TryGetValue(coinId, out var prices)
+                        && prices.TryGetValue("usd", out var usdPrice)
+                    )
                     {
                         result[symbol] = usdPrice;
                         _priceCache[symbol] = usdPrice;
                     }
                 }
-                
+
                 _lastUpdate = DateTime.UtcNow;
             }
 

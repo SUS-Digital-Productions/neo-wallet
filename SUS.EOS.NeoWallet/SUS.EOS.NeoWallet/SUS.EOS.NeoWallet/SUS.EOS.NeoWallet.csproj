@@ -24,6 +24,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\SUS.EOS.Sharp\SUS.EOS.Sharp.csproj" />
+    <ProjectReference Include="..\..\SUS.EOS.EosioSigningRequest\SUS.EOS.EosioSigningRequest.csproj" />
   </ItemGroup>
   <ItemGroup>
     <MauiXaml Update="Pages\ContractActionsPage.xaml">

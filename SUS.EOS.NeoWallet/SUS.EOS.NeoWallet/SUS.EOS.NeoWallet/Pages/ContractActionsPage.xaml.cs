@@ -1,8 +1,6 @@
 using System.Text.Json;
-using SUS.EOS.NeoWallet.Services;
 using SUS.EOS.NeoWallet.Services.Interfaces;
 using SUS.EOS.Sharp.Services;
-using SUS.EOS.Sharp.Serialization;
 
 namespace SUS.EOS.NeoWallet.Pages;
 
@@ -12,6 +10,7 @@ public partial class ContractActionsPage : ContentPage
     private readonly IAntelopeTransactionService _transactionService;
     private readonly IWalletAccountService _accountService;
     private readonly IWalletStorageService _storageService;
+    private readonly IWalletContextService _contextService;
     private string? _lastTransactionId;
     private List<string> _availableActions = new();
 
@@ -19,32 +18,29 @@ public partial class ContractActionsPage : ContentPage
         IAntelopeBlockchainClient blockchainClient,
         IAntelopeTransactionService transactionService,
         IWalletAccountService accountService,
-        IWalletStorageService storageService)
+        IWalletStorageService storageService,
+        IWalletContextService contextService
+    )
     {
         InitializeComponent();
         _blockchainClient = blockchainClient;
         _transactionService = transactionService;
         _accountService = accountService;
         _storageService = storageService;
-        
+
         LoadCurrentAccount();
+        _contextService = contextService;
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        
-        // Check for query parameter
-        if (Shell.Current.CurrentState.Location.OriginalString.Contains("contract="))
+
+        var contract = _contextService.ActiveAccount?.Data.Account ?? "eosio";
+        if (!string.IsNullOrEmpty(contract))
         {
-            var uri = new Uri(Shell.Current.CurrentState.Location.OriginalString);
-            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-            var contract = query["contract"];
-            if (!string.IsNullOrEmpty(contract))
-            {
-                ContractEntry.Text = contract;
-                OnLoadAbiClicked(this, EventArgs.Empty);
-            }
+            ContractEntry.Text = contract;
+            OnLoadAbiClicked(this, EventArgs.Empty);
         }
     }
 
@@ -82,7 +78,7 @@ public partial class ContractActionsPage : ContentPage
             // TODO: Get contract ABI from blockchain
             // For now, use common action names
             _availableActions = new List<string> { "transfer", "issue", "retire", "open", "close" };
-            
+
             ActionPicker.Items.Clear();
             foreach (var action in _availableActions)
             {
@@ -90,7 +86,11 @@ public partial class ContractActionsPage : ContentPage
             }
 
             ActionPickerSection.IsVisible = true;
-            await DisplayAlertAsync("Success", $"Loaded {_availableActions.Count} actions for {contract}", "OK");
+            await DisplayAlertAsync(
+                "Success",
+                $"Loaded {_availableActions.Count} actions for {contract}",
+                "OK"
+            );
         }
         catch (Exception ex)
         {
@@ -120,8 +120,11 @@ public partial class ContractActionsPage : ContentPage
 
     private void OnTemplateTransferClicked(object sender, EventArgs e)
     {
-        ParametersEditor.Text = @"{
-  ""from"": """ + ActorLabel.Text + @""",
+        ParametersEditor.Text =
+            @"{
+  ""from"": """
+            + ActorLabel.Text
+            + @""",
   ""to"": ""receiver"",
   ""quantity"": ""1.0000 WAX"",
   ""memo"": ""Transfer from wallet""
@@ -130,8 +133,11 @@ public partial class ContractActionsPage : ContentPage
 
     private void OnTemplateIssueClicked(object sender, EventArgs e)
     {
-        ParametersEditor.Text = @"{
-  ""to"": """ + ActorLabel.Text + @""",
+        ParametersEditor.Text =
+            @"{
+  ""to"": """
+            + ActorLabel.Text
+            + @""",
   ""quantity"": ""100.0000 TOKEN"",
   ""memo"": ""Issue tokens""
 }";
@@ -181,11 +187,15 @@ public partial class ContractActionsPage : ContentPage
             }
 
             // Confirm action
-            var confirm = await DisplayAlertAsync("Confirm Action",
+            var confirm = await DisplayAlertAsync(
+                "Confirm Action",
                 $"Execute {action} on {contract}?\n\nParameters:\n{parametersJson}",
-                "Execute", "Cancel");
+                "Execute",
+                "Cancel"
+            );
 
-            if (!confirm) return;
+            if (!confirm)
+                return;
 
             // Prompt for password if wallet is locked
             string? password = null;
@@ -222,18 +232,20 @@ public partial class ContractActionsPage : ContentPage
 
             // TODO: Build and sign transaction using proper EOSIO transaction format
             // For now, show what would be executed
-            await DisplayAlertAsync("TODO", 
-                $"Transaction execution is being implemented.\n\n" +
-                $"Contract: {contract}\n" +
-                $"Action: {action}\n" +
-                $"Actor: {actor}@{permission}\n" +
-                $"Data: {parametersJson}\n" +
-                $"Chain: {chainInfo.ChainId}",
-                "OK");
+            await DisplayAlertAsync(
+                "TODO",
+                $"Transaction execution is being implemented.\n\n"
+                    + $"Contract: {contract}\n"
+                    + $"Action: {action}\n"
+                    + $"Actor: {actor}@{permission}\n"
+                    + $"Data: {parametersJson}\n"
+                    + $"Chain: {chainInfo.ChainId}",
+                "OK"
+            );
 
             // Placeholder for success
             _lastTransactionId = "pending_implementation";
-            
+
             ResultStatusLabel.Text = "⏳ Pending";
             ResultStatusLabel.TextColor = Colors.Orange;
             TransactionIdLabel.Text = "Transaction execution being implemented";

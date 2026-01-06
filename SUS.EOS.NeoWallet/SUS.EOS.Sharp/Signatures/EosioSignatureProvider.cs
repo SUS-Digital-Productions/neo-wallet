@@ -20,6 +20,19 @@ public sealed class EosioSignatureProvider
     public string PublicKey => _key.PublicKey;
 
     /// <summary>
+    /// Signs a raw SHA256 digest and returns EOSIO formatted signature
+    /// Used for identity proofs and other non-transaction signatures
+    /// </summary>
+    public string SignDigest(byte[] digest)
+    {
+        // Sign with Cryptography.ECDSA which produces canonical signatures
+        var compactSignature = _key.SignCompact(digest);
+        
+        // Encode in EOSIO format
+        return EncodeSignature(compactSignature);
+    }
+
+    /// <summary>
     /// Signs a transaction and returns EOSIO formatted signature
     /// </summary>
     public string SignTransaction<T>(string chainId, EosioTransaction<T> transaction)

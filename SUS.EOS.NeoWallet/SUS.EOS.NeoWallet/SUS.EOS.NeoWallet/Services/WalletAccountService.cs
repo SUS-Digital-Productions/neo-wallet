@@ -1,6 +1,6 @@
-using System.Text.Json;
 using SUS.EOS.NeoWallet.Services.Interfaces;
 using SUS.EOS.NeoWallet.Services.Models;
+using SUS.EOS.NeoWallet.Services.Models.WalletData;
 using SUS.EOS.Sharp.Cryptography;
 
 namespace SUS.EOS.NeoWallet.Services;
@@ -17,7 +17,8 @@ public class WalletAccountService : IWalletAccountService
 
     public WalletAccountService(
         IWalletStorageService storageService,
-        ICryptographyService cryptographyService)
+        ICryptographyService cryptographyService
+    )
     {
         _storageService = storageService;
         _cryptographyService = cryptographyService;
@@ -32,7 +33,8 @@ public class WalletAccountService : IWalletAccountService
         string chainId,
         string privateKey,
         string password,
-        WalletMode mode = WalletMode.Hot)
+        WalletMode mode = WalletMode.Hot
+    )
     {
         var wallet = await _storageService.LoadWalletAsync();
         if (wallet == null)
@@ -57,8 +59,8 @@ public class WalletAccountService : IWalletAccountService
                 PublicKey = publicKey,
                 Mode = mode,
                 Type = WalletType.Key,
-                Created = DateTime.UtcNow
-            }
+                Created = DateTime.UtcNow,
+            },
         };
 
         // Add to wallet
@@ -78,9 +80,8 @@ public class WalletAccountService : IWalletAccountService
             return false;
 
         var accountToRemove = wallet.Wallets.FirstOrDefault(w =>
-            w.Data.Account == account &&
-            w.Data.Authority == authority &&
-            w.Data.ChainId == chainId);
+            w.Data.Account == account && w.Data.Authority == authority && w.Data.ChainId == chainId
+        );
 
         if (accountToRemove == null)
             return false;
@@ -89,9 +90,11 @@ public class WalletAccountService : IWalletAccountService
         await _storageService.SaveWalletAsync(wallet);
 
         // Clear current account if removed
-        if (_currentAccount?.Data.Account == account &&
-            _currentAccount?.Data.Authority == authority &&
-            _currentAccount?.Data.ChainId == chainId)
+        if (
+            _currentAccount?.Data.Account == account
+            && _currentAccount?.Data.Authority == authority
+            && _currentAccount?.Data.ChainId == chainId
+        )
         {
             _currentAccount = null;
         }
@@ -111,13 +114,16 @@ public class WalletAccountService : IWalletAccountService
     /// <summary>
     /// Get wallet account by account name and authority
     /// </summary>
-    public async Task<WalletAccount?> GetAccountAsync(string account, string authority, string chainId)
+    public async Task<WalletAccount?> GetAccountAsync(
+        string account,
+        string authority,
+        string chainId
+    )
     {
         var wallet = await _storageService.LoadWalletAsync();
         return wallet?.Wallets.FirstOrDefault(w =>
-            w.Data.Account == account &&
-            w.Data.Authority == authority &&
-            w.Data.ChainId == chainId);
+            w.Data.Account == account && w.Data.Authority == authority && w.Data.ChainId == chainId
+        );
     }
 
     /// <summary>
@@ -129,15 +135,23 @@ public class WalletAccountService : IWalletAccountService
         string chainId,
         string privateKey,
         string password,
-        string? label = null)
+        string? label = null
+    )
     {
         // Validate private key format
         if (!_cryptographyService.IsValidPrivateKey(privateKey))
             throw new ArgumentException("Invalid private key format", nameof(privateKey));
 
         // Add the account
-        var walletAccount = await AddAccountAsync(account, authority, chainId, privateKey, password, WalletMode.Hot);
-        
+        var walletAccount = await AddAccountAsync(
+            account,
+            authority,
+            chainId,
+            privateKey,
+            password,
+            WalletMode.Hot
+        );
+
         // Set label if provided
         if (!string.IsNullOrEmpty(label))
         {
@@ -159,7 +173,8 @@ public class WalletAccountService : IWalletAccountService
         string account,
         string authority,
         string chainId,
-        string password)
+        string password
+    )
     {
         // Validate password
         if (!await _storageService.ValidatePasswordAsync(password))
@@ -190,16 +205,16 @@ public class WalletAccountService : IWalletAccountService
         string authority,
         string chainId,
         string? label = null,
-        WalletMode? mode = null)
+        WalletMode? mode = null
+    )
     {
         var wallet = await _storageService.LoadWalletAsync();
         if (wallet == null)
             return false;
 
         var walletAccount = wallet.Wallets.FirstOrDefault(w =>
-            w.Data.Account == account &&
-            w.Data.Authority == authority &&
-            w.Data.ChainId == chainId);
+            w.Data.Account == account && w.Data.Authority == authority && w.Data.ChainId == chainId
+        );
 
         if (walletAccount == null)
             return false;
@@ -222,7 +237,8 @@ public class WalletAccountService : IWalletAccountService
         string account,
         string authority,
         string chainId,
-        string password)
+        string password
+    )
     {
         // Validate password
         if (!await _storageService.ValidatePasswordAsync(password))
@@ -270,46 +286,72 @@ public class WalletAccountService : IWalletAccountService
         string mnemonic,
         string password,
         int accountIndex = 0,
-        string? label = null)
+        string? label = null
+    )
     {
         try
         {
             // Derive private key from mnemonic
             var privateKey = _cryptographyService.DeriveKeyFromMnemonic(mnemonic, accountIndex);
-            
+
             // Import using the derived key
-            return await ImportAccountAsync(account, authority, chainId, privateKey, password, label);
+            return await ImportAccountAsync(
+                account,
+                authority,
+                chainId,
+                privateKey,
+                password,
+                label
+            );
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Failed to import from mnemonic: {ex.Message}", ex);
+            throw new InvalidOperationException(
+                $"Failed to import from mnemonic: {ex.Message}",
+                ex
+            );
         }
     }
 
     /// <summary>
     /// Generate a new account with random key
     /// </summary>
-    public async Task<(WalletAccount account, string privateKey, string mnemonic)> GenerateNewAccountAsync(
+    public async Task<(
+        WalletAccount account,
+        string privateKey,
+        string mnemonic
+    )> GenerateNewAccountAsync(
         string account,
         string authority,
         string chainId,
         string password,
-        string? label = null)
+        string? label = null
+    )
     {
         try
         {
             // Generate mnemonic and derive key
             var mnemonic = _cryptographyService.GenerateMnemonic();
             var privateKey = _cryptographyService.DeriveKeyFromMnemonic(mnemonic, 0);
-            
+
             // Import the generated account
-            var walletAccount = await ImportAccountAsync(account, authority, chainId, privateKey, password, label);
-            
+            var walletAccount = await ImportAccountAsync(
+                account,
+                authority,
+                chainId,
+                privateKey,
+                password,
+                label
+            );
+
             return (walletAccount, privateKey, mnemonic);
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Failed to generate new account: {ex.Message}", ex);
+            throw new InvalidOperationException(
+                $"Failed to generate new account: {ex.Message}",
+                ex
+            );
         }
     }
 }

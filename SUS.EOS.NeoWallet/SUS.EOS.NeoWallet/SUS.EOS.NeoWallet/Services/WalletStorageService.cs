@@ -1,6 +1,8 @@
 using System.Text.Json;
+using SUS.EOS.NeoWallet.Repositories.Interfaces;
 using SUS.EOS.NeoWallet.Services.Interfaces;
 using SUS.EOS.NeoWallet.Services.Models;
+using SUS.EOS.NeoWallet.Services.Models.WalletData;
 
 namespace SUS.EOS.NeoWallet.Services;
 
@@ -11,6 +13,7 @@ namespace SUS.EOS.NeoWallet.Services;
 public class WalletStorageService : IWalletStorageService
 {
     private readonly ICryptographyService _cryptographyService;
+    private readonly INetworkRepository _networkRepository;
     private readonly string _walletFilePath;
     private WalletData? _currentWallet;
     private bool _isUnlocked;
@@ -21,19 +24,25 @@ public class WalletStorageService : IWalletStorageService
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
     };
 
-    public WalletStorageService(ICryptographyService cryptographyService, string? walletPath = null)
+    public WalletStorageService(
+        ICryptographyService cryptographyService,
+        INetworkRepository networkRepository,
+        string? walletPath = null
+    )
     {
         _cryptographyService = cryptographyService;
-        
+        //_networkService = networkService;
+
         // Default to user's application data directory
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var walletDir = Path.Combine(appDataPath, "SUS.EOS.NeoWallet");
         Directory.CreateDirectory(walletDir);
-        
+
         _walletFilePath = walletPath ?? Path.Combine(walletDir, "wallet.json");
+        _networkRepository = networkRepository;
     }
 
     public bool IsUnlocked => _isUnlocked;
@@ -50,7 +59,7 @@ public class WalletStorageService : IWalletStorageService
 
             var jsonContent = await File.ReadAllTextAsync(_walletFilePath);
             _currentWallet = JsonSerializer.Deserialize<WalletData>(jsonContent, JsonOptions);
-            
+
             return _currentWallet;
         }
         catch (Exception ex)
@@ -68,19 +77,19 @@ public class WalletStorageService : IWalletStorageService
         {
             // Update metadata
             walletData.Metadata.Updated = DateTime.UtcNow;
-            
+
             var jsonContent = JsonSerializer.Serialize(walletData, JsonOptions);
-            
+
             // Create backup of existing wallet before overwriting
             if (File.Exists(_walletFilePath))
             {
                 var backupPath = $"{_walletFilePath}.backup.{DateTime.UtcNow:yyyyMMdd-HHmmss}";
                 File.Copy(_walletFilePath, backupPath, overwrite: true);
-                
+
                 // Keep only the 5 most recent backups
                 await CleanupOldBackups();
             }
-            
+
             await File.WriteAllTextAsync(_walletFilePath, jsonContent);
             _currentWallet = walletData;
         }
@@ -106,9 +115,9 @@ public class WalletStorageService : IWalletStorageService
                     Created = DateTime.UtcNow,
                     Updated = DateTime.UtcNow,
                     Application = "SUS.EOS.NeoWallet",
-                    Description = description
+                    Description = description,
                 },
-                Networks = GetDefaultNetworks(),
+                Networks = _networkRepository.GetPredefinedNetworks(),
                 Storage = new EncryptedStorage
                 {
                     EncryptedData = null, // No keys initially
@@ -120,8 +129,8 @@ public class WalletStorageService : IWalletStorageService
                         KeyDerivation = "PBKDF2",
                         Iterations = 4500,
                         KeySize = 256,
-                        IvSize = 128
-                    }
+                        IvSize = 128,
+                    },
                 },
                 Wallets = new List<WalletAccount>(),
                 Settings = new WalletSettings
@@ -132,13 +141,13 @@ public class WalletStorageService : IWalletStorageService
                     ShowTestnets = false,
                     Currency = "USD",
                     Language = "en",
-                    Theme = "auto"
-                }
+                    Theme = "auto",
+                },
             };
 
             // Create empty encrypted storage
             walletData.Storage.EncryptedData = _cryptographyService.Encrypt(
-                JsonSerializer.Serialize(new List<KeyPair>(), JsonOptions), 
+                JsonSerializer.Serialize(new List<KeyPair>(), JsonOptions),
                 password
             );
 
@@ -164,7 +173,7 @@ public class WalletStorageService : IWalletStorageService
 
             // Try to decrypt storage - if successful, password is valid
             var decrypted = _cryptographyService.Decrypt(wallet.Storage.EncryptedData, password);
-            
+
             // Validate that decrypted content is valid JSON
             JsonSerializer.Deserialize<List<KeyPair>>(decrypted, JsonOptions);
             return true;
@@ -190,11 +199,14 @@ public class WalletStorageService : IWalletStorageService
                 return false;
 
             // Decrypt with current password
-            var decryptedData = _cryptographyService.Decrypt(wallet.Storage.EncryptedData, currentPassword);
-            
+            var decryptedData = _cryptographyService.Decrypt(
+                wallet.Storage.EncryptedData,
+                currentPassword
+            );
+
             // Re-encrypt with new password
             wallet.Storage.EncryptedData = _cryptographyService.Encrypt(decryptedData, newPassword);
-            
+
             await SaveWalletAsync(wallet);
             return true;
         }
@@ -230,13 +242,13 @@ public class WalletStorageService : IWalletStorageService
     {
         // Lock wallet first
         LockWallet();
-        
+
         // Delete main wallet file
         if (File.Exists(_walletFilePath))
         {
             File.Delete(_walletFilePath);
         }
-        
+
         // Delete backup files
         var walletDir = Path.GetDirectoryName(_walletFilePath);
         if (walletDir != null && Directory.Exists(walletDir))
@@ -244,13 +256,17 @@ public class WalletStorageService : IWalletStorageService
             var backupFiles = Directory.GetFiles(walletDir, "wallet.json.backup.*");
             foreach (var backup in backupFiles)
             {
-                try { File.Delete(backup); } catch { }
+                try
+                {
+                    File.Delete(backup);
+                }
+                catch { }
             }
         }
-        
+
         // Clear in-memory data
         _currentWallet = null;
-        
+
         return Task.CompletedTask;
     }
 
@@ -274,7 +290,7 @@ public class WalletStorageService : IWalletStorageService
                 exportedAt = DateTime.UtcNow,
                 exportVersion = "1.0.0",
                 application = "SUS.EOS.NeoWallet",
-                wallet = wallet
+                wallet = wallet,
             };
 
             return JsonSerializer.Serialize(exportData, JsonOptions);
@@ -293,13 +309,16 @@ public class WalletStorageService : IWalletStorageService
         try
         {
             var importData = JsonSerializer.Deserialize<JsonElement>(backupData, JsonOptions);
-            
+
             WalletData? walletData;
-            
+
             // Check if this is an export package or raw wallet data
             if (importData.TryGetProperty("wallet", out var walletElement))
             {
-                walletData = JsonSerializer.Deserialize<WalletData>(walletElement.GetRawText(), JsonOptions);
+                walletData = JsonSerializer.Deserialize<WalletData>(
+                    walletElement.GetRawText(),
+                    JsonOptions
+                );
             }
             else
             {
@@ -334,7 +353,7 @@ public class WalletStorageService : IWalletStorageService
     {
         _isUnlocked = false;
         _unlockedKeys.Clear();
-        
+
         // Clear sensitive data from memory
         GC.Collect();
         GC.WaitForPendingFinalizers();
@@ -356,9 +375,14 @@ public class WalletStorageService : IWalletStorageService
                 return false;
 
             // Decrypt and load keys into memory
-            var decryptedData = _cryptographyService.Decrypt(wallet.Storage.EncryptedData, password);
-            var keyPairs = JsonSerializer.Deserialize<List<KeyPair>>(decryptedData, JsonOptions) ?? new List<KeyPair>();
-            
+            var decryptedData = _cryptographyService.Decrypt(
+                wallet.Storage.EncryptedData,
+                password
+            );
+            var keyPairs =
+                JsonSerializer.Deserialize<List<KeyPair>>(decryptedData, JsonOptions)
+                ?? new List<KeyPair>();
+
             _unlockedKeys.Clear();
             foreach (var keyPair in keyPairs)
             {
@@ -388,7 +412,12 @@ public class WalletStorageService : IWalletStorageService
     /// <summary>
     /// Add key to encrypted storage
     /// </summary>
-    public async Task<bool> AddKeyToStorageAsync(string privateKey, string publicKey, string password, string? label = null)
+    public async Task<bool> AddKeyToStorageAsync(
+        string privateKey,
+        string publicKey,
+        string password,
+        string? label = null
+    )
     {
         try
         {
@@ -403,24 +432,31 @@ public class WalletStorageService : IWalletStorageService
             var keyPairs = new List<KeyPair>();
             if (wallet.Storage.EncryptedData != null)
             {
-                var decryptedData = _cryptographyService.Decrypt(wallet.Storage.EncryptedData, password);
-                keyPairs = JsonSerializer.Deserialize<List<KeyPair>>(decryptedData, JsonOptions) ?? new List<KeyPair>();
+                var decryptedData = _cryptographyService.Decrypt(
+                    wallet.Storage.EncryptedData,
+                    password
+                );
+                keyPairs =
+                    JsonSerializer.Deserialize<List<KeyPair>>(decryptedData, JsonOptions)
+                    ?? new List<KeyPair>();
             }
 
             // Remove existing entry with same public key
             keyPairs.RemoveAll(k => k.PublicKey == publicKey);
-            
+
             // Add new key
-            keyPairs.Add(new KeyPair
-            {
-                PrivateKey = privateKey,
-                PublicKey = publicKey,
-                Label = label
-            });
+            keyPairs.Add(
+                new KeyPair
+                {
+                    PrivateKey = privateKey,
+                    PublicKey = publicKey,
+                    Label = label,
+                }
+            );
 
             // Update storage
             wallet.Storage.EncryptedData = _cryptographyService.Encrypt(
-                JsonSerializer.Serialize(keyPairs, JsonOptions), 
+                JsonSerializer.Serialize(keyPairs, JsonOptions),
                 password
             );
 
@@ -428,7 +464,7 @@ public class WalletStorageService : IWalletStorageService
             wallet.Storage.PublicKeys = keyPairs.Select(k => k.PublicKey).Distinct().ToList();
 
             await SaveWalletAsync(wallet);
-            
+
             // Update in-memory keys if unlocked
             if (_isUnlocked)
             {
@@ -458,15 +494,20 @@ public class WalletStorageService : IWalletStorageService
                 return false;
 
             // Decrypt existing storage
-            var decryptedData = _cryptographyService.Decrypt(wallet.Storage.EncryptedData, password);
-            var keyPairs = JsonSerializer.Deserialize<List<KeyPair>>(decryptedData, JsonOptions) ?? new List<KeyPair>();
+            var decryptedData = _cryptographyService.Decrypt(
+                wallet.Storage.EncryptedData,
+                password
+            );
+            var keyPairs =
+                JsonSerializer.Deserialize<List<KeyPair>>(decryptedData, JsonOptions)
+                ?? new List<KeyPair>();
 
             // Remove key
             keyPairs.RemoveAll(k => k.PublicKey == publicKey);
 
             // Update storage
             wallet.Storage.EncryptedData = _cryptographyService.Encrypt(
-                JsonSerializer.Serialize(keyPairs, JsonOptions), 
+                JsonSerializer.Serialize(keyPairs, JsonOptions),
                 password
             );
 
@@ -474,7 +515,7 @@ public class WalletStorageService : IWalletStorageService
             wallet.Storage.PublicKeys = keyPairs.Select(k => k.PublicKey).Distinct().ToList();
 
             await SaveWalletAsync(wallet);
-            
+
             // Update in-memory keys if unlocked
             if (_isUnlocked)
             {
@@ -485,51 +526,11 @@ public class WalletStorageService : IWalletStorageService
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Failed to remove key from storage: {ex.Message}", ex);
+            throw new InvalidOperationException(
+                $"Failed to remove key from storage: {ex.Message}",
+                ex
+            );
         }
-    }
-
-    /// <summary>
-    /// Get default network configurations (WAX, EOS, etc.)
-    /// </summary>
-    private static Dictionary<string, NetworkConfig> GetDefaultNetworks()
-    {
-        return new Dictionary<string, NetworkConfig>
-        {
-            ["wax"] = new()
-            {
-                ChainId = "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4",
-                Name = "WAX",
-                HttpEndpoint = "https://api.wax.alohaeos.com",
-                KeyPrefix = "EOS",
-                Symbol = "WAX",
-                Precision = 8,
-                BlockExplorer = "https://waxblock.io",
-                Enabled = true
-            },
-            ["eos"] = new()
-            {
-                ChainId = "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
-                Name = "EOS",
-                HttpEndpoint = "https://api.eosn.io",
-                KeyPrefix = "EOS",
-                Symbol = "EOS",
-                Precision = 4,
-                BlockExplorer = "https://bloks.io",
-                Enabled = true
-            },
-            ["telos"] = new()
-            {
-                ChainId = "4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11",
-                Name = "Telos",
-                HttpEndpoint = "https://mainnet.telos.net",
-                KeyPrefix = "EOS",
-                Symbol = "TLOS",
-                Precision = 4,
-                BlockExplorer = "https://explorer.telos.net",
-                Enabled = false
-            }
-        };
     }
 
     /// <summary>
@@ -539,10 +540,13 @@ public class WalletStorageService : IWalletStorageService
     {
         try
         {
-            var backupFiles = Directory.GetFiles(
-                Path.GetDirectoryName(_walletFilePath) ?? "",
-                Path.GetFileName(_walletFilePath) + ".backup.*"
-            ).OrderByDescending(f => File.GetCreationTime(f)).ToArray();
+            var backupFiles = Directory
+                .GetFiles(
+                    Path.GetDirectoryName(_walletFilePath) ?? "",
+                    Path.GetFileName(_walletFilePath) + ".backup.*"
+                )
+                .OrderByDescending(f => File.GetCreationTime(f))
+                .ToArray();
 
             // Keep only the 5 most recent backups
             for (int i = 5; i < backupFiles.Length; i++)

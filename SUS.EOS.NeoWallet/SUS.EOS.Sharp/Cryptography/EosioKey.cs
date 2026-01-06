@@ -56,9 +56,19 @@ public sealed class EosioKey
     public byte[] GetPrivateKeyBytes() => (byte[])_privateKeyBytes.Clone();
     
     /// <summary>
+    /// Gets the compressed public key bytes (33 bytes)
+    /// </summary>
+    public byte[] GetPublicKeyBytes() => (byte[])_publicKeyBytes.Clone();
+    
+    /// <summary>
     /// Gets the private key as a hex string
     /// </summary>
     public string PrivateKeyHex => Convert.ToHexString(_privateKeyBytes).ToLowerInvariant();
+    
+    /// <summary>
+    /// Gets the public key in modern PUB_K1_ format
+    /// </summary>
+    public string PublicKeyK1 => EncodePublicKeyK1(_publicKeyBytes);
 
     private EosioKey(byte[] privateKeyBytes, byte[] publicKeyBytes, string privateKeyWif, string publicKey, KeyFormat format)
     {
@@ -322,6 +332,33 @@ public sealed class EosioKey
     }
 
     /// <summary>
+    /// Encodes public key in modern PUB_K1_ format with RIPEMD160 checksum
+    /// </summary>
+    public static string EncodePublicKeyK1(byte[] publicKey)
+    {
+        // Modern format: PUB_K1_ + base58(publicKey + ripemd160(publicKey + "K1")[0:4])
+        var ripemd160 = new Org.BouncyCastle.Crypto.Digests.RipeMD160Digest();
+        var suffix = System.Text.Encoding.UTF8.GetBytes("K1");
+        
+        var toHash = new byte[publicKey.Length + suffix.Length];
+        Array.Copy(publicKey, 0, toHash, 0, publicKey.Length);
+        Array.Copy(suffix, 0, toHash, publicKey.Length, suffix.Length);
+        
+        var hash = new byte[ripemd160.GetDigestSize()];
+        ripemd160.BlockUpdate(toHash, 0, toHash.Length);
+        ripemd160.DoFinal(hash, 0);
+        
+        var checksum = new byte[4];
+        Array.Copy(hash, 0, checksum, 0, 4);
+
+        var data = new byte[publicKey.Length + checksum.Length];
+        Array.Copy(publicKey, 0, data, 0, publicKey.Length);
+        Array.Copy(checksum, 0, data, publicKey.Length, checksum.Length);
+
+        return "PUB_K1_" + Base58Encode(data);
+    }
+
+    /// <summary>
     /// Base58 decode with checksum verification
     /// </summary>
     private static byte[] Base58CheckDecode(string encoded, byte[] version)
@@ -428,6 +465,87 @@ public sealed class EosioKey
         }
 
         return new string(result.ToArray());
+    }
+
+    /// <summary>
+    /// Parse a public key from EOS or PUB_K1_ format and return the raw bytes
+    /// </summary>
+    public static byte[] ParsePublicKey(string publicKey)
+    {
+        if (string.IsNullOrWhiteSpace(publicKey))
+            throw new ArgumentException("Public key cannot be empty", nameof(publicKey));
+
+        publicKey = publicKey.Trim();
+
+        // Handle PUB_K1_ format
+        if (publicKey.StartsWith("PUB_K1_"))
+        {
+            var base58Part = publicKey[7..]; // Remove "PUB_K1_" prefix
+            var decoded = Base58Decode(base58Part);
+            
+            if (decoded.Length < 37) // 33 bytes pubkey + 4 bytes checksum
+                throw new FormatException($"Invalid PUB_K1_ public key length: {decoded.Length}");
+            
+            // Extract public key (all but last 4 bytes)
+            var pubKeyBytes = new byte[decoded.Length - 4];
+            Array.Copy(decoded, 0, pubKeyBytes, 0, pubKeyBytes.Length);
+            
+            // Verify checksum
+            var checksum = new byte[4];
+            Array.Copy(decoded, decoded.Length - 4, checksum, 0, 4);
+            
+            var ripemd160 = new Org.BouncyCastle.Crypto.Digests.RipeMD160Digest();
+            var suffix = System.Text.Encoding.UTF8.GetBytes("K1");
+            var toHash = new byte[pubKeyBytes.Length + suffix.Length];
+            Array.Copy(pubKeyBytes, 0, toHash, 0, pubKeyBytes.Length);
+            Array.Copy(suffix, 0, toHash, pubKeyBytes.Length, suffix.Length);
+            
+            var hash = new byte[ripemd160.GetDigestSize()];
+            ripemd160.BlockUpdate(toHash, 0, toHash.Length);
+            ripemd160.DoFinal(hash, 0);
+            
+            // Verify first 4 bytes match
+            for (int i = 0; i < 4; i++)
+            {
+                if (hash[i] != checksum[i])
+                    throw new FormatException("Invalid PUB_K1_ checksum");
+            }
+            
+            return pubKeyBytes;
+        }
+        // Handle legacy EOS format
+        else if (publicKey.StartsWith("EOS"))
+        {
+            var base58Part = publicKey[3..]; // Remove "EOS" prefix
+            var decoded = Base58Decode(base58Part);
+            
+            if (decoded.Length < 37) // 33 bytes pubkey + 4 bytes checksum
+                throw new FormatException($"Invalid EOS public key length: {decoded.Length}");
+            
+            // Extract public key (all but last 4 bytes)
+            var pubKeyBytes = new byte[decoded.Length - 4];
+            Array.Copy(decoded, 0, pubKeyBytes, 0, pubKeyBytes.Length);
+            
+            // Verify checksum
+            var checksum = new byte[4];
+            Array.Copy(decoded, decoded.Length - 4, checksum, 0, 4);
+            
+            using var sha256 = SHA256.Create();
+            var hash1 = sha256.ComputeHash(pubKeyBytes);
+            var hash2 = sha256.ComputeHash(hash1);
+            
+            for (int i = 0; i < 4; i++)
+            {
+                if (hash2[i] != checksum[i])
+                    throw new FormatException("Invalid EOS public key checksum");
+            }
+            
+            return pubKeyBytes;
+        }
+        else
+        {
+            throw new FormatException($"Unknown public key format: {publicKey[..Math.Min(10, publicKey.Length)]}");
+        }
     }
 
     /// <summary>

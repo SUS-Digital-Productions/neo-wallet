@@ -1,5 +1,9 @@
+#pragma warning disable CS0618 // DisplayActionSheet obsolete warning
+
+using SUS.EOS.EosioSigningRequest.Services;
 using SUS.EOS.NeoWallet.Services;
 using SUS.EOS.NeoWallet.Services.Interfaces;
+using EsrRequest = SUS.EOS.EosioSigningRequest.Models.Esr;
 
 namespace SUS.EOS.NeoWallet.Pages;
 
@@ -15,7 +19,8 @@ public partial class SettingsPage : ContentPage
     public SettingsPage(
         ThemeService themeService,
         INetworkService networkService,
-        IWalletStorageService storageService)
+        IWalletStorageService storageService
+    )
     {
         InitializeComponent();
         _themeService = themeService;
@@ -53,7 +58,7 @@ public partial class SettingsPage : ContentPage
         {
             var networks = await _networkService.GetNetworksAsync();
             var networkList = networks.Values.Where(n => n.Enabled).ToList();
-            
+
             if (!networkList.Any())
             {
                 await DisplayAlertAsync("No Networks", "No networks are configured.", "OK");
@@ -61,14 +66,21 @@ public partial class SettingsPage : ContentPage
             }
 
             var networkNames = networkList.Select(n => n.Name).ToArray();
-            var result = await DisplayActionSheet("Select Default Network", "Cancel", null, networkNames);
-            
+            var result = await DisplayActionSheet(
+                "Select Default Network",
+                "Cancel",
+                null,
+                networkNames
+            );
+
             if (result != null && result != "Cancel")
             {
                 var selectedNetwork = networkList.FirstOrDefault(n => n.Name == result);
                 if (selectedNetwork != null)
                 {
-                    var networkId = networks.FirstOrDefault(x => x.Value.ChainId == selectedNetwork.ChainId).Key;
+                    var networkId = networks
+                        .FirstOrDefault(x => x.Value.ChainId == selectedNetwork.ChainId)
+                        .Key;
                     if (!string.IsNullOrEmpty(networkId))
                     {
                         await _networkService.SetDefaultNetworkAsync(networkId);
@@ -118,10 +130,12 @@ public partial class SettingsPage : ContentPage
             "Warning",
             "Exporting private keys is dangerous. Anyone with your keys can steal your funds. Only proceed if you understand the risks.",
             "I Understand",
-            "Cancel");
-        
-        if (!confirm) return;
-        
+            "Cancel"
+        );
+
+        if (!confirm)
+            return;
+
         await DisplayAlertAsync("Export Keys", "Key export coming soon", "OK");
     }
 
@@ -131,27 +145,31 @@ public partial class SettingsPage : ContentPage
             "⚠️ Reset Wallet",
             "This will DELETE ALL your wallet data including private keys. This action CANNOT be undone.\n\nMake sure you have backed up your keys!",
             "Delete Everything",
-            "Cancel");
-        
-        if (!confirm) return;
-        
+            "Cancel"
+        );
+
+        if (!confirm)
+            return;
+
         var doubleConfirm = await DisplayAlertAsync(
             "Are you absolutely sure?",
             "Type 'DELETE' to confirm (just tap OK for now)",
             "DELETE",
-            "Cancel");
-        
+            "Cancel"
+        );
+
         if (doubleConfirm)
         {
             try
             {
                 // Delete wallet file
                 await _storageService.DeleteWalletAsync();
-                
+
                 await DisplayAlertAsync("Wallet Reset", "All data has been deleted.", "OK");
-                
+
                 // Restart app to initial state
-                var initPage = Application.Current!.Handler.MauiContext!.Services.GetRequiredService<InitializePage>();
+                var initPage =
+                    Application.Current!.Handler.MauiContext!.Services.GetRequiredService<InitializePage>();
                 if (Application.Current?.Windows.Count > 0)
                 {
                     Application.Current.Windows[0].Page = new NavigationPage(initPage);
@@ -172,30 +190,36 @@ public partial class SettingsPage : ContentPage
             "Enter ESR URI (esr://...) or paste ESR payload:",
             "Test",
             "Cancel",
-            keyboard: Keyboard.Url);
-        
+            keyboard: Keyboard.Url
+        );
+
         if (string.IsNullOrEmpty(esrUri))
             return;
-        
+
         try
         {
             var serviceProvider = Application.Current!.Handler.MauiContext!.Services;
-            var esrService = serviceProvider.GetRequiredService<SUS.EOS.Sharp.ESR.IEsrService>();
+            var esrService = serviceProvider.GetRequiredService<IEsrService>();
             var popupPage = serviceProvider.GetRequiredService<EsrSigningPopupPage>();
-            
+
             // Parse ESR
             var request = await esrService.ParseRequestAsync(esrUri);
-            
+
             // Show popup
             await Navigation.PushModalAsync(popupPage);
             var result = await popupPage.ShowSigningRequestAsync(
                 request,
                 rawPayload: esrUri,
-                dAppName: "Test ESR");
-            
+                dAppName: "Test ESR"
+            );
+
             if (result.Success)
             {
-                await DisplayAlertAsync("Success", $"Transaction signed!\nSignatures: {result.Signatures?.Count ?? 0}", "OK");
+                await DisplayAlertAsync(
+                    "Success",
+                    $"Transaction signed!\nSignatures: {result.Signatures?.Count ?? 0}",
+                    "OK"
+                );
             }
             else if (result.Cancelled)
             {
@@ -217,15 +241,16 @@ public partial class SettingsPage : ContentPage
         // Show the current Anchor Link ID for debugging
         var serviceProvider = Application.Current!.Handler.MauiContext!.Services;
         var esrManager = serviceProvider.GetRequiredService<IEsrSessionManager>();
-        
+
         var linkId = esrManager.LinkId ?? "Not initialized";
         var status = esrManager.Status.ToString();
         var publicKey = esrManager.RequestPublicKey ?? "Not available";
-        
+
         await DisplayAlertAsync(
             "ESR Session Info",
             $"Status: {status}\n\nLink ID: {linkId}\n\nPublic Key:\n{publicKey}",
-            "OK");
+            "OK"
+        );
     }
 
     private async void OnDoneClicked(object sender, EventArgs e)

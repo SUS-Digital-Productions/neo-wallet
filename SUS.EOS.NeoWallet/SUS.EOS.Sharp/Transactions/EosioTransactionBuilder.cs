@@ -90,7 +90,8 @@ public sealed class EosioTransactionBuilder<T>
         {
             // Expiration is already in UTC, just format it
             Expiration = _expiration.ToString("yyyy-MM-ddTHH:mm:ss.fff"),
-            RefBlockNum = (ushort)(_chainInfo.HeadBlockNum & 0xFFFF),
+            // TAPOS: Use LastIrreversibleBlockNum, NOT HeadBlockNum
+            RefBlockNum = (ushort)(_chainInfo.LastIrreversibleBlockNum & 0xFFFF),
             RefBlockPrefix = _chainInfo.RefBlockPrefix,
             MaxNetUsageWords = 0,
             MaxCpuUsageMs = 0,

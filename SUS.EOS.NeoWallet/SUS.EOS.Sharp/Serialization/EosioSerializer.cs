@@ -29,9 +29,11 @@ public static class EosioSerializer
         writer.Write(secondsSinceEpoch);
 
         // Reference block number (uint16)
+        System.Diagnostics.Trace.WriteLine($"[SERIALIZER] RefBlockNum: {transaction.RefBlockNum}");
         writer.Write(transaction.RefBlockNum);
 
         // Reference block prefix (uint32)
+        System.Diagnostics.Trace.WriteLine($"[SERIALIZER] RefBlockPrefix: {transaction.RefBlockPrefix}");
         writer.Write(transaction.RefBlockPrefix);
 
         // Max net usage words (varint)

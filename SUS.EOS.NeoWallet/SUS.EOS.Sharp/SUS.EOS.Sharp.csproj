@@ -7,7 +7,6 @@
     <RootNamespace>SUS.EOS.Sharp</RootNamespace>
     <AssemblyName>SUS.EOS.Sharp</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    
     <!-- NuGet Package Configuration -->
     <IsPackable>true</IsPackable>
     <PackageId>SUS.EOS.Sharp</PackageId>
@@ -28,14 +27,12 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
     <PackageReference Include="Cryptography.ECDSA.Secp256K1" Version="1.1.3" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
   </ItemGroup>
-
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
-
 </Project>

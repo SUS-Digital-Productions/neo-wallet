@@ -36,7 +36,7 @@
           <VerticalStackLayout Spacing="4">
             <Label Text="Account Name" FontSize="11" TextColor="{DynamicResource TextSecondary}" />
             <Border BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12">
-              <Label x:Name="AccountNameLabel" Text="Loading..." FontSize="15" FontFamily="Consolas" TextColor="{DynamicResource TextPrimary}" />
+              <Label x:Name="AccountNameLabel" Text="Loading..." FontSize="15" TextColor="{DynamicResource TextPrimary}" />
             </Border>
           </VerticalStackLayout>
           
@@ -44,7 +44,7 @@
           <VerticalStackLayout Spacing="4">
             <Label Text="Public Key" FontSize="11" TextColor="{DynamicResource TextSecondary}" />
             <Border BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12">
-              <Label x:Name="AddressLabel" Text="Loading..." FontSize="13" FontFamily="Consolas" TextColor="{DynamicResource TextPrimary}" LineBreakMode="MiddleTruncation" />
+              <Label x:Name="AddressLabel" Text="Loading..." FontSize="13" TextColor="{DynamicResource TextPrimary}" LineBreakMode="MiddleTruncation" />
             </Border>
           </VerticalStackLayout>
           

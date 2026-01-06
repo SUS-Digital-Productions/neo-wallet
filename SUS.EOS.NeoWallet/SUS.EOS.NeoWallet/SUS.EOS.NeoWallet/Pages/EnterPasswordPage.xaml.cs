@@ -91,6 +91,12 @@ public partial class EnterPasswordPage : ContentPage
                         var navPage = new NavigationPage(mainPage);
                         Application.Current.Windows[0].Page = navPage;
                         System.Diagnostics.Trace.WriteLine("[ENTER_PASSWORD] Window.Page set to MainPage");
+                        
+                        // Notify app that wallet is unlocked (process pending ESR)
+                        if (Application.Current is App app)
+                        {
+                            await app.OnWalletUnlockedAsync();
+                        }
                     }
                     else
                     {

@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="SUS.EOS.EosioSigningRequest/SUS.EOS.EosioSigningRequest.csproj" Id="04dc03be-de3f-4f60-b914-28742febbee2" />
   <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.Droid/SUS.EOS.NeoWallet.Droid.csproj">
     <Deploy />
   </Project>

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using SUS.EOS.Sharp.Models;
 
 namespace SUS.EOS.Sharp.Services;
@@ -17,7 +18,10 @@ public interface IAntelopeBlockchainClient : IDisposable
     /// <summary>
     /// Gets account information by name
     /// </summary>
-    Task<Account> GetAccountAsync(string accountName, CancellationToken cancellationToken = default);
+    Task<Account> GetAccountAsync(
+        string accountName,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets block information by height or ID
@@ -27,33 +31,59 @@ public interface IAntelopeBlockchainClient : IDisposable
     /// <summary>
     /// Pushes a signed transaction to the blockchain
     /// </summary>
-    Task<TransactionResult> PushTransactionAsync(object signedTransaction, CancellationToken cancellationToken = default);
+    Task<TransactionResult> PushTransactionAsync(
+        object signedTransaction,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets table rows from a smart contract
     /// </summary>
-    Task<TableRowsResult<T>> GetTableRowsAsync<T>(string contract, string scope, string table, CancellationToken cancellationToken = default);
+    Task<TableRowsResult<T>> GetTableRowsAsync<T>(
+        string contract,
+        string scope,
+        string table,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets currency balance for an account
     /// </summary>
-    Task<List<string>> GetCurrencyBalanceAsync(string contract, string account, string? symbol = null, CancellationToken cancellationToken = default);
+    Task<List<string>> GetCurrencyBalanceAsync(
+        string contract,
+        string account,
+        string? symbol = null,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets the ABI for a smart contract
     /// </summary>
-    Task<AbiDefinition?> GetAbiAsync(string contractAccount, CancellationToken cancellationToken = default);
+    Task<AbiDefinition?> GetAbiAsync(
+        string contractAccount,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Converts JSON action data to binary using the chain's serialization
     /// Useful as a fallback when local serialization doesn't work
     /// </summary>
-    Task<byte[]> AbiJsonToBinAsync(string contract, string action, object data, CancellationToken cancellationToken = default);
+    Task<byte[]> AbiJsonToBinAsync(
+        string contract,
+        string action,
+        object data,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Converts binary action data back to JSON
     /// </summary>
-    Task<object?> AbiBinToJsonAsync(string contract, string action, string binArgs, CancellationToken cancellationToken = default);
+    Task<object?> AbiBinToJsonAsync(
+        string contract,
+        string action,
+        string binArgs,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Network endpoint URL
@@ -86,13 +116,13 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
         _httpClient = new HttpClient
         {
             BaseAddress = new Uri(endpoint),
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(30),
         };
 
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         };
     }
 
@@ -103,23 +133,52 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
     {
         var response = await _httpClient.PostAsync("/v1/chain/get_info", null, cancellationToken);
         response.EnsureSuccessStatusCode();
-        
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var info = JsonSerializer.Deserialize<ChainInfo>(json, _jsonOptions);
-        
+
         if (info == null)
             throw new InvalidOperationException("Failed to deserialize chain info");
 
         // Cache chain ID for convenience
         ChainId = info.ChainId;
+
+        // Calculate RefBlockPrefix from LastIrreversibleBlockId for TAPOS
+        var refBlockPrefix = CalculateRefBlockPrefix(info.LastIrreversibleBlockId);
         
-        return info;
+        System.Diagnostics.Trace.WriteLine($"[TAPOS] LastIrreversibleBlockId: {info.LastIrreversibleBlockId}");
+        System.Diagnostics.Trace.WriteLine($"[TAPOS] LastIrreversibleBlockNum: {info.LastIrreversibleBlockNum}");
+        System.Diagnostics.Trace.WriteLine($"[TAPOS] RefBlockPrefix calculated: {refBlockPrefix}");
+        System.Diagnostics.Trace.WriteLine($"[TAPOS] RefBlockNum (& 0xFFFF): {info.LastIrreversibleBlockNum & 0xFFFF}");
+        
+        // Return info with calculated RefBlockPrefix
+        return info with { RefBlockPrefix = refBlockPrefix };
+    }
+    
+    /// <summary>
+    /// Calculate ref_block_prefix from block ID
+    /// </summary>
+    private static uint CalculateRefBlockPrefix(string blockId)
+    {
+        if (string.IsNullOrEmpty(blockId) || blockId.Length < 24)
+            return 0;
+
+        // Block ID is 64 hex characters (32 bytes)
+        // ref_block_prefix is bytes 8-11 (characters 16-23 in hex)
+        // Read directly as little-endian uint32
+        var prefixHex = blockId.Substring(16, 8);
+        var prefixBytes = Convert.FromHexString(prefixHex);
+        
+        return BitConverter.ToUInt32(prefixBytes);
     }
 
     /// <summary>
     /// Gets account information by name
     /// </summary>
-    public async Task<Account> GetAccountAsync(string accountName, CancellationToken cancellationToken = default)
+    public async Task<Account> GetAccountAsync(
+        string accountName,
+        CancellationToken cancellationToken = default
+    )
     {
         var request = new { account_name = accountName };
         var requestContent = new StringContent(
@@ -128,19 +187,26 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             "application/json"
         );
 
-        var response = await _httpClient.PostAsync("/v1/chain/get_account", requestContent, cancellationToken);
+        var response = await _httpClient.PostAsync(
+            "/v1/chain/get_account",
+            requestContent,
+            cancellationToken
+        );
         response.EnsureSuccessStatusCode();
-        
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var account = JsonSerializer.Deserialize<Account>(json, _jsonOptions);
-        
+
         return account ?? throw new InvalidOperationException($"Account '{accountName}' not found");
     }
 
     /// <summary>
     /// Gets block information by height or ID
     /// </summary>
-    public async Task<Block> GetBlockAsync(string blockNumOrId, CancellationToken cancellationToken = default)
+    public async Task<Block> GetBlockAsync(
+        string blockNumOrId,
+        CancellationToken cancellationToken = default
+    )
     {
         var request = new { block_num_or_id = blockNumOrId };
         var requestContent = new StringContent(
@@ -149,19 +215,26 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             "application/json"
         );
 
-        var response = await _httpClient.PostAsync("/v1/chain/get_block", requestContent, cancellationToken);
+        var response = await _httpClient.PostAsync(
+            "/v1/chain/get_block",
+            requestContent,
+            cancellationToken
+        );
         response.EnsureSuccessStatusCode();
-        
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var block = JsonSerializer.Deserialize<Block>(json, _jsonOptions);
-        
+
         return block ?? throw new InvalidOperationException($"Block '{blockNumOrId}' not found");
     }
 
     /// <summary>
     /// Pushes a signed transaction to the blockchain
     /// </summary>
-    public async Task<TransactionResult> PushTransactionAsync(object signedTransaction, CancellationToken cancellationToken = default)
+    public async Task<TransactionResult> PushTransactionAsync(
+        object signedTransaction,
+        CancellationToken cancellationToken = default
+    )
     {
         var requestContent = new StringContent(
             JsonSerializer.Serialize(signedTransaction, _jsonOptions),
@@ -169,10 +242,14 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             "application/json"
         );
 
-        var response = await _httpClient.PostAsync("/v1/chain/push_transaction", requestContent, cancellationToken);
-        
+        var response = await _httpClient.PostAsync(
+            "/v1/chain/push_transaction",
+            requestContent,
+            cancellationToken
+        );
+
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        
+
         if (!response.IsSuccessStatusCode)
         {
             var errorInfo = "";
@@ -188,26 +265,32 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             {
                 errorInfo = responseContent;
             }
-            
+
             throw new InvalidOperationException($"Transaction failed: {errorInfo}");
         }
-        
+
         var result = JsonSerializer.Deserialize<TransactionResult>(responseContent, _jsonOptions);
-        return result ?? throw new InvalidOperationException("Failed to deserialize transaction result");
+        return result
+            ?? throw new InvalidOperationException("Failed to deserialize transaction result");
     }
 
     /// <summary>
     /// Gets table rows from a smart contract
     /// </summary>
-    public async Task<TableRowsResult<T>> GetTableRowsAsync<T>(string contract, string scope, string table, CancellationToken cancellationToken = default)
+    public async Task<TableRowsResult<T>> GetTableRowsAsync<T>(
+        string contract,
+        string scope,
+        string table,
+        CancellationToken cancellationToken = default
+    )
     {
-        var request = new 
+        var request = new
         {
             code = contract,
             scope = scope,
             table = table,
             json = true,
-            limit = 1000
+            limit = 1000,
         };
 
         var requestContent = new StringContent(
@@ -216,25 +299,34 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             "application/json"
         );
 
-        var response = await _httpClient.PostAsync("/v1/chain/get_table_rows", requestContent, cancellationToken);
+        var response = await _httpClient.PostAsync(
+            "/v1/chain/get_table_rows",
+            requestContent,
+            cancellationToken
+        );
         response.EnsureSuccessStatusCode();
-        
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var result = JsonSerializer.Deserialize<TableRowsResult<T>>(json, _jsonOptions);
-        
+
         return result ?? throw new InvalidOperationException("Failed to deserialize table rows");
     }
 
     /// <summary>
     /// Gets currency balance for an account
     /// </summary>
-    public async Task<List<string>> GetCurrencyBalanceAsync(string contract, string account, string? symbol = null, CancellationToken cancellationToken = default)
+    public async Task<List<string>> GetCurrencyBalanceAsync(
+        string contract,
+        string account,
+        string? symbol = null,
+        CancellationToken cancellationToken = default
+    )
     {
-        var request = new 
+        var request = new
         {
             code = contract,
-            account = account,
-            symbol = symbol
+            account,
+            symbol,
         };
 
         var requestContent = new StringContent(
@@ -243,19 +335,26 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             "application/json"
         );
 
-        var response = await _httpClient.PostAsync("/v1/chain/get_currency_balance", requestContent, cancellationToken);
+        var response = await _httpClient.PostAsync(
+            "/v1/chain/get_currency_balance",
+            requestContent,
+            cancellationToken
+        );
         response.EnsureSuccessStatusCode();
-        
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var balances = JsonSerializer.Deserialize<List<string>>(json, _jsonOptions);
-        
+
         return balances ?? new List<string>();
     }
 
     /// <summary>
     /// Gets the ABI for a smart contract
     /// </summary>
-    public async Task<AbiDefinition?> GetAbiAsync(string contractAccount, CancellationToken cancellationToken = default)
+    public async Task<AbiDefinition?> GetAbiAsync(
+        string contractAccount,
+        CancellationToken cancellationToken = default
+    )
     {
         var request = new { account_name = contractAccount };
         var requestContent = new StringContent(
@@ -264,25 +363,34 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             "application/json"
         );
 
-        var response = await _httpClient.PostAsync("/v1/chain/get_abi", requestContent, cancellationToken);
+        var response = await _httpClient.PostAsync(
+            "/v1/chain/get_abi",
+            requestContent,
+            cancellationToken
+        );
         response.EnsureSuccessStatusCode();
-        
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var result = JsonSerializer.Deserialize<GetAbiResponse>(json, _jsonOptions);
-        
+
         return result?.Abi;
     }
 
     /// <summary>
     /// Converts JSON action data to binary using the chain's serialization
     /// </summary>
-    public async Task<byte[]> AbiJsonToBinAsync(string contract, string action, object data, CancellationToken cancellationToken = default)
+    public async Task<byte[]> AbiJsonToBinAsync(
+        string contract,
+        string action,
+        object data,
+        CancellationToken cancellationToken = default
+    )
     {
-        var request = new 
+        var request = new
         {
             code = contract,
             action = action,
-            args = data
+            args = data,
         };
 
         var requestContent = new StringContent(
@@ -291,12 +399,16 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             "application/json"
         );
 
-        var response = await _httpClient.PostAsync("/v1/chain/abi_json_to_bin", requestContent, cancellationToken);
+        var response = await _httpClient.PostAsync(
+            "/v1/chain/abi_json_to_bin",
+            requestContent,
+            cancellationToken
+        );
         response.EnsureSuccessStatusCode();
-        
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var result = JsonSerializer.Deserialize<AbiJsonToBinResponse>(json, _jsonOptions);
-        
+
         if (result == null || string.IsNullOrEmpty(result.BinArgs))
             return Array.Empty<byte>();
 
@@ -307,13 +419,18 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
     /// <summary>
     /// Converts binary action data back to JSON
     /// </summary>
-    public async Task<object?> AbiBinToJsonAsync(string contract, string action, string binArgs, CancellationToken cancellationToken = default)
+    public async Task<object?> AbiBinToJsonAsync(
+        string contract,
+        string action,
+        string binArgs,
+        CancellationToken cancellationToken = default
+    )
     {
-        var request = new 
+        var request = new
         {
             code = contract,
             action = action,
-            binargs = binArgs
+            binargs = binArgs,
         };
 
         var requestContent = new StringContent(
@@ -322,12 +439,16 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             "application/json"
         );
 
-        var response = await _httpClient.PostAsync("/v1/chain/abi_bin_to_json", requestContent, cancellationToken);
+        var response = await _httpClient.PostAsync(
+            "/v1/chain/abi_bin_to_json",
+            requestContent,
+            cancellationToken
+        );
         response.EnsureSuccessStatusCode();
-        
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var result = JsonSerializer.Deserialize<AbiBinToJsonResponse>(json, _jsonOptions);
-        
+
         return result?.Args;
     }
 
@@ -343,7 +464,11 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
     /// <summary>
     /// Generic POST request helper that returns a typed response
     /// </summary>
-    public async Task<T?> PostJsonAsync<T>(string endpoint, object request, CancellationToken cancellationToken = default)
+    public async Task<T?> PostJsonAsync<T>(
+        string endpoint,
+        object request,
+        CancellationToken cancellationToken = default
+    )
     {
         var requestContent = new StringContent(
             JsonSerializer.Serialize(request, _jsonOptions),
@@ -353,7 +478,7 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
 
         var response = await _httpClient.PostAsync(endpoint, requestContent, cancellationToken);
         response.EnsureSuccessStatusCode();
-        
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return JsonSerializer.Deserialize<T>(json, _jsonOptions);
     }
@@ -384,16 +509,30 @@ public class TransactionResult
 public class TransactionReceipt
 {
     public string Id { get; set; } = string.Empty;
+    
+    [JsonPropertyName("block_num")]
     public uint BlockNum { get; set; }
-    public uint BlockTime { get; set; }
+    
+    [JsonPropertyName("block_time")]
+    public string BlockTime { get; set; } = string.Empty;
+    
+    [JsonPropertyName("producer_block_id")]
     public string ProducerBlockId { get; set; } = string.Empty;
     public TransactionReceiptHeader? Receipt { get; set; }
     public int Elapsed { get; set; }
+    
+    [JsonPropertyName("net_usage")]
     public int NetUsage { get; set; }
     public bool Scheduled { get; set; }
+    
+    [JsonPropertyName("action_traces")]
     public List<object>? ActionTraces { get; set; }
+    
+    [JsonPropertyName("account_ram_deltas")]
     public object? AccountRamDeltas { get; set; }
     public object? Except { get; set; }
+    
+    [JsonPropertyName("error_code")]
     public object? ErrorCode { get; set; }
 }
 

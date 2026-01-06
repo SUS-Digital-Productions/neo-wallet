@@ -183,7 +183,6 @@
                                             Text="{Binding DataPreview}"
                                             FontSize="11"
                                             TextColor="{DynamicResource TextSecondary}"
-                                            FontFamily="Consolas"
                                             LineBreakMode="TailTruncation"
                                             MaxLines="3" />
                                     </VerticalStackLayout>
@@ -226,8 +225,7 @@
                                 x:Name="RawTransactionLabel"
                                 Text="{}{}"
                                 FontSize="10"
-                                TextColor="{DynamicResource TextSecondary}"
-                                FontFamily="Consolas" />
+                                TextColor="{DynamicResource TextSecondary}" />
                         </ScrollView>
                     </Border>
                 </VerticalStackLayout>

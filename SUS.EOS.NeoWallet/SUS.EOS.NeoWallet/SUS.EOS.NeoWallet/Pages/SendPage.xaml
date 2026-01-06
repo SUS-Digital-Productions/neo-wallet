@@ -38,7 +38,7 @@
           <VerticalStackLayout Spacing="8">
             <Label Text="Recipient Account" FontSize="13" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" />
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-              <Entry x:Name="RecipientEntry" Grid.Column="0" Placeholder="e.g. myaccount123" FontFamily="Consolas" />
+              <Entry x:Name="RecipientEntry" Grid.Column="0" Placeholder="e.g. myaccount123" />
               <Button Grid.Column="1" Text="📷" BackgroundColor="{DynamicResource Surface}" TextColor="{DynamicResource TextPrimary}" WidthRequest="44" HeightRequest="44" CornerRadius="10" Clicked="OnScanAddressClicked" />
             </Grid>
             <Label x:Name="AddressValidationLabel" Text="" FontSize="11" IsVisible="False" />

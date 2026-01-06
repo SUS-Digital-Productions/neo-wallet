@@ -3,6 +3,13 @@
 ## Project Overview
 This is a cross-platform Neo blockchain wallet built with .NET MAUI targeting .NET 10.0. The solution follows a single-project architecture pattern with platform-specific head projects inspired by the Anchor wallet (greymass/anchor).
 
+**Key Features:**
+- Multi-blockchain support (WAX, EOS, Telos, and other Antelope chains)
+- ESR (EOSIO Signing Request) protocol for dApp integration
+- Anchor Link compatible WebSocket listener for real-time signing requests
+- Secure wallet management with encrypted storage
+- Modern async/await architecture throughout
+
 ## Architecture Pattern
 
 ### Project Structure
@@ -11,6 +18,17 @@ This is a cross-platform Neo blockchain wallet built with .NET MAUI targeting .N
 - **SUS.EOS.NeoWallet.iOS** - iOS platform head
 - **SUS.EOS.NeoWallet.Mac** - macOS platform head
 - **SUS.EOS.NeoWallet.WinUI** - Windows platform head (targets `net10.0-windows10.0.19041.0`)
+- **SUS.EOS.Sharp** - Antelope blockchain client library (.NET 10.0)
+- **SUS.EOS.EosioSigningRequest** - Dedicated ESR protocol library (.NET 10.0)
+
+### Dependency Chain
+```
+SUS.EOS.Sharp (blockchain client, crypto, models)
+    ↓
+SUS.EOS.EosioSigningRequest (ESR protocol, parsing, signing)
+    ↓
+SUS.EOS.NeoWallet (MAUI wallet app, UI, storage)
+```
 
 ### Single-Project MAUI Pattern
 All platform heads use the `UseSharedMauiApp()` extension method defined in [MauiProgramExtensions.cs](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/MauiProgramExtensions.cs). Each platform's `MauiProgram.cs` simply calls:
@@ -39,12 +57,162 @@ Uses Shell-based navigation defined in [AppShell.xaml](SUS.EOS.NeoWallet/SUS.EOS
 2. [SendPage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/SendPage.xaml) - Send NEO/GAS with fee selection
 3. [ReceivePage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/ReceivePage.xaml) - Display QR code and address for receiving assets
 
-## Code Conventions
+## Code Conventions and Best Practices
+
+### Modern C# Features (Use These!)
+- ✅ **File-scoped namespaces**: `namespace SUS.EOS.NeoWallet.Pages;` (no braces)
+- ✅ **Nullable reference types**: Enabled throughout (`<Nullable>enable</Nullable>`)
+- ✅ **Records for immutable data**: Use `record` for DTOs and configuration objects
+- ✅ **Init-only properties**: Use `init` instead of `set` for immutable properties
+- ✅ **CancellationToken support**: All async methods should accept `CancellationToken cancellationToken = default`
+- ✅ **IDisposable pattern**: Implement for resources (WebSockets, HTTP clients, etc.)
+- ✅ **using declarations**: Prefer `using var client = ...` over `using (var client = ...) { }`
 
 ### Namespaces
 - Root namespace: `SUS.EOS.NeoWallet`
-- Pages use file-scoped namespaces: `namespace SUS.EOS.NeoWallet.Pages;`
-- Platform-specific code may use nested namespaces (e.g., `SUS.EOS.NeoWallet.Droid`)
+- Pages: `namespace SUS.EOS.NeoWallet.Pages;`
+- Services: `namespace SUS.EOS.NeoWallet.Services;`
+- Models: `namespace SUS.EOS.NeoWallet.Services.Models.{Category};`
+- Sharp library: `namespace SUS.EOS.Sharp.{Category};`
+- ESR library: `namespace SUS.EOS.EosioSigningRequest.{Models|Services};`
+
+### Service Layer Architecture
+**All services follow interface-first design:**
+
+1. **Create interface in** `Services/Interfaces/I{ServiceName}.cs`
+2. **Implement in** `Services/{ServiceName}.cs`
+3. **Register in** `MauiProgramExtensions.cs`
+
+**Service Registration Pattern:**
+```csharp
+// Singleton for stateful services (storage, context, session managers)
+builder.Services.AddSingleton<IWalletStorageService, WalletStorageService>();
+builder.Services.AddSingleton<IWalletContextService, WalletContextService>();
+builder.Services.AddSingleton<IEsrSessionManager, EsrSessionManager>();
+
+// Transient for stateless operations
+builder.Services.AddTransient<IAntelopeTransactionService, AntelopeTransactionService>();
+
+// HttpClient registration
+builder.Services.AddHttpClient();
+```
+
+### Dependency Injection in Pages
+**ALWAYS use constructor injection:**
+```csharp
+public partial class MainPage : ContentPage
+{
+    private readonly IWalletAccountService _accountService;
+    private readonly IWalletStorageService _storageService;
+    private readonly IAntelopeBlockchainClient _blockchainClient;
+
+    public MainPage(
+        IWalletAccountService accountService,
+        IWalletStorageService storageService,
+        IAntelopeBlockchainClient blockchainClient
+    )
+    {
+        InitializeComponent();
+        _accountService = accountService;
+        _storageService = storageService;
+        _blockchainClient = blockchainClient;
+    }
+}
+```
+
+**Register pages as transient in MauiProgramExtensions.cs:**
+```csharp
+builder.Services.AddTransient<MainPage>();
+builder.Services.AddTransient<DashboardPage>();
+```
+
+### Async/Await Best Practices
+✅ **DO:**
+- Use `async`/`await` for all I/O operations
+- Always provide `CancellationToken` parameter
+- Return `Task` or `Task<T>`, never `async void` (except event handlers)
+- Use `ConfigureAwait(false)` for library code (not in UI code)
+
+```csharp
+public async Task<WalletAccount> AddAccountAsync(
+    string account,
+    string authority,
+    string chainId,
+    string privateKey,
+    string password,
+    WalletMode mode = WalletMode.Hot
+)
+{
+    var wallet = await _storageService.LoadWalletAsync();
+    // ... implementation
+}
+```
+
+❌ **DON'T:**
+- Use `.Result` or `.Wait()` (causes deadlocks)
+- Use `async void` except for event handlers
+- Forget to pass `CancellationToken` through the call chain
+
+### Error Handling
+**Use try-catch with specific logging:**
+```csharp
+try
+{
+    var result = await _service.PerformOperationAsync();
+    return result;
+}
+catch (HttpRequestException ex)
+{
+    System.Diagnostics.Trace.WriteLine($"[SERVICE] Network error: {ex.Message}");
+    throw new InvalidOperationException("Network request failed", ex);
+}
+catch (Exception ex)
+{
+    System.Diagnostics.Trace.WriteLine($"[SERVICE] Unexpected error: {ex.Message}");
+    System.Diagnostics.Trace.WriteLine($"[SERVICE] Stack trace: {ex.StackTrace}");
+    throw;
+}
+```
+
+### Debug Logging Pattern
+**Use System.Diagnostics.Trace for debug output:**
+```csharp
+System.Diagnostics.Trace.WriteLine("[COMPONENT] Action started");
+System.Diagnostics.Trace.WriteLine($"[COMPONENT] Processing {itemCount} items");
+System.Diagnostics.Trace.WriteLine($"[COMPONENT] Error occurred: {ex.Message}");
+```
+
+**Logging conventions:**
+- Use `[COMPONENTNAME]` prefix in square brackets
+- Use descriptive messages, include context
+- Log entry/exit of important methods
+- Log connection state changes
+- Log full exception details for errors
+
+### Model Organization
+**Separate models by category in** `Services/Models/{Category}/`:
+- `WalletData/` - Wallet, accounts, keys
+- `AnchorCallback/` - Anchor protocol callbacks
+- Place ESR models in dedicated `SUS.EOS.EosioSigningRequest.Models` library
+
+**Model class conventions:**
+```csharp
+using System.Text.Json.Serialization;
+
+namespace SUS.EOS.NeoWallet.Services.Models.WalletData;
+
+/// <summary>
+/// Wallet account entry
+/// </summary>
+public class WalletAccount
+{
+    [JsonPropertyName("schema")]
+    public string Schema { get; set; } = "neowallet.v1.wallet";
+
+    [JsonPropertyName("data")]
+    public WalletAccountData? Data { get; set; }
+}
+```
 
 ### XAML Files
 - All XAML files use the MAUI 2021 schema: `http://schemas.microsoft.com/dotnet/2021/maui`
@@ -144,29 +312,75 @@ Debug logging enabled via `#if DEBUG` in [MauiProgramExtensions.cs](SUS.EOS.NeoW
 
 ## SUS.EOS.Sharp Library
 
+### Overview
+Modern .NET 10 blockchain client library for Antelope (EOSIO) blockchains.
+
+**Key Features:**
+- ✅ Modern C# 13 with records, nullable reference types, file-scoped namespaces
+- ✅ Full async/await with `CancellationToken` support throughout
+- ✅ Strongly typed immutable models
+- ✅ Interface-based design with `IDisposable` pattern
+- ✅ ABI-based automatic binary serialization
+- ✅ Secp256k1 cryptographic signing with BouncyCastle
+- ✅ Support for all Antelope chains (WAX, EOS, Telos, etc.)
+
 ### Architecture
-- **Location**: `SUS.EOS.Sharp/` project (referenced by main wallet project)
-- **Target**: .NET 10 class library
-- **Design**: Modern C# with records, async/await, cancellation tokens, IDisposable
+- **Location**: `SUS.EOS.Sharp/` project
+- **Target**: .NET 10.0 class library
+- **Design**: Production-ready, used in real blockchain transactions
 
 ### Key Classes
-- `EosClient`: Main blockchain client (chainInfo, account, balance, transactions)
-- `EosConfiguration`: Immutable configuration record
-- Models: `Transaction`, `SignedTransaction`, `Account`, `Asset`, `ChainInfo`
-- Providers: `ISignatureProvider`, `IAbiSerializationProvider` interfaces
+- `IAntelopeBlockchainClient` / `AntelopeHttpClient` - Blockchain client interface and HTTP implementation
+- `IAntelopeTransactionService` / `AntelopeTransactionService` - Transaction building and signing
+- `IBlockchainOperationsService` / `BlockchainOperationsService` - High-level operations
+- `EosioKey` - Key management (WIF, PVT_K1_, hex formats)
+- `AbiSerializer` - ABI-based binary serialization
+- `EosioSerializer` - Transaction binary encoding
 
 ### Usage Pattern
 ```csharp
-var config = new EosConfiguration
-{
-    HttpEndpoint = "https://nodes.eos42.io",
-    ChainId = "...",
-    ExpireSeconds = 30
+// Create blockchain client
+using var client = new AntelopeHttpClient("https://wax.greymass.com");
+
+// Get chain info
+var chainInfo = await client.GetInfoAsync(cancellationToken);
+
+// Build and sign transaction
+var txService = new AntelopeTransactionService(client);
+var signatureProvider = new EosioSignatureProvider(privateKeyWif);
+
+var result = await txService.BuildAndSignTransactionAsync(
+    actions: new[]
+    {
+        new
+        {
+            account = "eosio.token",
+            name = "transfer",
+            authorization = new[] { new { actor = "myaccount", permission = "active" } },
+            data = new { from = "myaccount", to = "receiver", quantity = "1.00000000 WAX", memo = "test" }
+        }
+    },
+    signatureProvider: signatureProvider,
+    cancellationToken: cancellationToken
+);
+
+// Broadcast
+var pushResult = await client.PushTransactionAsync(result, cancellationToken);
+```
+
+### ABI Serialization
+The library automatically handles ABI serialization:
+```csharp
+// Define action data as plain object - ABI handles serialization
+var actionData = new 
+{ 
+    from = "sender", 
+    to = "receiver", 
+    quantity = "10.0000 TOKEN",
+    memo = "payment"
 };
 
-using var client = new EosClient(config);
-var info = await client.GetInfoAsync(cancellationToken);
-var account = await client.GetAccountAsync("myaccount", cancellationToken);
+// ABI fetched automatically, binary serialization handled internally
 ```
 
 ### Asset Parsing
@@ -178,26 +392,244 @@ Console.WriteLine(asset.Precision); // 4
 Console.WriteLine(asset);           // "100.0000 EOS"
 ```
 
+## SUS.EOS.EosioSigningRequest Library
+
+### Overview
+Dedicated library for ESR (EOSIO Signing Request) protocol v3 implementation.
+
+**Key Features:**
+- ✅ ESR URI parsing and encoding
+- ✅ Request signing with blockchain integration
+- ✅ Anchor Link compatible WebSocket session management
+- ✅ Identity request support
+- ✅ Callback handling
+
+### Architecture
+- **Location**: `SUS.EOS.EosioSigningRequest/` project
+- **Target**: .NET 10.0 class library
+- **Dependencies**: References `SUS.EOS.Sharp` for crypto and blockchain models
+
+### Namespace Structure
+```
+SUS.EOS.EosioSigningRequest
+├── Esr (core class)
+├── Models/
+│   ├── EsrRequestPayload
+│   ├── EsrFlags
+│   ├── EsrCallbackResponse
+│   ├── EsrSession
+│   ├── EsrSessionStatus
+│   ├── EsrSigningRequestEventArgs
+│   ├── EsrSessionStatusEventArgs
+│   ├── EsrCallbackPayload
+│   └── EsrMessageEnvelope
+└── Services/
+    ├── IEsrService / EsrService
+    └── IEsrSessionManager (impl in NeoWallet due to MAUI dependency)
+```
+
+### Service Interfaces
+
+**IEsrService** - ESR parsing and signing:
+```csharp
+public interface IEsrService
+{
+    Task<Esr> ParseRequestAsync(string uri);
+    Task<EsrCallbackResponse> SignRequestAsync(
+        Esr request, 
+        string privateKeyWif, 
+        object? blockchainClient = null,
+        bool broadcast = false,
+        CancellationToken cancellationToken = default
+    );
+    Task<EsrCallbackResponse> SignAndBroadcastAsync(...);
+    Task<bool> SendCallbackAsync(Esr request, EsrCallbackResponse response);
+}
+```
+
+**IEsrSessionManager** - WebSocket session management (Anchor Link compatible):
+```csharp
+public interface IEsrSessionManager
+{
+    event EventHandler<EsrSigningRequestEventArgs>? SigningRequestReceived;
+    event EventHandler<EsrSessionStatusEventArgs>? StatusChanged;
+    
+    EsrSessionStatus Status { get; }
+    string LinkId { get; }
+    string? RequestPublicKey { get; }
+    IReadOnlyList<EsrSession> Sessions { get; }
+    
+    Task ConnectAsync(CancellationToken cancellationToken = default);
+    Task DisconnectAsync();
+    Task SendCallbackAsync(EsrCallbackPayload callback);
+    Task AddSessionAsync(EsrSession session);
+    Task<bool> RemoveSessionAsync(string actor, string permission, string chainId);
+    Task ClearSessionsAsync();
+}
+```
+
+### Usage Pattern
+```csharp
+// Parse ESR
+var esrService = new EsrService();
+var request = await esrService.ParseRequestAsync("esr://...");
+
+// Sign with blockchain client
+var response = await esrService.SignRequestAsync(
+    request,
+    privateKeyWif: "5K...",
+    blockchainClient: blockchainClient,
+    broadcast: true
+);
+
+// Send callback
+await esrService.SendCallbackAsync(request, response);
+```
+
+### Namespace Conflict Resolution
+When using ESR library, use alias to avoid namespace/class name conflict:
+```csharp
+using SUS.EOS.EosioSigningRequest.Models;
+using SUS.EOS.EosioSigningRequest.Services;
+using EsrRequest = SUS.EOS.EosioSigningRequest.Esr;  // Alias to avoid conflict
+
+// Now use EsrRequest instead of Esr
+private async Task ProcessRequest(EsrRequest request)
+{
+    // ...
+}
+```
+
 ## Services Layer
 
-### IWalletService
-- `GetBalanceAsync()`: Returns main wallet balance
-- `GetAssetsAsync()`: Returns all wallet assets
-- `GetTransactionHistoryAsync(count)`: Returns recent transactions
-- `GetAddressAsync()`: Returns wallet address
-- `SendAsync(toAddress, amount, memo)`: Sends transaction
+### Service Organization
+All NeoWallet services follow this structure:
+- Interface in `Services/Interfaces/I{Name}.cs`
+- Implementation in `Services/{Name}.cs`
+- Models in `Services/Models/{Category}/`
+- Registration in `MauiProgramExtensions.cs`
 
-### MockWalletService
-- Registered as singleton in DI container
-- Pre-populated with mock NEO, GAS, EOS, USDT assets
-- 6 mock transactions with varied timestamps
-- Simulates 1-second network delay on send
+### Core Services
+
+**IWalletStorageService** - Secure wallet storage:
+- Load/save wallet with encryption
+- Key management with password protection
+- Secure preferences storage
+
+**IWalletAccountService** - Account management:
+- Add/remove wallet accounts
+- Get account list
+- Set active account
+- Import from private key
+
+**IWalletContextService** - Application-wide state:
+- Active account tracking
+- Active network tracking
+- Initialization and state change events
+
+**INetworkService** - Network management:
+- Get available networks (WAX, EOS, Telos, etc.)
+- Get default network
+- Get network by chain ID
+
+**ICryptographyService** - Encryption operations:
+- Encrypt/decrypt with password
+- Hash generation
+- Key derivation
+
+**IAnchorCallbackService** - Anchor protocol integration:
+- Register callback handlers
+- Execute callbacks
+- Session persistence
+
+**IEsrSessionManager** - ESR session lifecycle:
+- WebSocket connection management
+- dApp session tracking
+- Real-time signing request handling
+
+**IPriceFeedService** - Price data:
+- Get token prices
+- Cache management
+
+### Service Implementation Pattern
+```csharp
+namespace SUS.EOS.NeoWallet.Services;
+
+/// <summary>
+/// Service description
+/// </summary>
+public class MyService : IMyService, IDisposable
+{
+    private readonly IDependency _dependency;
+    private bool _disposed;
+
+    public MyService(IDependency dependency)
+    {
+        _dependency = dependency;
+    }
+
+    public async Task<Result> PerformOperationAsync(
+        string parameter,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(parameter);
+
+        try
+        {
+            var result = await _dependency.ProcessAsync(parameter, cancellationToken);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[MYSERVICE] Error: {ex.Message}");
+            throw;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            // Cleanup resources
+            _disposed = true;
+        }
+    }
+}
+```
 
 ## Navigation Structure
 
 ### MainPage (Home)
 - Wallet overview with balance and address
 - Quick action buttons (Dashboard, Send, Receive, Import)
+- Assets list with balances
+- Recent transactions (3 most recent)
+- Account management section
+- **ESR Listener**: Automatically connects to WebSocket on appear
+
+### Shell Flyout Menu
+```
+Home
+  └─ Main (MainPage)
+Wallet
+  ├─ Dashboard (DashboardPage)
+  ├─ Send (SendPage)
+  └─ Receive (ReceivePage)
+Account
+  ├─ Create Account (CreateAccountPage)
+  ├─ Import Wallet (ImportWalletPage)
+  └─ Recover Account (RecoverAccountPage)
+Developer Tools
+  ├─ Contract Tables (ContractTablesPage)
+  ├─ Contract Actions (ContractActionsPage)
+  └─ Settings (SettingsPage)
+Hidden Routes (IsVisible=False)
+  ├─ Initialize (InitializePage)
+  ├─ Wallet Setup (WalletSetupPage)
+  └─ Enter Password (EnterPasswordPage)
+```
 - Assets list with balances
 - Recent transactions (3 most recent)
 - Account management section
@@ -228,3 +660,77 @@ Hidden Routes (IsVisible=False)
 - QR code generation and scanning
 - Transaction signing and broadcasting
 - Balance and transaction history fetching
+
+## Event Handling Best Practices
+
+### Subscribe to Events in Constructor
+```csharp
+public MainPage(IWalletContextService walletContext, IEsrSessionManager esrManager)
+{
+    InitializeComponent();
+    _walletContext = walletContext;
+    _esrManager = esrManager;
+
+    // Subscribe to context changes
+    _walletContext.ActiveAccountChanged += OnActiveAccountChanged;
+    _walletContext.ActiveNetworkChanged += OnActiveNetworkChanged;
+
+    // Subscribe to ESR events
+    _esrManager.SigningRequestReceived += OnEsrSigningRequestReceived;
+    _esrManager.StatusChanged += OnEsrStatusChanged;
+}
+```
+
+### Event Handler Pattern
+```csharp
+private async void OnEsrSigningRequestReceived(object? sender, EsrSigningRequestEventArgs e)
+{
+    try
+    {
+        System.Diagnostics.Trace.WriteLine($"[MAINPAGE] ESR request received: {e.Request.ChainId}");
+        await ProcessSigningRequestAsync(e);
+    }
+    catch (Exception ex)
+    {
+        System.Diagnostics.Trace.WriteLine($"[MAINPAGE] Error: {ex.Message}");
+        await DisplayAlert("Error", $"Failed: {ex.Message}", "OK");
+    }
+}
+```
+
+## Security Best Practices
+
+### Never Hardcode Secrets
+ DON'T: `const string PrivateKey = "5K...";`
+ DO: Use SecureStorage or environment variables
+
+### Input Validation
+Always validate input parameters:
+```csharp
+ArgumentException.ThrowIfNullOrWhiteSpace(account);
+ArgumentException.ThrowIfNullOrWhiteSpace(privateKey);
+if (!IsValidFormat(account))
+    throw new ArgumentException("Invalid format", nameof(account));
+```
+
+## UI Event Handler Pattern
+```csharp
+private async void OnActionClicked(object sender, EventArgs e)
+{
+    try
+    {
+        LoadingIndicator.IsVisible = true;
+        var result = await _service.PerformAsync();
+        await DisplayAlert("Success", "Done!", "OK");
+    }
+    catch (Exception ex)
+    {
+        System.Diagnostics.Trace.WriteLine($"[PAGE] Error: {ex.Message}");
+        await DisplayAlert("Error", ex.Message, "OK");
+    }
+    finally
+    {
+        LoadingIndicator.IsVisible = false;
+    }
+}
+```

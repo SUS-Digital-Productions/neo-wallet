@@ -6,19 +6,83 @@
   Title="Wallet"
   BackgroundColor="{DynamicResource PageBackgroundColor}"
 >
-  <Grid ColumnDefinitions="Auto,*">
+  <Grid x:Name="RootGrid">
+    <VisualStateManager.VisualStateGroups>
+      <VisualStateGroup>
+        <!-- Mobile Layout: Stack sidebar and content vertically -->
+        <VisualState Name="Mobile">
+          <VisualState.StateTriggers>
+            <AdaptiveTrigger MinWindowWidth="0" />
+          </VisualState.StateTriggers>
+          <VisualState.Setters>
+            <Setter TargetName="RootGrid" Property="RowDefinitions" Value="Auto,*" />
+            <Setter TargetName="Sidebar" Property="Grid.Row" Value="0" />
+            <Setter TargetName="Sidebar" Property="Grid.Column" Value="0" />
+            <Setter TargetName="Sidebar" Property="Grid.ColumnSpan" Value="2" />
+            <Setter TargetName="Sidebar" Property="WidthRequest" Value="NaN" />
+            <Setter TargetName="Sidebar" Property="HeightRequest" Value="300" />
+            <Setter TargetName="MainContent" Property="Grid.Row" Value="1" />
+            <Setter TargetName="MainContent" Property="Grid.Column" Value="0" />
+            <Setter TargetName="MainContent" Property="Grid.ColumnSpan" Value="2" />
+            <Setter TargetName="MainContentScroll" Property="Padding" Value="16" />
+            <Setter TargetName="QuickActionsGrid" Property="ColumnSpacing" Value="8" />
+            <Setter TargetName="QuickActionsGrid" Property="ColumnDefinitions" Value="*,*,*,*" />
+            <Setter TargetName="BalanceLabel" Property="FontSize" Value="28" />
+          </VisualState.Setters>
+        </VisualState>
+        <!-- Tablet Layout: Smaller sidebar with different layout -->
+        <VisualState Name="Tablet">
+          <VisualState.StateTriggers>
+            <AdaptiveTrigger MinWindowWidth="600" />
+          </VisualState.StateTriggers>
+          <VisualState.Setters>
+            <Setter TargetName="RootGrid" Property="ColumnDefinitions" Value="220,*" />
+            <Setter TargetName="RootGrid" Property="RowDefinitions" Value="*" />
+            <Setter TargetName="Sidebar" Property="Grid.Row" Value="0" />
+            <Setter TargetName="Sidebar" Property="Grid.Column" Value="0" />
+            <Setter TargetName="Sidebar" Property="WidthRequest" Value="220" />
+            <Setter TargetName="Sidebar" Property="HeightRequest" Value="NaN" />
+            <Setter TargetName="MainContent" Property="Grid.Row" Value="0" />
+            <Setter TargetName="MainContent" Property="Grid.Column" Value="1" />
+            <Setter TargetName="MainContent" Property="Grid.ColumnSpan" Value="1" />
+            <Setter TargetName="MainContentScroll" Property="Padding" Value="20" />
+            <Setter TargetName="QuickActionsGrid" Property="ColumnSpacing" Value="12" />
+            <Setter TargetName="BalanceLabel" Property="FontSize" Value="32" />
+          </VisualState.Setters>
+        </VisualState>
+        <!-- Desktop Layout: Full sidebar with proper spacing -->
+        <VisualState Name="Desktop">
+          <VisualState.StateTriggers>
+            <AdaptiveTrigger MinWindowWidth="900" />
+          </VisualState.StateTriggers>
+          <VisualState.Setters>
+            <Setter TargetName="RootGrid" Property="ColumnDefinitions" Value="260,*" />
+            <Setter TargetName="RootGrid" Property="RowDefinitions" Value="*" />
+            <Setter TargetName="Sidebar" Property="Grid.Row" Value="0" />
+            <Setter TargetName="Sidebar" Property="Grid.Column" Value="0" />
+            <Setter TargetName="Sidebar" Property="WidthRequest" Value="260" />
+            <Setter TargetName="Sidebar" Property="HeightRequest" Value="NaN" />
+            <Setter TargetName="MainContent" Property="Grid.Row" Value="0" />
+            <Setter TargetName="MainContent" Property="Grid.Column" Value="1" />
+            <Setter TargetName="MainContent" Property="Grid.ColumnSpan" Value="1" />
+            <Setter TargetName="MainContentScroll" Property="Padding" Value="32" />
+            <Setter TargetName="QuickActionsGrid" Property="ColumnSpacing" Value="16" />
+            <Setter TargetName="BalanceLabel" Property="FontSize" Value="36" />
+          </VisualState.Setters>
+        </VisualState>
+      </VisualStateGroup>
+    </VisualStateManager.VisualStateGroups>
     <!-- Sidebar Navigation -->
-    <Border 
-      Grid.Column="0"
+    <Border
+      x:Name="Sidebar"
       BackgroundColor="{DynamicResource Card}"
       StrokeThickness="0"
-      WidthRequest="220"
       Padding="0"
     >
       <Grid RowDefinitions="Auto,*,Auto">
         <!-- Logo & App Title -->
-        <VerticalStackLayout Grid.Row="0" Padding="16,20" Spacing="8">
-          <Border 
+        <VerticalStackLayout Grid.Row="0" Padding="16,20,16,20" Spacing="8">
+          <Border
             BackgroundColor="{DynamicResource Primary}"
             StrokeShape="RoundRectangle 12"
             StrokeThickness="0"
@@ -26,12 +90,22 @@
             HeightRequest="48"
             HorizontalOptions="Start"
           >
-            <Label Text="⚡" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center" TextColor="White" />
+            <Label
+              Text="⚡"
+              FontSize="24"
+              HorizontalOptions="Center"
+              VerticalOptions="Center"
+              TextColor="White"
+            />
           </Border>
-          <Label Text="Antelope Wallet" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
-          
+          <Label
+            Text="Antelope Wallet"
+            FontSize="18"
+            FontAttributes="Bold"
+            TextColor="{DynamicResource TextPrimary}"
+          />
           <!-- Chain Selector -->
-          <Border 
+          <Border
             BackgroundColor="{DynamicResource Surface}"
             StrokeShape="RoundRectangle 8"
             StrokeThickness="0"
@@ -42,16 +116,45 @@
               <TapGestureRecognizer Tapped="OnChainSelectorClicked" />
             </Border.GestureRecognizers>
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-              <Border Grid.Column="0" BackgroundColor="{DynamicResource WaxColor}" StrokeShape="RoundRectangle 10" StrokeThickness="0" WidthRequest="20" HeightRequest="20" HorizontalOptions="Center" VerticalOptions="Center">
-                <Label x:Name="ChainIconLabel" Text="W" FontSize="10" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center" />
+              <Border
+                Grid.Column="0"
+                BackgroundColor="{DynamicResource WaxColor}"
+                StrokeShape="RoundRectangle 10"
+                StrokeThickness="0"
+                WidthRequest="20"
+                HeightRequest="20"
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+              >
+                <Label
+                  x:Name="ChainIconLabel"
+                  Text="W"
+                  FontSize="10"
+                  FontAttributes="Bold"
+                  TextColor="White"
+                  HorizontalOptions="Center"
+                  VerticalOptions="Center"
+                />
               </Border>
-              <Label Grid.Column="1" x:Name="ChainNameLabel" Text="WAX Mainnet" FontSize="12" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
-              <Label Grid.Column="2" Text="▼" FontSize="10" TextColor="{DynamicResource TextSecondary}" VerticalOptions="Center" />
+              <Label
+                Grid.Column="1"
+                x:Name="ChainNameLabel"
+                Text="WAX Mainnet"
+                FontSize="12"
+                TextColor="{DynamicResource TextPrimary}"
+                VerticalOptions="Center"
+              />
+              <Label
+                Grid.Column="2"
+                Text="▼"
+                FontSize="10"
+                TextColor="{DynamicResource TextSecondary}"
+                VerticalOptions="Center"
+              />
             </Grid>
           </Border>
-          
-          <!-- Account Selector (below chain selector) -->
-          <Border 
+          <!-- Account Selector -->
+          <Border
             BackgroundColor="{DynamicResource Surface}"
             StrokeShape="RoundRectangle 8"
             StrokeThickness="0"
@@ -62,267 +165,624 @@
               <TapGestureRecognizer Tapped="OnAccountSelectorClicked" />
             </Border.GestureRecognizers>
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-              <Border Grid.Column="0" BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 10" StrokeThickness="0" WidthRequest="20" HeightRequest="20" HorizontalOptions="Center" VerticalOptions="Center">
-                <Label x:Name="AccountIconLabel" Text="👤" FontSize="10" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center" />
+              <Border
+                Grid.Column="0"
+                BackgroundColor="{DynamicResource Primary}"
+                StrokeShape="RoundRectangle 10"
+                StrokeThickness="0"
+                WidthRequest="20"
+                HeightRequest="20"
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+              >
+                <Label
+                  x:Name="AccountIconLabel"
+                  Text="👤"
+                  FontSize="10"
+                  TextColor="White"
+                  HorizontalOptions="Center"
+                  VerticalOptions="Center"
+                />
               </Border>
               <VerticalStackLayout Grid.Column="1" Spacing="0" VerticalOptions="Center">
-                <Label x:Name="AccountNameLabel" Text="No Account" FontSize="12" TextColor="{DynamicResource TextPrimary}" LineBreakMode="TailTruncation" />
-                <Label x:Name="AccountPermissionLabel" Text="Select account" FontSize="10" TextColor="{DynamicResource TextSecondary}" />
+                <Label
+                  x:Name="AccountNameLabel"
+                  Text="No Account"
+                  FontSize="12"
+                  TextColor="{DynamicResource TextPrimary}"
+                  LineBreakMode="TailTruncation"
+                />
+                <Label
+                  x:Name="AccountPermissionLabel"
+                  Text="Select account"
+                  FontSize="10"
+                  TextColor="{DynamicResource TextSecondary}"
+                />
               </VerticalStackLayout>
-              <Label Grid.Column="2" Text="▼" FontSize="10" TextColor="{DynamicResource TextSecondary}" VerticalOptions="Center" />
+              <Label
+                Grid.Column="2"
+                Text="▼"
+                FontSize="10"
+                TextColor="{DynamicResource TextSecondary}"
+                VerticalOptions="Center"
+              />
             </Grid>
           </Border>
         </VerticalStackLayout>
-        
         <!-- Navigation Menu -->
-        <ScrollView Grid.Row="1" Padding="8,0">
+        <ScrollView Grid.Row="1" Padding="8,0,8,0">
           <VerticalStackLayout Spacing="4">
             <!-- Section: Wallet -->
-            <Label Text="WALLET" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" Margin="12,16,0,8" />
-            
-            <Border x:Name="NavHome" BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,10">
+            <Label
+              Text="WALLET"
+              FontSize="10"
+              FontAttributes="Bold"
+              TextColor="{DynamicResource TextSecondary}"
+              Margin="12,16,0,8"
+            />
+            <Border
+              x:Name="NavHome"
+              BackgroundColor="{DynamicResource Primary}"
+              StrokeShape="RoundRectangle 8"
+              StrokeThickness="0"
+              Padding="12,10"
+            >
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnNavHomeClicked" />
               </Border.GestureRecognizers>
               <HorizontalStackLayout Spacing="12">
                 <Label Text="🏠" FontSize="16" />
-                <Label Text="Home" FontSize="14" TextColor="White" FontAttributes="Bold" VerticalOptions="Center" />
+                <Label
+                  Text="Home"
+                  FontSize="14"
+                  TextColor="White"
+                  FontAttributes="Bold"
+                  VerticalOptions="Center"
+                />
               </HorizontalStackLayout>
             </Border>
-            
-            <Border x:Name="NavDashboard" BackgroundColor="Transparent" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,10">
+            <Border
+              x:Name="NavDashboard"
+              BackgroundColor="Transparent"
+              StrokeShape="RoundRectangle 8"
+              StrokeThickness="0"
+              Padding="12,10"
+            >
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnDashboardClicked" />
               </Border.GestureRecognizers>
               <HorizontalStackLayout Spacing="12">
                 <Label Text="📊" FontSize="16" />
-                <Label Text="Dashboard" FontSize="14" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+                <Label
+                  Text="Dashboard"
+                  FontSize="14"
+                  TextColor="{DynamicResource TextPrimary}"
+                  VerticalOptions="Center"
+                />
               </HorizontalStackLayout>
             </Border>
-            
-            <Border x:Name="NavSend" BackgroundColor="Transparent" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,10">
+            <Border
+              x:Name="NavSend"
+              BackgroundColor="Transparent"
+              StrokeShape="RoundRectangle 8"
+              StrokeThickness="0"
+              Padding="12,10"
+            >
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnSendClicked" />
               </Border.GestureRecognizers>
               <HorizontalStackLayout Spacing="12">
                 <Label Text="📤" FontSize="16" />
-                <Label Text="Send" FontSize="14" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+                <Label
+                  Text="Send"
+                  FontSize="14"
+                  TextColor="{DynamicResource TextPrimary}"
+                  VerticalOptions="Center"
+                />
               </HorizontalStackLayout>
             </Border>
-            
-            <Border x:Name="NavReceive" BackgroundColor="Transparent" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,10">
+            <Border
+              x:Name="NavReceive"
+              BackgroundColor="Transparent"
+              StrokeShape="RoundRectangle 8"
+              StrokeThickness="0"
+              Padding="12,10"
+            >
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnReceiveClicked" />
               </Border.GestureRecognizers>
               <HorizontalStackLayout Spacing="12">
                 <Label Text="📥" FontSize="16" />
-                <Label Text="Receive" FontSize="14" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+                <Label
+                  Text="Receive"
+                  FontSize="14"
+                  TextColor="{DynamicResource TextPrimary}"
+                  VerticalOptions="Center"
+                />
               </HorizontalStackLayout>
             </Border>
-            
             <!-- Section: Contracts -->
-            <Label Text="CONTRACTS" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" Margin="12,16,0,8" />
-            
-            <Border x:Name="NavActions" BackgroundColor="Transparent" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,10">
+            <Label
+              Text="CONTRACTS"
+              FontSize="10"
+              FontAttributes="Bold"
+              TextColor="{DynamicResource TextSecondary}"
+              Margin="12,16,0,8"
+            />
+            <Border
+              x:Name="NavActions"
+              BackgroundColor="Transparent"
+              StrokeShape="RoundRectangle 8"
+              StrokeThickness="0"
+              Padding="12,10"
+            >
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnContractActionsClicked" />
               </Border.GestureRecognizers>
               <HorizontalStackLayout Spacing="12">
                 <Label Text="⚡" FontSize="16" />
-                <Label Text="Actions" FontSize="14" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+                <Label
+                  Text="Actions"
+                  FontSize="14"
+                  TextColor="{DynamicResource TextPrimary}"
+                  VerticalOptions="Center"
+                />
               </HorizontalStackLayout>
             </Border>
-            
-            <Border x:Name="NavTables" BackgroundColor="Transparent" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,10">
+            <Border
+              x:Name="NavTables"
+              BackgroundColor="Transparent"
+              StrokeShape="RoundRectangle 8"
+              StrokeThickness="0"
+              Padding="12,10"
+            >
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnContractTablesClicked" />
               </Border.GestureRecognizers>
               <HorizontalStackLayout Spacing="12">
                 <Label Text="📋" FontSize="16" />
-                <Label Text="Tables" FontSize="14" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+                <Label
+                  Text="Tables"
+                  FontSize="14"
+                  TextColor="{DynamicResource TextPrimary}"
+                  VerticalOptions="Center"
+                />
               </HorizontalStackLayout>
             </Border>
-            
             <!-- Section: Account -->
-            <Label Text="ACCOUNT" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" Margin="12,16,0,8" />
-            
-            <Border x:Name="NavImport" BackgroundColor="Transparent" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,10">
+            <Label
+              Text="ACCOUNT"
+              FontSize="10"
+              FontAttributes="Bold"
+              TextColor="{DynamicResource TextSecondary}"
+              Margin="12,16,0,8"
+            />
+            <Border
+              x:Name="NavImport"
+              BackgroundColor="Transparent"
+              StrokeShape="RoundRectangle 8"
+              StrokeThickness="0"
+              Padding="12,10"
+            >
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnImportWalletClicked" />
               </Border.GestureRecognizers>
               <HorizontalStackLayout Spacing="12">
                 <Label Text="📁" FontSize="16" />
-                <Label Text="Import Keys" FontSize="14" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+                <Label
+                  Text="Import Keys"
+                  FontSize="14"
+                  TextColor="{DynamicResource TextPrimary}"
+                  VerticalOptions="Center"
+                />
               </HorizontalStackLayout>
             </Border>
-            
-            <Border x:Name="NavCreate" BackgroundColor="Transparent" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,10">
+            <Border
+              x:Name="NavCreate"
+              BackgroundColor="Transparent"
+              StrokeShape="RoundRectangle 8"
+              StrokeThickness="0"
+              Padding="12,10"
+            >
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnCreateAccountClicked" />
               </Border.GestureRecognizers>
               <HorizontalStackLayout Spacing="12">
                 <Label Text="➕" FontSize="16" />
-                <Label Text="Create Account" FontSize="14" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+                <Label
+                  Text="Create Account"
+                  FontSize="14"
+                  TextColor="{DynamicResource TextPrimary}"
+                  VerticalOptions="Center"
+                />
               </HorizontalStackLayout>
             </Border>
           </VerticalStackLayout>
         </ScrollView>
-        
         <!-- Bottom: Settings -->
         <VerticalStackLayout Grid.Row="2" Padding="8,8,8,16" Spacing="4">
           <BoxView HeightRequest="1" Color="{DynamicResource Border}" Margin="4,0,4,8" />
-          <Border x:Name="NavSettings" BackgroundColor="Transparent" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,10">
+          <Border
+            x:Name="NavSettings"
+            BackgroundColor="Transparent"
+            StrokeShape="RoundRectangle 8"
+            StrokeThickness="0"
+            Padding="12,10"
+          >
             <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnSettingsClicked" />
             </Border.GestureRecognizers>
             <HorizontalStackLayout Spacing="12">
               <Label Text="⚙️" FontSize="16" />
-              <Label Text="Settings" FontSize="14" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+              <Label
+                Text="Settings"
+                FontSize="14"
+                TextColor="{DynamicResource TextPrimary}"
+                VerticalOptions="Center"
+              />
             </HorizontalStackLayout>
           </Border>
         </VerticalStackLayout>
       </Grid>
     </Border>
-    
     <!-- Main Content Area -->
-    <ScrollView Grid.Column="1" BackgroundColor="{DynamicResource PageBackgroundColor}">
-      <VerticalStackLayout Spacing="24" Padding="32" MaximumWidthRequest="800" HorizontalOptions="Center">
-        
+    <ScrollView x:Name="MainContent" BackgroundColor="{DynamicResource PageBackgroundColor}">
+      <VerticalStackLayout x:Name="MainContentScroll" Spacing="24" HorizontalOptions="Fill">
         <!-- Wallet Header Card -->
         <Border
           BackgroundColor="{DynamicResource Primary}"
           StrokeThickness="0"
           StrokeShape="RoundRectangle 16"
-          Padding="24"
+          Padding="20"
+          Margin="0,0,0,0"
         >
-          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="12">
+          <VerticalStackLayout Spacing="12">
             <Label
-              Grid.Row="0"
               x:Name="BalanceLabel"
               Text="$0.00 USD"
               FontSize="36"
               FontAttributes="Bold"
               TextColor="White"
+              HorizontalOptions="Start"
             />
-            <Border Grid.Row="1" BackgroundColor="White" Opacity="0.2" StrokeShape="RoundRectangle 8" StrokeThickness="0" Padding="12,8">
-              <Label
-                x:Name="AddressLabel"
-                Text="No wallet loaded"
-                FontSize="13"
-                TextColor="White"
-                FontFamily="Consolas"
-              />
+            <!-- Address Display with better truncation -->
+            <Border
+              BackgroundColor="White"
+              Opacity="0.2"
+              StrokeShape="RoundRectangle 8"
+              StrokeThickness="0"
+              Padding="12,8"
+            >
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Label
+                  Grid.Column="0"
+                  x:Name="AddressLabel"
+                  Text="E056sp4fa9fq...+3321TN1677"
+                  FontSize="13"
+                  TextColor="White"
+                  FontFamily="monospace"
+                  LineBreakMode="TailTruncation"
+                />
+                <Border Grid.Column="1" BackgroundColor="Transparent" Padding="4,0,0,0">
+                  <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnCopyAddressClicked" />
+                  </Border.GestureRecognizers>
+                  <Label Text="📋" FontSize="12" TextColor="White" Opacity="0.8" />
+                </Border>
+              </Grid>
             </Border>
-          </Grid>
+          </VerticalStackLayout>
         </Border>
-        
         <!-- Quick Actions Row -->
-        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
-          <Border Grid.Column="0" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="16">
+        <Grid
+          x:Name="QuickActionsGrid"
+          ColumnDefinitions="*,*,*,*"
+          ColumnSpacing="16"
+          RowSpacing="0"
+        >
+          <Border
+            Grid.Column="0"
+            BackgroundColor="{DynamicResource Card}"
+            StrokeShape="RoundRectangle 12"
+            Stroke="{DynamicResource Border}"
+            StrokeThickness="1"
+            Padding="16"
+          >
             <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnSendClicked" />
             </Border.GestureRecognizers>
             <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
-              <Border BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 20" StrokeThickness="0" WidthRequest="40" HeightRequest="40" HorizontalOptions="Center">
-                <Label Text="↑" FontSize="20" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center" />
+              <Border
+                BackgroundColor="{DynamicResource Primary}"
+                StrokeShape="RoundRectangle 20"
+                StrokeThickness="0"
+                WidthRequest="40"
+                HeightRequest="40"
+                HorizontalOptions="Center"
+              >
+                <Label
+                  Text="↑"
+                  FontSize="20"
+                  FontAttributes="Bold"
+                  TextColor="White"
+                  HorizontalOptions="Center"
+                  VerticalOptions="Center"
+                />
               </Border>
-              <Label Text="Send" FontSize="13" TextColor="{DynamicResource TextPrimary}" HorizontalTextAlignment="Center" />
+              <Label
+                Text="Send"
+                FontSize="13"
+                TextColor="{DynamicResource TextPrimary}"
+                HorizontalTextAlignment="Center"
+              />
             </VerticalStackLayout>
           </Border>
-          
-          <Border Grid.Column="1" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="16">
+          <Border
+            Grid.Column="1"
+            BackgroundColor="{DynamicResource Card}"
+            StrokeShape="RoundRectangle 12"
+            Stroke="{DynamicResource Border}"
+            StrokeThickness="1"
+            Padding="16"
+          >
             <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnReceiveClicked" />
             </Border.GestureRecognizers>
             <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
-              <Border BackgroundColor="{DynamicResource Secondary}" StrokeShape="RoundRectangle 20" StrokeThickness="0" WidthRequest="40" HeightRequest="40" HorizontalOptions="Center">
-                <Label Text="↓" FontSize="20" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center" />
+              <Border
+                BackgroundColor="{DynamicResource Secondary}"
+                StrokeShape="RoundRectangle 20"
+                StrokeThickness="0"
+                WidthRequest="40"
+                HeightRequest="40"
+                HorizontalOptions="Center"
+              >
+                <Label
+                  Text="↓"
+                  FontSize="20"
+                  FontAttributes="Bold"
+                  TextColor="White"
+                  HorizontalOptions="Center"
+                  VerticalOptions="Center"
+                />
               </Border>
-              <Label Text="Receive" FontSize="13" TextColor="{DynamicResource TextPrimary}" HorizontalTextAlignment="Center" />
+              <Label
+                Text="Receive"
+                FontSize="13"
+                TextColor="{DynamicResource TextPrimary}"
+                HorizontalTextAlignment="Center"
+              />
             </VerticalStackLayout>
           </Border>
-          
-          <Border Grid.Column="2" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="16">
+          <Border
+            Grid.Column="2"
+            BackgroundColor="{DynamicResource Card}"
+            StrokeShape="RoundRectangle 12"
+            Stroke="{DynamicResource Border}"
+            StrokeThickness="1"
+            Padding="16"
+          >
             <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnContractActionsClicked" />
             </Border.GestureRecognizers>
             <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
-              <Border BackgroundColor="{DynamicResource Tertiary}" StrokeShape="RoundRectangle 20" StrokeThickness="0" WidthRequest="40" HeightRequest="40" HorizontalOptions="Center">
-                <Label Text="⚡" FontSize="18" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center" />
+              <Border
+                BackgroundColor="{DynamicResource Tertiary}"
+                StrokeShape="RoundRectangle 20"
+                StrokeThickness="0"
+                WidthRequest="40"
+                HeightRequest="40"
+                HorizontalOptions="Center"
+              >
+                <Label
+                  Text="⚡"
+                  FontSize="18"
+                  TextColor="White"
+                  HorizontalOptions="Center"
+                  VerticalOptions="Center"
+                />
               </Border>
-              <Label Text="Actions" FontSize="13" TextColor="{DynamicResource TextPrimary}" HorizontalTextAlignment="Center" />
+              <Label
+                Text="Actions"
+                FontSize="13"
+                TextColor="{DynamicResource TextPrimary}"
+                HorizontalTextAlignment="Center"
+              />
             </VerticalStackLayout>
           </Border>
-          
-          <Border Grid.Column="3" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="16">
+          <Border
+            Grid.Column="3"
+            BackgroundColor="{DynamicResource Card}"
+            StrokeShape="RoundRectangle 12"
+            Stroke="{DynamicResource Border}"
+            StrokeThickness="1"
+            Padding="16"
+          >
             <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnImportWalletClicked" />
             </Border.GestureRecognizers>
             <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
-              <Border BackgroundColor="{DynamicResource Gray500}" StrokeShape="RoundRectangle 20" StrokeThickness="0" WidthRequest="40" HeightRequest="40" HorizontalOptions="Center">
-                <Label Text="+" FontSize="20" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center" />
+              <Border
+                BackgroundColor="{DynamicResource Gray500}"
+                StrokeShape="RoundRectangle 20"
+                StrokeThickness="0"
+                WidthRequest="40"
+                HeightRequest="40"
+                HorizontalOptions="Center"
+              >
+                <Label
+                  Text="+"
+                  FontSize="20"
+                  FontAttributes="Bold"
+                  TextColor="White"
+                  HorizontalOptions="Center"
+                  VerticalOptions="Center"
+                />
               </Border>
-              <Label Text="Import" FontSize="13" TextColor="{DynamicResource TextPrimary}" HorizontalTextAlignment="Center" />
+              <Label
+                Text="Import"
+                FontSize="13"
+                TextColor="{DynamicResource TextPrimary}"
+                HorizontalTextAlignment="Center"
+              />
             </VerticalStackLayout>
           </Border>
         </Grid>
-        
         <!-- Assets Section -->
         <VerticalStackLayout Spacing="12">
-          <Label Text="Assets" FontSize="20" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
-          <Border BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="0">
+          <Label
+            Text="Assets"
+            FontSize="20"
+            FontAttributes="Bold"
+            TextColor="{DynamicResource TextPrimary}"
+          />
+          <Border
+            BackgroundColor="{DynamicResource Card}"
+            StrokeShape="RoundRectangle 12"
+            Stroke="{DynamicResource Border}"
+            StrokeThickness="1"
+            Padding="0"
+          >
             <CollectionView x:Name="AssetsCollectionView" SelectionMode="None">
               <CollectionView.EmptyView>
                 <VerticalStackLayout Padding="24" Spacing="8" HorizontalOptions="Center">
                   <Label Text="💰" FontSize="32" HorizontalOptions="Center" />
-                  <Label Text="No assets found" FontSize="14" TextColor="{DynamicResource TextSecondary}" HorizontalTextAlignment="Center" />
-                  <Label Text="Import a key to view your balances" FontSize="12" TextColor="{DynamicResource TextSecondary}" HorizontalTextAlignment="Center" />
+                  <Label
+                    Text="No assets found"
+                    FontSize="14"
+                    TextColor="{DynamicResource TextSecondary}"
+                    HorizontalTextAlignment="Center"
+                  />
+                  <Label
+                    Text="Import a key to view your balances"
+                    FontSize="12"
+                    TextColor="{DynamicResource TextSecondary}"
+                    HorizontalTextAlignment="Center"
+                  />
                 </VerticalStackLayout>
               </CollectionView.EmptyView>
               <CollectionView.ItemTemplate>
                 <DataTemplate>
                   <Grid Padding="16" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <Border Grid.Column="0" BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 20" StrokeThickness="0" WidthRequest="40" HeightRequest="40" HorizontalOptions="Center" VerticalOptions="Center">
-                      <Label Text="💎" FontSize="18" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Border
+                      Grid.Column="0"
+                      BackgroundColor="{DynamicResource Surface}"
+                      StrokeShape="RoundRectangle 20"
+                      StrokeThickness="0"
+                      WidthRequest="40"
+                      HeightRequest="40"
+                      HorizontalOptions="Center"
+                      VerticalOptions="Center"
+                    >
+                      <Label
+                        Text="💎"
+                        FontSize="18"
+                        HorizontalOptions="Center"
+                        VerticalOptions="Center"
+                      />
                     </Border>
                     <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                      <Label Text="{Binding Symbol}" FontSize="15" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
-                      <Label Text="{Binding Symbol}" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+                      <Label
+                        Text="{Binding Symbol}"
+                        FontSize="15"
+                        FontAttributes="Bold"
+                        TextColor="{DynamicResource TextPrimary}"
+                      />
+                      <Label
+                        Text="WAX Mainnet"
+                        FontSize="12"
+                        TextColor="{DynamicResource TextSecondary}"
+                      />
                     </VerticalStackLayout>
-                    <Label Grid.Column="2" Text="{Binding Amount, StringFormat='{0:N4}'}" FontSize="15" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" VerticalOptions="Center" />
+                    <Label
+                      Grid.Column="2"
+                      Text="{Binding Amount, StringFormat='{0:N4}'}"
+                      FontSize="15"
+                      FontAttributes="Bold"
+                      TextColor="{DynamicResource TextPrimary}"
+                      VerticalOptions="Center"
+                    />
                   </Grid>
                 </DataTemplate>
               </CollectionView.ItemTemplate>
             </CollectionView>
           </Border>
         </VerticalStackLayout>
-        
         <!-- Recent Transactions Section -->
         <VerticalStackLayout Spacing="12">
           <Grid ColumnDefinitions="*,Auto">
-            <Label Grid.Column="0" Text="Recent Transactions" FontSize="20" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
+            <Label
+              Grid.Column="0"
+              Text="Recent Transactions"
+              FontSize="20"
+              FontAttributes="Bold"
+              TextColor="{DynamicResource TextPrimary}"
+            />
             <Border Grid.Column="1" BackgroundColor="Transparent" Padding="8,4">
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnViewAllTransactionsClicked" />
               </Border.GestureRecognizers>
-              <Label Text="View All →" FontSize="13" TextColor="{DynamicResource Primary}" VerticalOptions="Center" />
+              <Label
+                Text="View All →"
+                FontSize="13"
+                TextColor="{DynamicResource Primary}"
+                VerticalOptions="Center"
+              />
             </Border>
           </Grid>
-          <Border BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 12" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="0">
+          <Border
+            BackgroundColor="{DynamicResource Card}"
+            StrokeShape="RoundRectangle 12"
+            Stroke="{DynamicResource Border}"
+            StrokeThickness="1"
+            Padding="0"
+          >
             <CollectionView x:Name="RecentTransactionsCollectionView" SelectionMode="None">
               <CollectionView.EmptyView>
                 <VerticalStackLayout Padding="24" Spacing="8" HorizontalOptions="Center">
                   <Label Text="📜" FontSize="32" HorizontalOptions="Center" />
-                  <Label Text="No transactions yet" FontSize="14" TextColor="{DynamicResource TextSecondary}" HorizontalTextAlignment="Center" />
+                  <Label
+                    Text="No transactions yet"
+                    FontSize="14"
+                    TextColor="{DynamicResource TextSecondary}"
+                    HorizontalTextAlignment="Center"
+                  />
                 </VerticalStackLayout>
               </CollectionView.EmptyView>
               <CollectionView.ItemTemplate>
                 <DataTemplate>
-                  <Grid Padding="16" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="4">
-                    <Border Grid.Column="0" Grid.RowSpan="2" BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 20" StrokeThickness="0" WidthRequest="40" HeightRequest="40" HorizontalOptions="Center" VerticalOptions="Center">
-                      <Label Text="↔" FontSize="18" HorizontalOptions="Center" VerticalOptions="Center" />
+                  <Grid
+                    Padding="16"
+                    ColumnDefinitions="Auto,*,Auto"
+                    ColumnSpacing="12"
+                    RowDefinitions="Auto,Auto"
+                    RowSpacing="4"
+                  >
+                    <Border
+                      Grid.Column="0"
+                      Grid.RowSpan="2"
+                      BackgroundColor="{DynamicResource Surface}"
+                      StrokeShape="RoundRectangle 20"
+                      StrokeThickness="0"
+                      WidthRequest="40"
+                      HeightRequest="40"
+                      HorizontalOptions="Center"
+                      VerticalOptions="Center"
+                    >
+                      <Label
+                        Text="↔"
+                        FontSize="18"
+                        HorizontalOptions="Center"
+                        VerticalOptions="Center"
+                      />
                     </Border>
-                    <Label Grid.Row="0" Grid.Column="1" FontSize="14" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}">
+                    <Label
+                      Grid.Row="0"
+                      Grid.Column="1"
+                      FontSize="14"
+                      FontAttributes="Bold"
+                      TextColor="{DynamicResource TextPrimary}"
+                    >
                       <Label.Text>
                         <MultiBinding StringFormat="{}{0} → {1}">
                           <Binding Path="From" />
@@ -330,10 +790,33 @@
                         </MultiBinding>
                       </Label.Text>
                     </Label>
-                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding Timestamp, StringFormat='{0:MMM dd, yyyy HH:mm}'}" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
-                    <VerticalStackLayout Grid.Row="0" Grid.Column="2" Grid.RowSpan="2" Spacing="2" VerticalOptions="Center">
-                      <Label Text="{Binding Amount}" FontSize="14" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" HorizontalOptions="End" />
-                      <Label Text="{Binding Status}" FontSize="10" TextColor="{DynamicResource Success}" HorizontalOptions="End" />
+                    <Label
+                      Grid.Row="1"
+                      Grid.Column="1"
+                      Text="{Binding Timestamp, StringFormat='{0:MMM dd, yyyy HH:mm}'}"
+                      FontSize="12"
+                      TextColor="{DynamicResource TextSecondary}"
+                    />
+                    <VerticalStackLayout
+                      Grid.Row="0"
+                      Grid.Column="2"
+                      Grid.RowSpan="2"
+                      Spacing="2"
+                      VerticalOptions="Center"
+                    >
+                      <Label
+                        Text="{Binding Amount}"
+                        FontSize="14"
+                        FontAttributes="Bold"
+                        TextColor="{DynamicResource TextPrimary}"
+                        HorizontalOptions="End"
+                      />
+                      <Label
+                        Text="{Binding Status}"
+                        FontSize="10"
+                        TextColor="{DynamicResource Success}"
+                        HorizontalOptions="End"
+                      />
                     </VerticalStackLayout>
                   </Grid>
                 </DataTemplate>
@@ -341,10 +824,14 @@
             </CollectionView>
           </Border>
         </VerticalStackLayout>
-        
         <!-- Footer -->
-        <Label Text="🔐 Your wallet is secured with local encryption" FontSize="12" TextColor="{DynamicResource TextSecondary}" HorizontalOptions="Center" Margin="0,16,0,0" />
-        
+        <Label
+          Text="🔐 Your wallet is secured with local encryption"
+          FontSize="12"
+          TextColor="{DynamicResource TextSecondary}"
+          HorizontalOptions="Center"
+          Margin="0,16,0,32"
+        />
       </VerticalStackLayout>
     </ScrollView>
   </Grid>

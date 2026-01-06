@@ -1,5 +1,6 @@
 using System.IO.Compression;
-using SUS.EOS.Sharp.ESR;
+using SUS.EOS.EosioSigningRequest;
+using SUS.EOS.EosioSigningRequest.Services;
 using Xunit;
 
 namespace SUS.EOS.Sharp.Tests;
