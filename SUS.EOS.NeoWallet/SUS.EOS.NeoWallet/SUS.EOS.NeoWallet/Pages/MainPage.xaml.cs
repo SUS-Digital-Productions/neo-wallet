@@ -388,6 +388,20 @@ public partial class MainPage : ContentPage
         await Navigation.PushAsync(settingsPage);
     }
 
+    private async void OnKeyManagementClicked(object sender, EventArgs e)
+    {
+        System.Diagnostics.Trace.WriteLine("[MAINPAGE] Key Management clicked");
+        var keyManagementPage = _serviceProvider.GetRequiredService<KeyManagementPage>();
+        await Navigation.PushAsync(keyManagementPage);
+    }
+
+    private async void OnAccountManagementClicked(object sender, EventArgs e)
+    {
+        System.Diagnostics.Trace.WriteLine("[MAINPAGE] Account Management clicked");
+        var accountManagementPage = _serviceProvider.GetRequiredService<AccountManagementPage>();
+        await Navigation.PushAsync(accountManagementPage);
+    }
+
     private async void OnViewAllTransactionsClicked(object sender, EventArgs e)
     {
         System.Diagnostics.Trace.WriteLine("[MAINPAGE] View all transactions clicked");

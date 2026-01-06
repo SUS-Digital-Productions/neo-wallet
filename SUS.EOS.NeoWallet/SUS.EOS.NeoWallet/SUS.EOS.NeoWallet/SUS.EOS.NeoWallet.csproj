@@ -51,6 +51,12 @@
     <MauiXaml Update="Pages\InitializePage.xaml">
       <Generator>MSBuild:Compile</Generator>
     </MauiXaml>
+    <MauiXaml Update="Pages\KeyManagementPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
+    <MauiXaml Update="Pages\AccountManagementPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
     <MauiXaml Update="Pages\MainPage.xaml">
       <Generator>MSBuild:Compile</Generator>
     </MauiXaml>

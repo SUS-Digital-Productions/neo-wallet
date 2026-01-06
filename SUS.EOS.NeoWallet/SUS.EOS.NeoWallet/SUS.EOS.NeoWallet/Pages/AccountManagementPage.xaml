@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.AccountManagementPage"
+  Title="Account Management"
+  BackgroundColor="{DynamicResource PageBackgroundColor}"
+>
+  <Grid>
+    <ScrollView>
+      <VerticalStackLayout Padding="20" Spacing="20">
+        <!-- Header -->
+        <Label
+          Text="Manage Accounts"
+          FontSize="24"
+          FontAttributes="Bold"
+          TextColor="{DynamicResource TextPrimary}"
+        />
+        <Label
+          Text="Remove accounts you no longer use. They will be deleted from your wallet."
+          FontSize="14"
+          TextColor="{DynamicResource TextSecondary}"
+          Margin="0,0,0,10"
+        />
+
+        <!-- Accounts List -->
+        <CollectionView
+          x:Name="AccountsCollectionView"
+          SelectionMode="None"
+        >
+          <CollectionView.ItemTemplate>
+            <DataTemplate>
+              <Border
+                BackgroundColor="{DynamicResource CardBackground}"
+                StrokeThickness="1"
+                Stroke="{DynamicResource Gray200}"
+                Padding="16"
+                Margin="0,0,0,12"
+              >
+                <Border.StrokeShape>
+                  <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                  <!-- Account Icon -->
+                  <Label
+                    Grid.Column="0"
+                    Text="👤"
+                    FontSize="24"
+                    VerticalOptions="Center"
+                  />
+
+                  <!-- Account Info -->
+                  <VerticalStackLayout Grid.Column="1" Spacing="4">
+                    <Label
+                      Text="{Binding AccountName}"
+                      FontSize="16"
+                      FontAttributes="Bold"
+                      TextColor="{DynamicResource TextPrimary}"
+                    />
+                    <Label
+                      Text="{Binding ChainName}"
+                      FontSize="12"
+                      TextColor="{DynamicResource TextSecondary}"
+                    />
+                    <Label
+                      Text="{Binding PublicKeyShort}"
+                      FontSize="10"
+                      TextColor="{DynamicResource TextTertiary}"
+                      LineBreakMode="MiddleTruncation"
+                    />
+                  </VerticalStackLayout>
+
+                  <!-- Delete Button -->
+                  <Button
+                    Grid.Column="2"
+                    Text="🗑️"
+                    FontSize="20"
+                    BackgroundColor="Transparent"
+                    TextColor="{DynamicResource Danger}"
+                    VerticalOptions="Center"
+                    Clicked="OnDeleteAccountClicked"
+                    CommandParameter="{Binding .}"
+                  />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Empty State -->
+        <VerticalStackLayout
+          x:Name="EmptyStateLayout"
+          IsVisible="False"
+          Spacing="16"
+          HorizontalOptions="Center"
+          Margin="0,40,0,0"
+        >
+          <Label
+            Text="👤"
+            FontSize="48"
+            HorizontalOptions="Center"
+          />
+          <Label
+            Text="No Accounts"
+            FontSize="18"
+            FontAttributes="Bold"
+            TextColor="{DynamicResource TextPrimary}"
+            HorizontalOptions="Center"
+          />
+          <Label
+            Text="Import keys to add accounts"
+            FontSize="14"
+            TextColor="{DynamicResource TextSecondary}"
+            HorizontalOptions="Center"
+          />
+        </VerticalStackLayout>
+      </VerticalStackLayout>
+    </ScrollView>
+
+    <!-- Loading Indicator -->
+    <ActivityIndicator
+      x:Name="LoadingIndicator"
+      IsRunning="False"
+      IsVisible="False"
+      Color="{DynamicResource Primary}"
+      VerticalOptions="Center"
+      HorizontalOptions="Center"
+    />
+  </Grid>
+</ContentPage>

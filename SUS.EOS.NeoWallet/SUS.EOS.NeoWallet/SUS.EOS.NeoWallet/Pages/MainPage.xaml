@@ -358,19 +358,19 @@
               Margin="12,16,0,8"
             />
             <Border
-              x:Name="NavImport"
+              x:Name="NavAccountManagement"
               BackgroundColor="Transparent"
               StrokeShape="RoundRectangle 8"
               StrokeThickness="0"
               Padding="12,10"
             >
               <Border.GestureRecognizers>
-                <TapGestureRecognizer Tapped="OnImportWalletClicked" />
+                <TapGestureRecognizer Tapped="OnAccountManagementClicked" />
               </Border.GestureRecognizers>
               <HorizontalStackLayout Spacing="12">
-                <Label Text="📁" FontSize="16" />
+                <Label Text="👥" FontSize="16" />
                 <Label
-                  Text="Import Keys"
+                  Text="Account Management"
                   FontSize="14"
                   TextColor="{DynamicResource TextPrimary}"
                   VerticalOptions="Center"
@@ -399,9 +399,33 @@
             </Border>
           </VerticalStackLayout>
         </ScrollView>
-        <!-- Bottom: Settings -->
+        <!-- Bottom: Key Management & Settings -->
         <VerticalStackLayout Grid.Row="2" Padding="8,8,8,16" Spacing="4">
           <BoxView HeightRequest="1" Color="{DynamicResource Border}" Margin="4,0,4,8" />
+          
+          <!-- Key Management -->
+          <Border
+            x:Name="NavKeyManagement"
+            BackgroundColor="Transparent"
+            StrokeShape="RoundRectangle 8"
+            StrokeThickness="0"
+            Padding="12,10"
+          >
+            <Border.GestureRecognizers>
+              <TapGestureRecognizer Tapped="OnKeyManagementClicked" />
+            </Border.GestureRecognizers>
+            <HorizontalStackLayout Spacing="12">
+              <Label Text="🔑" FontSize="16" />
+              <Label
+                Text="Key Management"
+                FontSize="14"
+                TextColor="{DynamicResource TextPrimary}"
+                VerticalOptions="Center"
+              />
+            </HorizontalStackLayout>
+          </Border>
+          
+          <!-- Settings -->
           <Border
             x:Name="NavSettings"
             BackgroundColor="Transparent"
@@ -460,7 +484,6 @@
                   Text="E056sp4fa9fq...+3321TN1677"
                   FontSize="13"
                   TextColor="White"
-                  FontFamily="monospace"
                   LineBreakMode="TailTruncation"
                 />
                 <Border Grid.Column="1" BackgroundColor="Transparent" Padding="4,0,0,0">
