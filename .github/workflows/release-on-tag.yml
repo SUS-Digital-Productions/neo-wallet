@@ -78,10 +78,6 @@ jobs:
         echo "Event name: $GITHUB_EVENT_NAME"
         if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
           conclusion=$(jq -r .workflow_run.conclusion < "$GITHUB_EVENT_PATH")
-          if [ "$conclusion" != "success" ]; then
-            echo "Triggering workflow did not complete successfully (conclusion=$conclusion); exiting." >&2
-            exit 78
-          fi
           REF=$(jq -r .workflow_run.head_sha < "$GITHUB_EVENT_PATH")
           echo "Using HEAD SHA from workflow_run: $REF"
           echo "REF=$REF" >> $GITHUB_ENV
@@ -96,6 +92,18 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "TAGNAME=$TAGNAME" >> $GITHUB_ENV
           cd ..
+
+          # If triggering workflow failed, only proceed if the expected tag already exists remotely
+          if [ "$conclusion" != "success" ]; then
+            echo "Triggering workflow conclusion: $conclusion"
+            echo "Checking if tag $TAGNAME exists on remote..."
+            if git ls-remote --exit-code --tags https://github.com/${{ github.repository }}.git refs/tags/$TAGNAME >/dev/null 2>&1; then
+              echo "Tag $TAGNAME exists remotely — continuing despite workflow_run conclusion $conclusion"
+            else
+              echo "Triggering workflow did not complete successfully (conclusion=$conclusion) and tag $TAGNAME does not exist; exiting." >&2
+              exit 78
+            fi
+          fi
         else
           # triggered by tag push
           TAGNAME=${GITHUB_REF#refs/tags/}
