@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_run:
+    workflows:
+      - 'Version and Tag'
+    types:
+      - completed
 
 jobs:
   build-windows:
@@ -14,6 +19,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -37,15 +44,20 @@ jobs:
           -p:WindowsPackageType=None `
           -o ./publish/win-x64
 
+    - name: Read VERSION
+      run: |
+        VERSION=$(cat VERSION)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
     - name: Create Windows ZIP
       run: |
-        Compress-Archive -Path ./publish/win-x64/* -DestinationPath NeoWallet-${{ github.ref_name }}.zip
+        Compress-Archive -Path ./publish/win-x64/* -DestinationPath NeoWallet-${{ env.VERSION }}.zip
 
     - name: Upload Windows artifact
       uses: actions/upload-artifact@v4
       with:
         name: windows-zip
-        path: NeoWallet-${{ github.ref_name }}.zip
+        path: NeoWallet-${{ env.VERSION }}.zip
 
   build-android:
     runs-on: ubuntu-latest
@@ -55,6 +67,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -75,6 +89,11 @@ jobs:
           -p:AndroidPackageFormat=apk \
           -o ./publish/android
 
+    - name: Read VERSION
+      run: |
+        VERSION=$(cat VERSION)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
     - name: Upload Android artifact
       uses: actions/upload-artifact@v4
       with:
@@ -89,6 +108,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -108,16 +129,21 @@ jobs:
           -f net10.0-macos \
           -o ./publish/macos
 
+    - name: Read VERSION
+      run: |
+        VERSION=$(cat VERSION)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
     - name: Create macOS ZIP
       run: |
         cd ./publish/macos
-        zip -r ../../NeoWallet-${{ github.ref_name }}-macOS.zip .
+        zip -r ../../NeoWallet-${{ env.VERSION }}-macOS.zip .
 
     - name: Upload macOS artifact
       uses: actions/upload-artifact@v4
       with:
         name: macos-zip
-        path: ./NeoWallet-${{ github.ref_name }}-macOS.zip
+        path: ./NeoWallet-${{ env.VERSION }}-macOS.zip
 
   create-release:
     runs-on: ubuntu-latest
@@ -127,12 +153,50 @@ jobs:
       id-token: write
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - name: Determine build ref and version
+      id: determine
+      run: |
+        echo "Event name: $GITHUB_EVENT_NAME"
+        if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+          conclusion=$(jq -r .workflow_run.conclusion < "$GITHUB_EVENT_PATH")
+          if [ "$conclusion" != "success" ]; then
+            echo "Triggering workflow did not complete successfully (conclusion=$conclusion); exiting." >&2
+            exit 78
+          fi
+          REF=$(jq -r .workflow_run.head_sha < "$GITHUB_EVENT_PATH")
+          echo "Using HEAD SHA from workflow_run: $REF"
+          echo "REF=$REF" >> $GITHUB_ENV
+          # checkout this REF to read VERSION
+          git init repo
+          cd repo
+          git remote add origin https://github.com/${{ github.repository }}.git
+          git fetch --depth=1 origin $REF
+          git checkout -qf $REF
+          VERSION=$(cat VERSION)
+          TAGNAME="v$VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAGNAME=$TAGNAME" >> $GITHUB_ENV
+          cd ..
+        else
+          # triggered by tag push
+          TAGNAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAGNAME#v}
+          echo "REF=$GITHUB_REF" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAGNAME=$TAGNAME" >> $GITHUB_ENV
+        fi
 
-    - name: Set VERSION
-      run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
-
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.TAGNAME }}
+        release_name: Release ${{ env.TAGNAME }}
+        target_commitish: ${{ env.REF }}
+        draft: false
+        prerelease: false
     - name: Download Windows artifact
       uses: actions/download-artifact@v4
       with:
