@@ -60,108 +60,13 @@ jobs:
         name: windows-zip
         path: NeoWallet-${{ env.VERSION }}.zip
 
-  build-android:
-    runs-on: windows-latest
-    permissions:
-      contents: write
 
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
 
-    - name: Install MAUI Workload
-      run: dotnet workload install maui
-
-    - name: Restore dependencies (Android)
-      run: |
-        dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj -f net10.0-android
-        dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj -r android -f net10.0-android || true
-
-    - name: Build Android APK
-      run: |
-        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj `
-          -c Release `
-          -f net10.0-android `
-          -p:AndroidPackageFormat=apk `
-          -o ./publish/android
-
-    - name: Read VERSION
-      shell: pwsh
-      run: |
-        $version = Get-Content VERSION -Raw
-        Add-Content -Path $env:GITHUB_ENV -Value "VERSION=$version"
-
-    - name: Create Android ZIP
-      shell: pwsh
-      run: |
-        $apk = Get-ChildItem -Path ./publish/android -Filter *.apk -Recurse | Select-Object -First 1
-        if ($null -eq $apk) { Write-Error "No APK found"; exit 1 }
-        Compress-Archive -Path $apk.FullName -DestinationPath "NeoWallet-${{ env.VERSION }}-Android.zip"
-
-    - name: Upload Android artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: android-zip
-        path: NeoWallet-${{ env.VERSION }}-Android.zip
-
-  build-macos:
-    runs-on: macos-latest
-    permissions:
-      contents: write
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
-
-    - name: Restore workloads (project-specific)
-      run: dotnet workload restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj
-
-    - name: Install MAUI Workload
-      run: dotnet workload install maui
-
-    - name: Restore dependencies (mac)
-      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj --framework net10.0-macos
-
-    - name: Build macOS App
-      run: |
-        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj \
-          -c Release \
-          -f net10.0-macos \
-          -o ./publish/macos
-
-    - name: Read VERSION
-      run: |
-        VERSION=$(cat VERSION)
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-    - name: Create macOS ZIP
-      run: |
-        cd ./publish/macos
-        zip -r ../../NeoWallet-${{ env.VERSION }}-macOS.zip .
-
-    - name: Upload macOS artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-zip
-        path: ./NeoWallet-${{ env.VERSION }}-macOS.zip
 
   create-release:
     runs-on: ubuntu-latest
-    needs: [build-windows, build-android, build-macos]
+    needs: [build-windows]
     permissions:
       contents: write
       id-token: write
@@ -217,17 +122,10 @@ jobs:
         name: windows-zip
         path: ./artifacts/windows
 
-    - name: Download Android artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: android-zip
-        path: ./artifacts/android
+    - name: List artifacts
+      run: ls -la ./artifacts || true
 
-    - name: Download macOS artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: macos-zip
-        path: ./artifacts/macos
+
 
 
 
@@ -270,76 +168,5 @@ jobs:
         asset_name: NeoWallet-${{ env.TAGNAME }}.zip.sig
         asset_content_type: application/octet-stream
 
-    - name: Find Android ZIP
-      id: find_android_zip
-      run: |
-        zip=$(ls ./artifacts/android/*Android.zip | head -n1 || true)
-        echo "zip=$zip" >> $GITHUB_OUTPUT
 
-    - name: Sign Android ZIP
-      id: sign_android
-      env:
-        COSIGN_EXPERIMENTAL: 1
-      run: |
-        if [ "${{ steps.find_android_zip.outputs.zip }}" != "" ]; then
-          ./cosign sign-blob --keyless --yes "${{ steps.find_android_zip.outputs.zip }}" > "${{ steps.find_android_zip.outputs.zip }}.sig" || true
-          echo "apk_exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "apk_exists=false" >> $GITHUB_OUTPUT
-        fi
 
-    - name: Upload Android ZIP
-      if: steps.sign_android.outputs.apk_exists == 'true'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.find_android_zip.outputs.zip }}
-        asset_name: NeoWallet-${{ env.TAGNAME }}-Android.zip
-        asset_content_type: application/zip
-
-    - name: Upload Android ZIP Signature
-      if: steps.sign_android.outputs.apk_exists == 'true'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.find_android_zip.outputs.zip }}.sig
-        asset_name: NeoWallet-${{ env.TAGNAME }}-Android.zip.sig
-        asset_content_type: application/octet-stream
-
-    - name: Sign macOS ZIP
-      id: sign_macos
-      env:
-        COSIGN_EXPERIMENTAL: 1
-      run: |
-        if [ -f ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip ]; then
-          ./cosign sign-blob --keyless --yes ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip > ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip.sig || true
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Upload macOS asset
-      if: steps.sign_macos.outputs.exists == 'true'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip
-        asset_name: NeoWallet-${{ env.TAGNAME }}-macOS.zip
-        asset_content_type: application/zip
-
-    - name: Upload macOS signature
-      if: steps.sign_macos.outputs.exists == 'true'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip.sig
-        asset_name: NeoWallet-${{ env.TAGNAME }}-macOS.zip.sig
-        asset_content_type: application/octet-stream
