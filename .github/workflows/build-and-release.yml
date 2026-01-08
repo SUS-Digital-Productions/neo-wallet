@@ -37,6 +37,7 @@ jobs:
           --self-contained true `
           -p:PublishSingleFile=true `
           -p:PublishTrimmed=true `
+          -p:WindowsPackageType=None `
           -o ./publish/win-x64
 
     - name: Create ZIP Archive
