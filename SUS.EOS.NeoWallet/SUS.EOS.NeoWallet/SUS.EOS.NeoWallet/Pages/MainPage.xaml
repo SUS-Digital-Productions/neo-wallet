@@ -281,26 +281,6 @@
                 />
               </HorizontalStackLayout>
             </Border>
-            <Border
-              x:Name="NavReceive"
-              BackgroundColor="Transparent"
-              StrokeShape="RoundRectangle 8"
-              StrokeThickness="0"
-              Padding="12,10"
-            >
-              <Border.GestureRecognizers>
-                <TapGestureRecognizer Tapped="OnReceiveClicked" />
-              </Border.GestureRecognizers>
-              <HorizontalStackLayout Spacing="12">
-                <Label Text="📥" FontSize="16" />
-                <Label
-                  Text="Receive"
-                  FontSize="14"
-                  TextColor="{DynamicResource TextPrimary}"
-                  VerticalOptions="Center"
-                />
-              </HorizontalStackLayout>
-            </Border>
             <!-- Section: Contracts -->
             <Label
               Text="CONTRACTS"
@@ -499,7 +479,7 @@
         <!-- Quick Actions Row -->
         <Grid
           x:Name="QuickActionsGrid"
-          ColumnDefinitions="*,*,*,*"
+          ColumnDefinitions="*,*"
           ColumnSpacing="16"
           RowSpacing="0"
         >
@@ -542,43 +522,6 @@
           </Border>
           <Border
             Grid.Column="1"
-            BackgroundColor="{DynamicResource Card}"
-            StrokeShape="RoundRectangle 12"
-            Stroke="{DynamicResource Border}"
-            StrokeThickness="1"
-            Padding="16"
-          >
-            <Border.GestureRecognizers>
-              <TapGestureRecognizer Tapped="OnReceiveClicked" />
-            </Border.GestureRecognizers>
-            <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
-              <Border
-                BackgroundColor="{DynamicResource Secondary}"
-                StrokeShape="RoundRectangle 20"
-                StrokeThickness="0"
-                WidthRequest="40"
-                HeightRequest="40"
-                HorizontalOptions="Center"
-              >
-                <Label
-                  Text="↓"
-                  FontSize="20"
-                  FontAttributes="Bold"
-                  TextColor="White"
-                  HorizontalOptions="Center"
-                  VerticalOptions="Center"
-                />
-              </Border>
-              <Label
-                Text="Receive"
-                FontSize="13"
-                TextColor="{DynamicResource TextPrimary}"
-                HorizontalTextAlignment="Center"
-              />
-            </VerticalStackLayout>
-          </Border>
-          <Border
-            Grid.Column="2"
             BackgroundColor="{DynamicResource Card}"
             StrokeShape="RoundRectangle 12"
             Stroke="{DynamicResource Border}"

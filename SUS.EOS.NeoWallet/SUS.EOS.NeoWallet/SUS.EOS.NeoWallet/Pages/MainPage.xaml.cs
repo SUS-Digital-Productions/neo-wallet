@@ -346,13 +346,6 @@ public partial class MainPage : ContentPage
         await Navigation.PushAsync(sendPage);
     }
 
-    private async void OnReceiveClicked(object sender, EventArgs e)
-    {
-        System.Diagnostics.Trace.WriteLine("[MAINPAGE] Receive clicked");
-        var receivePage = _serviceProvider.GetRequiredService<ReceivePage>();
-        await Navigation.PushAsync(receivePage);
-    }
-
     private async void OnContractActionsClicked(object sender, EventArgs e)
     {
         System.Diagnostics.Trace.WriteLine("[MAINPAGE] Contract Actions clicked");

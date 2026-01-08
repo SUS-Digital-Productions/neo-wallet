@@ -14,7 +14,8 @@ public partial class KeyManagementPage : ContentPage
     private readonly IAntelopeBlockchainClient _blockchainClient;
     private readonly IWalletContextService _walletContext;
 
-    private ObservableCollection<KeyItemViewModel> _keys = new();
+    private readonly ObservableCollection<KeyItemViewModel> _keys = [];
+    private string? _sessionPassword;
 
     public KeyManagementPage(
         IWalletStorageService storageService,
@@ -36,7 +37,62 @@ public partial class KeyManagementPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        // Prompt for password on page entry
+        if (string.IsNullOrWhiteSpace(_sessionPassword))
+        {
+            try
+            {
+                var password = await ShowTextInputDialogAsync(
+                    "Wallet Password",
+                    "Enter your wallet password to access key management:",
+                    "OK",
+                    "Cancel",
+                    isPassword: true
+                );
+
+                if (string.IsNullOrWhiteSpace(password))
+                {
+                    // User cancelled, go back
+                    if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
+                    {
+                        await Navigation.PopAsync();
+                    }
+                    return;
+                }
+
+                if (!await _storageService.ValidatePasswordAsync(password))
+                {
+                    await DisplayAlertAsync("Error", "Invalid password", "OK");
+                    if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
+                    {
+                        await Navigation.PopAsync();
+                    }
+                    return;
+                }
+
+                _sessionPassword = password;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Error in password dialog: {ex.Message}");
+                // If dialog was dismissed or errored, go back
+                if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
+                {
+                    await Navigation.PopAsync();
+                }
+                return;
+            }
+        }
+
         await LoadKeysAsync();
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        // Clear password when leaving page
+        _sessionPassword = null;
     }
 
     private async Task LoadKeysAsync()
@@ -48,7 +104,7 @@ public partial class KeyManagementPage : ContentPage
             EmptyState.IsVisible = false;
 
             var wallet = await _storageService.LoadWalletAsync();
-            var accounts = wallet?.Wallets ?? new List<WalletAccount>();
+            var accounts = wallet?.Wallets ?? [];
 
             // Group accounts by public key
             var keyGroups = accounts
@@ -57,7 +113,7 @@ public partial class KeyManagementPage : ContentPage
                 {
                     PublicKey = g.Key,
                     AccountCount = g.Count(),
-                    Accounts = g.ToList(),
+                    Accounts = [.. g],
                 })
                 .ToList();
 
@@ -72,7 +128,7 @@ public partial class KeyManagementPage : ContentPage
         catch (Exception ex)
         {
             System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Error loading keys: {ex.Message}");
-            await DisplayAlert("Error", $"Failed to load keys: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed to load keys: {ex.Message}", "OK");
         }
         finally
         {
@@ -110,7 +166,7 @@ public partial class KeyManagementPage : ContentPage
             // Validate password
             if (!await _storageService.ValidatePasswordAsync(password))
             {
-                await DisplayAlert("Error", "Invalid password", "OK");
+                await DisplayAlertAsync("Error", "Invalid password", "OK");
                 return;
             }
 
@@ -120,7 +176,7 @@ public partial class KeyManagementPage : ContentPage
         catch (Exception ex)
         {
             System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Error adding key: {ex.Message}");
-            await DisplayAlert("Error", $"Failed to add key: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed to add key: {ex.Message}", "OK");
         }
     }
 
@@ -134,7 +190,7 @@ public partial class KeyManagementPage : ContentPage
             )
                 return;
 
-            var action = await DisplayActionSheet(
+            var action = await DisplayActionSheetAsync(
                 $"Key: {keyItem.PublicKey[..20]}...",
                 "Cancel",
                 null,
@@ -152,7 +208,7 @@ public partial class KeyManagementPage : ContentPage
                     break;
 
                 case "Copy Public Key":
-                    await ShowCopyKeyDialogAsync(keyItem.PublicKey);
+                    await ShowCopyKeyDialogAsync(keyItem);
                     break;
 
                 case "View Private Key":
@@ -173,7 +229,7 @@ public partial class KeyManagementPage : ContentPage
             System.Diagnostics.Trace.WriteLine(
                 $"[KEYMANAGEMENT] Error handling menu: {ex.Message}"
             );
-            await DisplayAlert("Error", $"Failed: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed: {ex.Message}", "OK");
         }
     }
 
@@ -181,25 +237,7 @@ public partial class KeyManagementPage : ContentPage
     {
         try
         {
-            // Get private key for this public key (need password)
-            var password = await ShowTextInputDialogAsync(
-                "Wallet Password",
-                "Enter your wallet password:",
-                "OK",
-                "Cancel",
-                isPassword: true
-            );
-
-            if (string.IsNullOrWhiteSpace(password))
-                return;
-
-            if (!await _storageService.ValidatePasswordAsync(password))
-            {
-                await DisplayAlert("Error", "Invalid password", "OK");
-                return;
-            }
-
-            // Get private key
+            // Use session password (already validated on page entry)
             string? privateKey = null;
             if (_storageService.IsUnlocked)
             {
@@ -211,24 +249,24 @@ public partial class KeyManagementPage : ContentPage
                     keyItem.Accounts.First().Data.Account,
                     keyItem.Accounts.First().Data.Authority,
                     keyItem.Accounts.First().Data.ChainId,
-                    password
+                    _sessionPassword!
                 );
             }
 
             if (string.IsNullOrEmpty(privateKey))
             {
-                await DisplayAlert("Error", "Failed to retrieve private key", "OK");
+                await DisplayAlertAsync("Error", "Failed to retrieve private key", "OK");
                 return;
             }
 
-            await GetAndAddLinkedAccountsAsync(privateKey, password);
+            await GetAndAddLinkedAccountsAsync(privateKey, _sessionPassword!);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Trace.WriteLine(
                 $"[KEYMANAGEMENT] Error getting linked accounts: {ex.Message}"
             );
-            await DisplayAlert("Error", $"Failed: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed: {ex.Message}", "OK");
         }
     }
 
@@ -289,23 +327,17 @@ public partial class KeyManagementPage : ContentPage
             // Extract accounts from all chains (combine both responses)
             var accountsLegacy =
                 keyResponseLegacy
-                    .Chains?.SelectMany(chain =>
-                        chain.Value.Accounts
-                        ?? new List<SUS.EOS.Sharp.Services.LightApiAccountPermission>()
-                    )
+                    .Chains?.SelectMany(chain => chain.Value.Accounts ?? [])
                     .Select(acc => acc.AccountName)
                     .Distinct()
-                    .ToList() ?? new List<string>();
+                    .ToList() ?? [];
 
             var accountsModern =
                 keyResponseModern
-                    .Chains?.SelectMany(chain =>
-                        chain.Value.Accounts
-                        ?? new List<SUS.EOS.Sharp.Services.LightApiAccountPermission>()
-                    )
+                    .Chains?.SelectMany(chain => chain.Value.Accounts ?? [])
                     .Select(acc => acc.AccountName)
                     .Distinct()
-                    .ToList() ?? new List<string>();
+                    .ToList() ?? [];
 
             var accounts = accountsLegacy.Union(accountsModern).Distinct().ToList();
 
@@ -327,7 +359,7 @@ public partial class KeyManagementPage : ContentPage
 
             if (accounts.Count == 0)
             {
-                await DisplayAlert(
+                await DisplayAlertAsync(
                     "No Accounts Found",
                     $"No accounts found using this key on the current network.\n\nPublic Key: {publicKey}",
                     "OK"
@@ -445,9 +477,18 @@ public partial class KeyManagementPage : ContentPage
                                     bool matchesPublicKey = keyAuth.Key == publicKey;
                                     bool matchesLegacy = keyAuth.Key == legacyFormat;
                                     bool matchesModern = keyAuth.Key == modernFormat;
-                                    bool matchesPublicKeyIgnoreChecksum = KeysMatchIgnoringChecksum(keyAuth.Key, publicKey);
-                                    bool matchesLegacyIgnoreChecksum = KeysMatchIgnoringChecksum(keyAuth.Key, legacyFormat);
-                                    bool matchesModernIgnoreChecksum = KeysMatchIgnoringChecksum(keyAuth.Key, modernFormat);
+                                    bool matchesPublicKeyIgnoreChecksum = KeysMatchIgnoringChecksum(
+                                        keyAuth.Key,
+                                        publicKey
+                                    );
+                                    bool matchesLegacyIgnoreChecksum = KeysMatchIgnoringChecksum(
+                                        keyAuth.Key,
+                                        legacyFormat
+                                    );
+                                    bool matchesModernIgnoreChecksum = KeysMatchIgnoringChecksum(
+                                        keyAuth.Key,
+                                        modernFormat
+                                    );
 
                                     System.Diagnostics.Trace.WriteLine(
                                         $"[KEYMANAGEMENT]   Comparing {keyAuth.Key}:"
@@ -459,8 +500,14 @@ public partial class KeyManagementPage : ContentPage
                                         $"[KEYMANAGEMENT]     Ignore checksum: publicKey={matchesPublicKeyIgnoreChecksum}, legacy={matchesLegacyIgnoreChecksum}, modern={matchesModernIgnoreChecksum}"
                                     );
 
-                                    if (matchesPublicKey || matchesLegacy || matchesModern ||
-                                        matchesPublicKeyIgnoreChecksum || matchesLegacyIgnoreChecksum || matchesModernIgnoreChecksum)
+                                    if (
+                                        matchesPublicKey
+                                        || matchesLegacy
+                                        || matchesModern
+                                        || matchesPublicKeyIgnoreChecksum
+                                        || matchesLegacyIgnoreChecksum
+                                        || matchesModernIgnoreChecksum
+                                    )
                                     {
                                         System.Diagnostics.Trace.WriteLine(
                                             $"[KEYMANAGEMENT]   ✓ MATCH FOUND on {perm.PermName}: {keyAuth.Key}"
@@ -485,7 +532,7 @@ public partial class KeyManagementPage : ContentPage
                                 ) == true
                             )
                             .Select(p => p.PermName)
-                            .ToList() ?? new List<string>();
+                            .ToList() ?? [];
 
                     System.Diagnostics.Trace.WriteLine(
                         $"[KEYMANAGEMENT] Found {permissions.Count} permissions for {accountName}: {string.Join(", ", permissions)}"
@@ -540,7 +587,7 @@ public partial class KeyManagementPage : ContentPage
                 }
             }
 
-            await DisplayAlert("Success", $"Added {addedCount} account(s) to wallet", "OK");
+            await DisplayAlertAsync("Success", $"Added {addedCount} account(s) to wallet", "OK");
 
             // Reload keys
             await LoadKeysAsync();
@@ -592,21 +639,15 @@ public partial class KeyManagementPage : ContentPage
 
         foreach (var account in accounts)
         {
-            var frame = new Frame
-            {
-                BorderColor = Colors.Gray,
-                CornerRadius = 8,
-                Padding = 10,
-                HasShadow = false,
-            };
+            var frame = new Border { BackgroundColor = Colors.Gray, Padding = 10 };
 
             var grid = new Grid
             {
-                ColumnDefinitions = new ColumnDefinitionCollection
-                {
+                ColumnDefinitions =
+                [
                     new ColumnDefinition { Width = GridLength.Auto },
                     new ColumnDefinition { Width = GridLength.Star },
-                },
+                ],
                 ColumnSpacing = 10,
             };
 
@@ -685,45 +726,30 @@ public partial class KeyManagementPage : ContentPage
         {
             var details = $"Public Key (Legacy EOS):\n{keyItem.PublicKey}\n\n";
 
-            // Try to get both formats if we have access to private key
+            // Try to get both formats using session password
             try
             {
-                // Get password to access private key
-                var password = await ShowTextInputDialogAsync(
-                    "Wallet Password",
-                    "Enter password to view both key formats:\n(or cancel to skip)",
-                    "OK",
-                    "Skip",
-                    isPassword: true
-                );
-
-                if (
-                    !string.IsNullOrWhiteSpace(password)
-                    && await _storageService.ValidatePasswordAsync(password)
-                )
+                string? privateKey = null;
+                if (_storageService.IsUnlocked)
                 {
-                    string? privateKey = null;
-                    if (_storageService.IsUnlocked)
-                    {
-                        privateKey = _storageService.GetUnlockedPrivateKey(keyItem.PublicKey);
-                    }
-                    else
-                    {
-                        privateKey = await _accountService.GetPrivateKeyAsync(
-                            keyItem.Accounts.First().Data.Account,
-                            keyItem.Accounts.First().Data.Authority,
-                            keyItem.Accounts.First().Data.ChainId,
-                            password
-                        );
-                    }
+                    privateKey = _storageService.GetUnlockedPrivateKey(keyItem.PublicKey);
+                }
+                else
+                {
+                    privateKey = await _accountService.GetPrivateKeyAsync(
+                        keyItem.Accounts.First().Data.Account,
+                        keyItem.Accounts.First().Data.Authority,
+                        keyItem.Accounts.First().Data.ChainId,
+                        _sessionPassword!
+                    );
+                }
 
-                    if (!string.IsNullOrEmpty(privateKey))
-                    {
-                        var keyObj = SUS.EOS.Sharp.Cryptography.EosioKey.FromPrivateKey(privateKey);
-                        details =
-                            $"Public Key (Legacy EOS):\n{keyObj.PublicKey}\n\n"
-                            + $"Public Key (Modern PUB_K1):\n{keyObj.PublicKeyK1}\n\n";
-                    }
+                if (!string.IsNullOrEmpty(privateKey))
+                {
+                    var keyObj = SUS.EOS.Sharp.Cryptography.EosioKey.FromPrivateKey(privateKey);
+                    details =
+                        $"Public Key (Legacy EOS):\n{keyObj.PublicKey}\n\n"
+                        + $"Public Key (Modern PUB_K1):\n{keyObj.PublicKeyK1}\n\n";
                 }
             }
             catch
@@ -738,47 +764,64 @@ public partial class KeyManagementPage : ContentPage
                 details += $"• {account.Data.Account}@{account.Data.Authority}\n";
             }
 
-            await DisplayAlert("Key Details", details, "OK");
+            await DisplayAlertAsync("Key Details", details, "OK");
         }
         catch (Exception ex)
         {
             System.Diagnostics.Trace.WriteLine(
                 $"[KEYMANAGEMENT] Error showing details: {ex.Message}"
             );
-            await DisplayAlert("Error", $"Failed to show details: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed to show details: {ex.Message}", "OK");
         }
     }
 
-    private async Task ShowCopyKeyDialogAsync(string publicKey)
+    private async Task ShowCopyKeyDialogAsync(KeyItemViewModel keyItem)
     {
         try
         {
-            // Try to get the private key to derive both formats
-            // If we can't, just show the one format we have
             string? legacyFormat = null;
             string? modernFormat = null;
 
-            // Try to derive from the public key we have
-            // Check if it's legacy (EOS...) or modern (PUB_K1_...)
-            if (publicKey.StartsWith("EOS"))
+            // Use session password to derive both formats
+            try
             {
-                legacyFormat = publicKey;
-                // We can't convert EOS to PUB_K1 without the raw key bytes
-                modernFormat = "(Need private key to derive)";
+                string? privateKey = null;
+                if (_storageService.IsUnlocked)
+                {
+                    privateKey = _storageService.GetUnlockedPrivateKey(keyItem.PublicKey);
+                }
+                else
+                {
+                    privateKey = await _accountService.GetPrivateKeyAsync(
+                        keyItem.Accounts.First().Data.Account,
+                        keyItem.Accounts.First().Data.Authority,
+                        keyItem.Accounts.First().Data.ChainId,
+                        _sessionPassword!
+                    );
+                }
+
+                if (!string.IsNullOrEmpty(privateKey))
+                {
+                    var keyObj = SUS.EOS.Sharp.Cryptography.EosioKey.FromPrivateKey(privateKey);
+                    legacyFormat = keyObj.PublicKey;
+                    modernFormat = keyObj.PublicKeyK1;
+                }
+                else
+                {
+                    // Fallback to stored public key
+                    legacyFormat = keyItem.PublicKey;
+                    modernFormat = "(Could not derive)";
+                }
             }
-            else if (publicKey.StartsWith("PUB_K1_"))
+            catch (Exception ex)
             {
-                modernFormat = publicKey;
-                // We can't convert PUB_K1 to EOS without the raw key bytes
-                legacyFormat = "(Need private key to derive)";
-            }
-            else
-            {
-                legacyFormat = publicKey;
-                modernFormat = publicKey;
+                System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Error deriving key formats: {ex.Message}");
+                // Fallback to stored public key
+                legacyFormat = keyItem.PublicKey;
+                modernFormat = "(Could not derive)";
             }
 
-            var action = await DisplayActionSheet(
+            var action = await DisplayActionSheetAsync(
                 "Select Format to Copy",
                 "Cancel",
                 null,
@@ -791,23 +834,23 @@ public partial class KeyManagementPage : ContentPage
                 string textToCopy;
                 if (action.StartsWith("Legacy"))
                 {
-                    textToCopy = legacyFormat ?? publicKey;
+                    textToCopy = legacyFormat ?? keyItem.PublicKey;
                 }
                 else
                 {
-                    textToCopy = modernFormat ?? publicKey;
+                    textToCopy = modernFormat ?? keyItem.PublicKey;
                 }
 
-                if (!textToCopy.Contains("Need private key"))
+                if (!textToCopy.Contains("Could not derive"))
                 {
                     await Clipboard.SetTextAsync(textToCopy);
-                    await DisplayAlert("Copied", "Public key copied to clipboard", "OK");
+                    await DisplayAlertAsync("Copied", "Public key copied to clipboard", "OK");
                 }
                 else
                 {
-                    await DisplayAlert(
+                    await DisplayAlertAsync(
                         "Cannot Copy",
-                        "This format requires the private key to derive. Use 'View Private Key' first.",
+                        "Could not derive this key format.",
                         "OK"
                     );
                 }
@@ -816,7 +859,7 @@ public partial class KeyManagementPage : ContentPage
         catch (Exception ex)
         {
             System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Error copying key: {ex.Message}");
-            await DisplayAlert("Error", $"Failed to copy key: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed to copy key: {ex.Message}", "OK");
         }
     }
 
@@ -824,25 +867,7 @@ public partial class KeyManagementPage : ContentPage
     {
         try
         {
-            // Get password
-            var password = await ShowTextInputDialogAsync(
-                "Wallet Password",
-                "Enter your wallet password to view the private key:",
-                "OK",
-                "Cancel",
-                isPassword: true
-            );
-
-            if (string.IsNullOrWhiteSpace(password))
-                return;
-
-            if (!await _storageService.ValidatePasswordAsync(password))
-            {
-                await DisplayAlert("Error", "Invalid password", "OK");
-                return;
-            }
-
-            // Get private key
+            // Use session password (already validated on page entry)
             string? privateKey = null;
             if (_storageService.IsUnlocked)
             {
@@ -854,18 +879,18 @@ public partial class KeyManagementPage : ContentPage
                     keyItem.Accounts.First().Data.Account,
                     keyItem.Accounts.First().Data.Authority,
                     keyItem.Accounts.First().Data.ChainId,
-                    password
+                    _sessionPassword!
                 );
             }
 
             if (string.IsNullOrEmpty(privateKey))
             {
-                await DisplayAlert("Error", "Failed to retrieve private key", "OK");
+                await DisplayAlertAsync("Error", "Failed to retrieve private key", "OK");
                 return;
             }
 
             // Show private key with copy option
-            var result = await DisplayAlert(
+            var result = await DisplayAlertAsync(
                 "Private Key",
                 $"Private Key:\n{privateKey}\n\n⚠️ Keep this secure! Never share your private key.",
                 "Copy to Clipboard",
@@ -875,7 +900,7 @@ public partial class KeyManagementPage : ContentPage
             if (result)
             {
                 await Clipboard.SetTextAsync(privateKey);
-                await DisplayAlert("Copied", "Private key copied to clipboard", "OK");
+                await DisplayAlertAsync("Copied", "Private key copied to clipboard", "OK");
             }
         }
         catch (Exception ex)
@@ -883,13 +908,13 @@ public partial class KeyManagementPage : ContentPage
             System.Diagnostics.Trace.WriteLine(
                 $"[KEYMANAGEMENT] Error viewing private key: {ex.Message}"
             );
-            await DisplayAlert("Error", $"Failed to view private key: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed to view private key: {ex.Message}", "OK");
         }
     }
 
     private async Task RemoveKeyFromWalletAsync(KeyItemViewModel keyItem)
     {
-        var confirm = await DisplayAlert(
+        var confirm = await DisplayAlertAsync(
             "Confirm Removal",
             $"Are you sure you want to remove this key?\n\n"
                 + $"This will remove {keyItem.AccountCount} account(s) from the wallet:\n"
@@ -917,13 +942,17 @@ public partial class KeyManagementPage : ContentPage
                 );
             }
 
-            await DisplayAlert("Success", "Key and associated accounts removed from wallet", "OK");
+            await DisplayAlertAsync(
+                "Success",
+                "Key and associated accounts removed from wallet",
+                "OK"
+            );
             await LoadKeysAsync();
         }
         catch (Exception ex)
         {
             System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Error removing key: {ex.Message}");
-            await DisplayAlert("Error", $"Failed to remove key: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed to remove key: {ex.Message}", "OK");
         }
     }
 
@@ -943,6 +972,13 @@ public partial class KeyManagementPage : ContentPage
         var dialogPage = new ContentPage
         {
             BackgroundColor = Color.FromArgb("#80000000"), // Semi-transparent overlay
+        };
+
+        // Handle hardware/software back button on the dialog
+        dialogPage.Disappearing += (s, e) =>
+        {
+            // If the dialog is dismissed without button click, cancel the operation
+            tcs.TrySetResult(null);
         };
 
         var entry = new Entry
@@ -973,22 +1009,22 @@ public partial class KeyManagementPage : ContentPage
             Padding = new Thickness(20, 10),
         };
 
-        acceptButton.Clicked += (s, e) =>
+        acceptButton.Clicked += async (s, e) =>
         {
+            await Navigation.PopModalAsync();
             tcs.TrySetResult(entry.Text);
-            Navigation.PopModalAsync();
         };
 
-        cancelButton.Clicked += (s, e) =>
+        cancelButton.Clicked += async (s, e) =>
         {
+            await Navigation.PopModalAsync();
             tcs.TrySetResult(null);
-            Navigation.PopModalAsync();
         };
 
-        entry.Completed += (s, e) =>
+        entry.Completed += async (s, e) =>
         {
+            await Navigation.PopModalAsync();
             tcs.TrySetResult(entry.Text);
-            Navigation.PopModalAsync();
         };
 
         var dialogFrame = new Border
@@ -1045,19 +1081,23 @@ public partial class KeyManagementPage : ContentPage
     /// </summary>
     private static bool KeysMatchIgnoringChecksum(string key1, string key2)
     {
-        if (key1 == key2) return true;
-        if (string.IsNullOrEmpty(key1) || string.IsNullOrEmpty(key2)) return false;
+        if (key1 == key2)
+            return true;
+        if (string.IsNullOrEmpty(key1) || string.IsNullOrEmpty(key2))
+            return false;
 
         // Strip prefixes
         var k1 = key1.Replace("EOS", "").Replace("PUB_K1_", "").Replace("PUB_R1_", "");
         var k2 = key2.Replace("EOS", "").Replace("PUB_K1_", "").Replace("PUB_R1_", "");
 
         // If lengths differ significantly, not a match
-        if (Math.Abs(k1.Length - k2.Length) > 5) return false;
+        if (Math.Abs(k1.Length - k2.Length) > 5)
+            return false;
 
         // Compare first N-5 characters (ignoring last 5 which contain checksum)
         var compareLength = Math.Min(k1.Length, k2.Length) - 5;
-        if (compareLength <= 0) return false;
+        if (compareLength <= 0)
+            return false;
 
         return k1[..compareLength] == k2[..compareLength];
     }
@@ -1067,7 +1107,7 @@ public class KeyItemViewModel
 {
     public string PublicKey { get; set; } = string.Empty;
     public int AccountCount { get; set; }
-    public List<WalletAccount> Accounts { get; set; } = new();
+    public List<WalletAccount> Accounts { get; set; } = [];
 
     public string AccountCountText => AccountCount == 1 ? "1 account" : $"{AccountCount} accounts";
 }

@@ -19,7 +19,7 @@
       </Border>
 
       <!-- Quick Actions -->
-      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
         <Border Grid.Column="0" Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="16">
           <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
             <Button Text="📤" FontSize="24" BackgroundColor="{DynamicResource Primary}" TextColor="White" WidthRequest="50" HeightRequest="50" CornerRadius="25" Clicked="OnSendClicked" />
@@ -27,12 +27,6 @@
           </VerticalStackLayout>
         </Border>
         <Border Grid.Column="1" Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="16">
-          <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
-            <Button Text="📥" FontSize="24" BackgroundColor="{DynamicResource Secondary}" TextColor="White" WidthRequest="50" HeightRequest="50" CornerRadius="25" Clicked="OnReceiveClicked" />
-            <Label Text="Receive" FontSize="12" HorizontalTextAlignment="Center" />
-          </VerticalStackLayout>
-        </Border>
-        <Border Grid.Column="2" Stroke="{DynamicResource Gray200}" StrokeShape="RoundRectangle 12" Padding="16">
           <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
             <Button Text="⚡" FontSize="24" BackgroundColor="{DynamicResource Tertiary}" TextColor="White" WidthRequest="50" HeightRequest="50" CornerRadius="25" Clicked="OnStakeClicked" />
             <Label Text="Stake" FontSize="12" HorizontalTextAlignment="Center" />

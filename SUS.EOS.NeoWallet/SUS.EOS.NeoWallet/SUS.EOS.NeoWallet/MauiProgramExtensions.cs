@@ -70,7 +70,6 @@ namespace SUS.EOS.NeoWallet
             builder.Services.AddTransient<MainPage>();
             builder.Services.AddTransient<DashboardPage>();
             builder.Services.AddTransient<SendPage>();
-            builder.Services.AddTransient<ReceivePage>();
             builder.Services.AddTransient<CreateAccountPage>();
             builder.Services.AddTransient<ImportWalletPage>();
             builder.Services.AddTransient<RecoverAccountPage>();
@@ -80,7 +79,8 @@ namespace SUS.EOS.NeoWallet
             builder.Services.AddTransient<SettingsPage>();
             builder.Services.AddTransient<EsrSigningPopupPage>();
             builder.Services.AddTransient<KeyManagementPage>();
-        builder.Services.AddTransient<AccountManagementPage>();
+            builder.Services.AddTransient<ContractActionsPage>();
+            builder.Services.AddTransient<AccountManagementPage>();
 
 #if DEBUG
             builder.Logging.AddDebug();

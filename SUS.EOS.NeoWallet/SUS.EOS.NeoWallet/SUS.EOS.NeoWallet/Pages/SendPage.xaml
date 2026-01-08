@@ -3,125 +3,336 @@
   xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
   xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
   x:Class="SUS.EOS.NeoWallet.Pages.SendPage"
-  Title="Send"
-  BackgroundColor="{DynamicResource PageBackgroundColor}">
+  Title="Send Assets"
+  BackgroundColor="{DynamicResource PageBackgroundColor}"
+>
   <ScrollView>
-    <VerticalStackLayout Padding="32" Spacing="24" MaximumWidthRequest="500" HorizontalOptions="Center">
-      
+    <VerticalStackLayout
+      Padding="20,16"
+      Spacing="24"
+      MaximumWidthRequest="600"
+      HorizontalOptions="Center"
+      WidthRequest="{OnPlatform 340, Default=600}"
+    >
       <!-- Header -->
-      <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
-        <Border BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 24" StrokeThickness="0" WidthRequest="64" HeightRequest="64" HorizontalOptions="Center">
-          <Label Text="↑" FontSize="28" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center" />
+      <VerticalStackLayout Spacing="12" HorizontalOptions="Center">
+        <Border
+          BackgroundColor="{DynamicResource Primary}"
+          StrokeShape="RoundRectangle 24"
+          StrokeThickness="0"
+          WidthRequest="64"
+          HeightRequest="64"
+          HorizontalOptions="Center"
+        >
+          <Label
+            Text="↑"
+            FontSize="32"
+            FontAttributes="Bold"
+            TextColor="White"
+            HorizontalOptions="Center"
+            VerticalOptions="Center"
+          />
         </Border>
-        <Label Text="Send Assets" FontSize="28" FontAttributes="Bold" HorizontalTextAlignment="Center" TextColor="{DynamicResource TextPrimary}" />
-        <Label Text="Transfer tokens to another account" FontSize="14" HorizontalTextAlignment="Center" TextColor="{DynamicResource TextSecondary}" />
+        <VerticalStackLayout Spacing="4">
+          <Label
+            Text="Send Assets"
+            FontSize="28"
+            FontAttributes="Bold"
+            HorizontalTextAlignment="Center"
+            TextColor="{DynamicResource TextPrimary}"
+          />
+          <Label
+            Text="Transfer tokens on EOSIO chains"
+            FontSize="14"
+            HorizontalTextAlignment="Center"
+            TextColor="{DynamicResource TextSecondary}"
+          />
+        </VerticalStackLayout>
       </VerticalStackLayout>
-      
       <!-- Main Form Card -->
-      <Border BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24">
+      <Border
+        BackgroundColor="{DynamicResource Card}"
+        StrokeShape="RoundRectangle 16"
+        Stroke="{DynamicResource Border}"
+        StrokeThickness="1"
+        Padding="20"
+      >
         <VerticalStackLayout Spacing="20">
-          
+          <!-- From Account -->
+          <VerticalStackLayout Spacing="6">
+            <Label
+              Text="From Account"
+              FontSize="13"
+              FontAttributes="Bold"
+              TextColor="{DynamicResource TextSecondary}"
+            />
+            <Border
+              BackgroundColor="{DynamicResource Surface}"
+              StrokeShape="RoundRectangle 10"
+              StrokeThickness="0"
+              Padding="0"
+            >
+              <Picker
+                x:Name="FromAccountPicker"
+                Title="Select account"
+                BackgroundColor="Transparent"
+                TextColor="{DynamicResource TextPrimary}"
+                FontSize="15"
+                HeightRequest="44"
+                TitleColor="{DynamicResource TextSecondary}"
+              />
+            </Border>
+          </VerticalStackLayout>
           <!-- Asset Selection -->
-          <VerticalStackLayout Spacing="8">
-            <Label Text="Asset" FontSize="13" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" />
-            <Border BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 10" StrokeThickness="0" Padding="4">
-              <Picker x:Name="AssetPicker" Title="Select asset" SelectedIndexChanged="OnAssetChanged" BackgroundColor="Transparent">
+          <VerticalStackLayout Spacing="6">
+            <Label
+              Text="Token"
+              FontSize="13"
+              FontAttributes="Bold"
+              TextColor="{DynamicResource TextSecondary}"
+            />
+            <Border
+              BackgroundColor="{DynamicResource Surface}"
+              StrokeShape="RoundRectangle 10"
+              StrokeThickness="0"
+              Padding="0"
+            >
+              <Picker
+                x:Name="AssetPicker"
+                Title="Select token"
+                SelectedIndexChanged="OnAssetChanged"
+                BackgroundColor="Transparent"
+                TextColor="{DynamicResource TextPrimary}"
+                FontSize="15"
+                HeightRequest="44"
+                TitleColor="{DynamicResource TextSecondary}"
+              >
                 <Picker.Items>
-                  <x:String>WAX</x:String>
-                  <x:String>TLM</x:String>
+                  <x:String>WAX (8 decimals)</x:String>
+                  <x:String>TLM (4 decimals)</x:String>
                 </Picker.Items>
               </Picker>
             </Border>
           </VerticalStackLayout>
-
           <!-- Recipient -->
-          <VerticalStackLayout Spacing="8">
-            <Label Text="Recipient Account" FontSize="13" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" />
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-              <Entry x:Name="RecipientEntry" Grid.Column="0" Placeholder="e.g. myaccount123" />
-              <Button Grid.Column="1" Text="📷" BackgroundColor="{DynamicResource Surface}" TextColor="{DynamicResource TextPrimary}" WidthRequest="44" HeightRequest="44" CornerRadius="10" Clicked="OnScanAddressClicked" />
-            </Grid>
-            <Label x:Name="AddressValidationLabel" Text="" FontSize="11" IsVisible="False" />
+          <VerticalStackLayout Spacing="6">
+            <Label
+              Text="To Account"
+              FontSize="13"
+              FontAttributes="Bold"
+              TextColor="{DynamicResource TextSecondary}"
+            />
+            <Entry
+              x:Name="RecipientEntry"
+              Placeholder="accountname"
+              PlaceholderColor="{DynamicResource TextTertiary}"
+              MaxLength="12"
+              HeightRequest="44"
+              BackgroundColor="{DynamicResource Surface}"
+              TextColor="{DynamicResource TextPrimary}"
+              FontSize="15"
+              ClearButtonVisibility="WhileEditing"
+            />
+            <Label
+              x:Name="AddressValidationLabel"
+              Text=""
+              FontSize="11"
+              IsVisible="False"
+              TextColor="#FF4444"
+              Margin="4,0,0,0"
+            />
           </VerticalStackLayout>
-
           <!-- Amount -->
-          <VerticalStackLayout Spacing="8">
+          <VerticalStackLayout Spacing="6">
             <Grid ColumnDefinitions="*,Auto">
-              <Label Grid.Column="0" Text="Amount" FontSize="13" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" />
-              <Label Grid.Column="1" x:Name="AvailableLabel" Text="Available: 0.0000" FontSize="11" TextColor="{DynamicResource TextSecondary}" />
+              <Label
+                Grid.Column="0"
+                Text="Amount"
+                FontSize="13"
+                FontAttributes="Bold"
+                TextColor="{DynamicResource TextSecondary}"
+              />
+              <Label
+                Grid.Column="1"
+                x:Name="AvailableLabel"
+                Text="Available: 0.00000000"
+                FontSize="11"
+                TextColor="{DynamicResource TextSecondary}"
+              />
             </Grid>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-              <Entry x:Name="AmountEntry" Grid.Column="0" Placeholder="0.0000" Keyboard="Numeric" TextChanged="OnAmountChanged" FontSize="18" />
-              <Button Grid.Column="1" Text="MAX" BackgroundColor="{DynamicResource Surface}" TextColor="{DynamicResource Primary}" FontSize="12" FontAttributes="Bold" WidthRequest="60" HeightRequest="44" CornerRadius="10" Clicked="OnMaxClicked" />
+              <Border
+                Grid.Column="0"
+                BackgroundColor="{DynamicResource Surface}"
+                StrokeShape="RoundRectangle 10"
+                StrokeThickness="0"
+                Padding="12,0"
+              >
+                <Entry
+                  x:Name="AmountEntry"
+                  Placeholder="0.00000000"
+                  PlaceholderColor="{DynamicResource TextTertiary}"
+                  Keyboard="Numeric"
+                  TextChanged="OnAmountChanged"
+                  FontSize="18"
+                  TextColor="{DynamicResource TextPrimary}"
+                  BackgroundColor="Transparent"
+                  ClearButtonVisibility="WhileEditing"
+                />
+              </Border>
+              <Button
+                Grid.Column="1"
+                Text="MAX"
+                BackgroundColor="{DynamicResource Primary}"
+                TextColor="White"
+                FontSize="12"
+                FontAttributes="Bold"
+                WidthRequest="70"
+                HeightRequest="44"
+                CornerRadius="8"
+                Clicked="OnMaxClicked"
+              />
             </Grid>
-            <Label x:Name="AmountUsdLabel" Text="≈ $0.00 USD" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+            <Label
+              x:Name="AmountUsdLabel"
+              Text="≈ $0.00 USD"
+              FontSize="12"
+              TextColor="{DynamicResource TextSecondary}"
+              Margin="4,0,0,0"
+            />
           </VerticalStackLayout>
-
           <!-- Memo -->
-          <VerticalStackLayout Spacing="8">
-            <Label Text="Memo (Optional)" FontSize="13" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" />
-            <Entry x:Name="MemoEntry" Placeholder="Transaction memo" MaxLength="256" />
-          </VerticalStackLayout>
-
-          <!-- Fee Selection -->
-          <VerticalStackLayout Spacing="8">
-            <Label Text="Transaction Speed" FontSize="13" FontAttributes="Bold" TextColor="{DynamicResource TextSecondary}" />
-            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-              <Border x:Name="SlowFeeBorder" Grid.Column="0" BackgroundColor="Transparent" StrokeShape="RoundRectangle 10" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="12,10">
-                <Border.GestureRecognizers>
-                  <TapGestureRecognizer Tapped="OnSlowFeeClicked" />
-                </Border.GestureRecognizers>
-                <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
-                  <Label Text="🐢" FontSize="16" HorizontalOptions="Center" />
-                  <Label Text="Slow" FontSize="12" HorizontalTextAlignment="Center" TextColor="{DynamicResource TextPrimary}" />
-                </VerticalStackLayout>
-              </Border>
-              <Border x:Name="NormalFeeBorder" Grid.Column="1" BackgroundColor="{DynamicResource Primary}" StrokeShape="RoundRectangle 10" StrokeThickness="0" Padding="12,10">
-                <Border.GestureRecognizers>
-                  <TapGestureRecognizer Tapped="OnNormalFeeClicked" />
-                </Border.GestureRecognizers>
-                <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
-                  <Label Text="⚡" FontSize="16" HorizontalOptions="Center" />
-                  <Label Text="Normal" FontSize="12" HorizontalTextAlignment="Center" TextColor="White" />
-                </VerticalStackLayout>
-              </Border>
-              <Border x:Name="FastFeeBorder" Grid.Column="2" BackgroundColor="Transparent" StrokeShape="RoundRectangle 10" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="12,10">
-                <Border.GestureRecognizers>
-                  <TapGestureRecognizer Tapped="OnFastFeeClicked" />
-                </Border.GestureRecognizers>
-                <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
-                  <Label Text="🚀" FontSize="16" HorizontalOptions="Center" />
-                  <Label Text="Fast" FontSize="12" HorizontalTextAlignment="Center" TextColor="{DynamicResource TextPrimary}" />
-                </VerticalStackLayout>
-              </Border>
-            </Grid>
+          <VerticalStackLayout Spacing="6">
+            <Label
+              Text="Memo (Optional)"
+              FontSize="13"
+              FontAttributes="Bold"
+              TextColor="{DynamicResource TextSecondary}"
+            />
+            <Entry
+              x:Name="MemoEntry"
+              Placeholder="Optional transaction memo"
+              PlaceholderColor="{DynamicResource TextTertiary}"
+              MaxLength="256"
+              HeightRequest="44"
+              BackgroundColor="{DynamicResource Surface}"
+              TextColor="{DynamicResource TextPrimary}"
+              FontSize="15"
+              ClearButtonVisibility="WhileEditing"
+            />
+            <Label
+              Text="Note: Some exchanges require a memo"
+              FontSize="11"
+              TextColor="{DynamicResource TextSecondary}"
+              Margin="4,0,0,0"
+            />
           </VerticalStackLayout>
         </VerticalStackLayout>
       </Border>
-
-      <!-- Summary Card -->
-      <Border BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 12" StrokeThickness="0" Padding="20">
-        <VerticalStackLayout Spacing="12">
-          <Grid ColumnDefinitions="*,Auto">
-            <Label Grid.Column="0" Text="You're sending" FontSize="14" TextColor="{DynamicResource TextSecondary}" />
-            <Label Grid.Column="1" x:Name="SendingSummary" Text="0 WAX" FontSize="14" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
-          </Grid>
-          <Grid ColumnDefinitions="*,Auto">
-            <Label Grid.Column="0" Text="Network fee" FontSize="14" TextColor="{DynamicResource TextSecondary}" />
-            <Label Grid.Column="1" x:Name="FeeSummary" Text="Free (staked)" FontSize="14" TextColor="{DynamicResource TextPrimary}" />
-          </Grid>
-          <BoxView HeightRequest="1" Color="{DynamicResource Border}" Margin="0,4" />
-          <Grid ColumnDefinitions="*,Auto">
-            <Label Grid.Column="0" Text="Total" FontSize="16" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
-            <Label Grid.Column="1" x:Name="TotalSummary" Text="0 WAX" FontSize="16" FontAttributes="Bold" TextColor="{DynamicResource Primary}" />
+      <!-- Transaction Details Card -->
+      <Border
+        BackgroundColor="{DynamicResource Surface}"
+        StrokeShape="RoundRectangle 12"
+        StrokeThickness="0"
+        Padding="16"
+      >
+        <VerticalStackLayout Spacing="10">
+          <Label
+            Text="Transaction Details"
+            FontSize="14"
+            FontAttributes="Bold"
+            TextColor="{DynamicResource TextPrimary}"
+          />
+          <BoxView HeightRequest="1" Color="{DynamicResource Border}" Margin="0,4,0,8" />
+          <Grid ColumnDefinitions="*,Auto" RowSpacing="8">
+            <Label
+              Grid.Row="0"
+              Grid.Column="0"
+              Text="You're sending"
+              FontSize="13"
+              TextColor="{DynamicResource TextSecondary}"
+            />
+            <Label
+              Grid.Row="0"
+              Grid.Column="1"
+              x:Name="SendingSummary"
+              Text="0 WAX"
+              FontSize="13"
+              FontAttributes="Bold"
+              TextColor="{DynamicResource TextPrimary}"
+            />
+            <Label
+              Grid.Row="1"
+              Grid.Column="0"
+              Text="Network fee"
+              FontSize="13"
+              TextColor="{DynamicResource TextSecondary}"
+            />
+            <Label
+              Grid.Row="1"
+              Grid.Column="1"
+              x:Name="FeeSummary"
+              Text="Free (CPU/NET staked)"
+              FontSize="13"
+              TextColor="#4CAF50"
+              FontAttributes="Bold"
+            />
+            <Label
+              Grid.Row="2"
+              Grid.Column="0"
+              Text="Contract"
+              FontSize="13"
+              TextColor="{DynamicResource TextSecondary}"
+            />
+            <Label
+              Grid.Row="2"
+              Grid.Column="1"
+              x:Name="ContractLabel"
+              Text="eosio.token"
+              FontSize="13"
+              TextColor="{DynamicResource TextSecondary}"
+              FontFamily="Consolas"
+            />
           </Grid>
         </VerticalStackLayout>
       </Border>
-
-      <!-- Buttons -->
-      <Button x:Name="SendButton" Text="Send Transaction" BackgroundColor="{DynamicResource Primary}" TextColor="White" HeightRequest="54" CornerRadius="12" FontAttributes="Bold" FontSize="16" IsEnabled="False" Clicked="OnSendClicked" />
-      <Button Text="Cancel" BackgroundColor="Transparent" TextColor="{DynamicResource TextSecondary}" BorderColor="{DynamicResource Border}" BorderWidth="1" HeightRequest="50" CornerRadius="12" Clicked="OnCancelClicked" />
-      
+      <!-- Action Buttons -->
+      <VerticalStackLayout Spacing="12">
+        <Button
+          x:Name="SendButton"
+          Text="Review &amp; Send"
+          BackgroundColor="{DynamicResource Primary}"
+          TextColor="White"
+          HeightRequest="52"
+          CornerRadius="10"
+          FontAttributes="Bold"
+          FontSize="16"
+          IsEnabled="False"
+          Clicked="OnSendClicked"
+          Margin="0,8,0,0"
+        />
+        <Button
+          Text="Cancel"
+          BackgroundColor="Transparent"
+          TextColor="{DynamicResource TextSecondary}"
+          BorderColor="{DynamicResource Border}"
+          BorderWidth="1"
+          HeightRequest="48"
+          CornerRadius="10"
+          Clicked="OnCancelClicked"
+        />
+      </VerticalStackLayout>
+      <!-- Loading Indicator -->
+      <ActivityIndicator
+        x:Name="LoadingIndicator"
+        IsVisible="False"
+        IsRunning="False"
+        Color="{DynamicResource Primary}"
+        HeightRequest="50"
+        WidthRequest="50"
+        HorizontalOptions="Center"
+        Margin="0,20,0,0"
+      />
     </VerticalStackLayout>
   </ScrollView>
 </ContentPage>

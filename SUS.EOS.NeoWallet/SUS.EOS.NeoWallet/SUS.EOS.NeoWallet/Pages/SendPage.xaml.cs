@@ -96,50 +96,6 @@ public partial class SendPage : ContentPage
         AmountEntry.Text = "0";
     }
 
-    private void OnSlowFeeClicked(object sender, EventArgs e)
-    {
-        UpdateFeeSelection("slow");
-    }
-
-    private void OnNormalFeeClicked(object sender, EventArgs e)
-    {
-        UpdateFeeSelection("normal");
-    }
-
-    private void OnFastFeeClicked(object sender, EventArgs e)
-    {
-        UpdateFeeSelection("fast");
-    }
-
-    private void UpdateFeeSelection(string speed)
-    {
-        // Reset all borders
-        SlowFeeBorder.BackgroundColor = Colors.Transparent;
-        SlowFeeBorder.Stroke = (Color)Application.Current!.Resources["Border"];
-        NormalFeeBorder.BackgroundColor = Colors.Transparent;
-        NormalFeeBorder.Stroke = (Color)Application.Current!.Resources["Border"];
-        FastFeeBorder.BackgroundColor = Colors.Transparent;
-        FastFeeBorder.Stroke = (Color)Application.Current!.Resources["Border"];
-
-        // Highlight selected
-        var primaryColor = (Color)Application.Current!.Resources["Primary"];
-        switch (speed)
-        {
-            case "slow":
-                SlowFeeBorder.BackgroundColor = primaryColor;
-                SlowFeeBorder.Stroke = primaryColor;
-                break;
-            case "normal":
-                NormalFeeBorder.BackgroundColor = primaryColor;
-                NormalFeeBorder.Stroke = primaryColor;
-                break;
-            case "fast":
-                FastFeeBorder.BackgroundColor = primaryColor;
-                FastFeeBorder.Stroke = primaryColor;
-                break;
-        }
-    }
-
     private async void OnSendClicked(object sender, EventArgs e)
     {
         try

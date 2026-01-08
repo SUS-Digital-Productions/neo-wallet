@@ -15,7 +15,6 @@ namespace SUS.EOS.NeoWallet
             Routing.RegisterRoute("MainPage", typeof(MainPage));
             Routing.RegisterRoute("DashboardPage", typeof(DashboardPage));
             Routing.RegisterRoute("SendPage", typeof(SendPage));
-            Routing.RegisterRoute("ReceivePage", typeof(ReceivePage));
             Routing.RegisterRoute("CreateAccountPage", typeof(CreateAccountPage));
             Routing.RegisterRoute("ImportWalletPage", typeof(ImportWalletPage));
             Routing.RegisterRoute("RecoverAccountPage", typeof(RecoverAccountPage));

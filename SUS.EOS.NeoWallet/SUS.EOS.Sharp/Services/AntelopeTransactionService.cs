@@ -357,6 +357,8 @@ public class BlockchainOperationsService : IBlockchainOperationsService
         return await _client.PushTransactionAsync(new
         {
             signatures = signedTx.Signatures,
+            compression = 0,
+            packed_context_free_data = "",
             packed_trx = signedTx.PackedTransaction
         });
     }
@@ -388,6 +390,8 @@ public class BlockchainOperationsService : IBlockchainOperationsService
         return await _client.PushTransactionAsync(new
         {
             signatures = signedTx.Signatures,
+            compression = 0,
+            packed_context_free_data = "",
             packed_trx = signedTx.PackedTransaction
         });
     }
@@ -418,6 +422,8 @@ public class BlockchainOperationsService : IBlockchainOperationsService
         return await _client.PushTransactionAsync(new
         {
             signatures = signedTx.Signatures,
+            compression = 0,
+            packed_context_free_data = "",
             packed_trx = signedTx.PackedTransaction
         });
     }

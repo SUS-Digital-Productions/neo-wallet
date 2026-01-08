@@ -99,11 +99,6 @@ public partial class DashboardPage : ContentPage
         await Shell.Current.GoToAsync("SendPage");
     }
 
-    private async void OnReceiveClicked(object sender, EventArgs e)
-    {
-        await Shell.Current.GoToAsync("ReceivePage");
-    }
-
     private async void OnStakeClicked(object sender, EventArgs e)
     {
         await Shell.Current.GoToAsync("StakingPage");

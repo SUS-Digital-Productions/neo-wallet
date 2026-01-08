@@ -13,6 +13,7 @@
     <Platform Project="x64" />
   </Project>
   <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj" />
+  <Project Path="SUS.EOS.Sharp.TestAction/SUS.EOS.Sharp.TestAction.csproj" />
   <Project Path="SUS.EOS.Sharp.Tests/SUS.EOS.Sharp.Tests.csproj" />
   <Project Path="SUS.EOS.Sharp/SUS.EOS.Sharp.csproj" />
 </Solution>

@@ -81,55 +81,17 @@
         <VerticalStackLayout Spacing="16">
           <Label Text="Action Parameters" FontSize="18" FontAttributes="Bold" />
           <Label
-            Text="Enter JSON parameters for the action"
+            Text="Enter parameters for the action"
             FontSize="14"
             TextColor="{DynamicResource Gray600}"
           />
-          <ScrollView HeightRequest="200">
-            <Border BackgroundColor="{DynamicResource Gray100}" Padding="12" Shadow="True">
-              <Editor
-                x:Name="ParametersEditor"
-                FontFamily="Courier"
-                FontSize="12"
-                AutoSize="TextChanges"
-                MinimumHeightRequest="150"
-              />
-            </Border>
-          </ScrollView>
-          <VerticalStackLayout Spacing="8">
-            <Label Text="Quick Templates" FontSize="14" FontAttributes="Bold" />
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" RowSpacing="8">
-              <Button
-                Grid.Row="0"
-                Grid.Column="0"
-                Text="Transfer"
-                Clicked="OnTemplateTransferClicked"
-                BackgroundColor="Transparent"
-                BorderColor="{DynamicResource Primary}"
-                BorderWidth="1"
-                TextColor="{DynamicResource Primary}"
-                FontSize="12"
-              />
-              <Button
-                Grid.Row="0"
-                Grid.Column="1"
-                Text="Issue"
-                Clicked="OnTemplateIssueClicked"
-                BackgroundColor="Transparent"
-                BorderColor="{DynamicResource Primary}"
-                BorderWidth="1"
-                TextColor="{DynamicResource Primary}"
-                FontSize="12"
-              />
-            </Grid>
-          </VerticalStackLayout>
+          <VerticalStackLayout x:Name="DynamicFieldsContainer" Spacing="12" />
           <VerticalStackLayout Spacing="8">
             <Label Text="Actor (Your Account)" FontSize="14" FontAttributes="Bold" />
-            <Label
-              x:Name="ActorLabel"
-              Text="No account selected"
+            <Entry
+              x:Name="ActorEntry"
+              Placeholder="Enter account name"
               FontSize="14"
-              TextColor="{DynamicResource Gray600}"
             />
           </VerticalStackLayout>
           <VerticalStackLayout Spacing="8">

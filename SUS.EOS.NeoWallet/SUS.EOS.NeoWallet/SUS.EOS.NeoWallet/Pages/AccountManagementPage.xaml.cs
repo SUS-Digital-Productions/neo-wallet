@@ -11,13 +11,14 @@ public partial class AccountManagementPage : ContentPage
     private readonly IWalletContextService _walletContext;
     private readonly INetworkService _networkService;
 
-    public ObservableCollection<AccountItemViewModel> Accounts { get; } = new();
+    public ObservableCollection<AccountItemViewModel> Accounts { get; } = [];
 
     public AccountManagementPage(
         IWalletStorageService storageService,
         IWalletAccountService accountService,
         IWalletContextService walletContext,
-        INetworkService networkService)
+        INetworkService networkService
+    )
     {
         InitializeComponent();
         _storageService = storageService;
@@ -59,29 +60,38 @@ public partial class AccountManagementPage : ContentPage
             foreach (var account in wallet.Wallets)
             {
                 var chainName = "Unknown Chain";
-                var networkEntry = networks.FirstOrDefault(n => n.Value.ChainId == account.Data.ChainId);
+                var networkEntry = networks.FirstOrDefault(n =>
+                    n.Value.ChainId == account.Data.ChainId
+                );
                 if (!string.IsNullOrEmpty(networkEntry.Key))
                 {
                     chainName = networkEntry.Value.Name;
                 }
 
-                Accounts.Add(new AccountItemViewModel
-                {
-                    Account = account,
-                    AccountName = $"{account.Data.Account}@{account.Data.Authority}",
-                    ChainName = chainName,
-                    PublicKeyShort = account.Data.PublicKey.Length > 24
-                        ? $"{account.Data.PublicKey[..12]}...{account.Data.PublicKey[^10..]}"
-                        : account.Data.PublicKey
-                });
+                Accounts.Add(
+                    new AccountItemViewModel
+                    {
+                        Account = account,
+                        AccountName = $"{account.Data.Account}@{account.Data.Authority}",
+                        ChainName = chainName,
+                        PublicKeyShort =
+                            account.Data.PublicKey.Length > 24
+                                ? $"{account.Data.PublicKey[..12]}...{account.Data.PublicKey[^10..]}"
+                                : account.Data.PublicKey,
+                    }
+                );
             }
 
-            System.Diagnostics.Trace.WriteLine($"[ACCOUNTMANAGEMENT] Loaded {Accounts.Count} accounts");
+            System.Diagnostics.Trace.WriteLine(
+                $"[ACCOUNTMANAGEMENT] Loaded {Accounts.Count} accounts"
+            );
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Trace.WriteLine($"[ACCOUNTMANAGEMENT] Error loading accounts: {ex.Message}");
-            await DisplayAlert("Error", $"Failed to load accounts: {ex.Message}", "OK");
+            System.Diagnostics.Trace.WriteLine(
+                $"[ACCOUNTMANAGEMENT] Error loading accounts: {ex.Message}"
+            );
+            await DisplayAlertAsync("Error", $"Failed to load accounts: {ex.Message}", "OK");
         }
         finally
         {
@@ -94,9 +104,12 @@ public partial class AccountManagementPage : ContentPage
     {
         try
         {
-            if (sender is Button button && button.CommandParameter is AccountItemViewModel accountItem)
+            if (
+                sender is Button button
+                && button.CommandParameter is AccountItemViewModel accountItem
+            )
             {
-                var confirm = await DisplayAlert(
+                var confirm = await DisplayAlertAsync(
                     "Confirm Delete",
                     $"Are you sure you want to remove {accountItem.AccountName} from your wallet?\n\nThis will not delete the account on-chain, only remove it from this wallet.",
                     "Delete",
@@ -117,9 +130,13 @@ public partial class AccountManagementPage : ContentPage
                 );
 
                 // If this was the active account, clear it
-                if (_walletContext.ActiveAccount?.Data.Account == accountItem.Account.Data.Account &&
-                    _walletContext.ActiveAccount?.Data.Authority == accountItem.Account.Data.Authority &&
-                    _walletContext.ActiveAccount?.Data.ChainId == accountItem.Account.Data.ChainId)
+                if (
+                    _walletContext.ActiveAccount?.Data.Account == accountItem.Account.Data.Account
+                    && _walletContext.ActiveAccount?.Data.Authority
+                        == accountItem.Account.Data.Authority
+                    && _walletContext.ActiveAccount?.Data.ChainId
+                        == accountItem.Account.Data.ChainId
+                )
                 {
                     _walletContext.ClearActiveAccount();
                 }
@@ -130,13 +147,15 @@ public partial class AccountManagementPage : ContentPage
                 // Refresh wallet context
                 await _walletContext.RefreshAsync();
 
-                await DisplayAlert("Success", $"Removed {accountItem.AccountName}", "OK");
+                await DisplayAlertAsync("Success", $"Removed {accountItem.AccountName}", "OK");
             }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Trace.WriteLine($"[ACCOUNTMANAGEMENT] Error deleting account: {ex.Message}");
-            await DisplayAlert("Error", $"Failed to delete account: {ex.Message}", "OK");
+            System.Diagnostics.Trace.WriteLine(
+                $"[ACCOUNTMANAGEMENT] Error deleting account: {ex.Message}"
+            );
+            await DisplayAlertAsync("Error", $"Failed to delete account: {ex.Message}", "OK");
         }
         finally
         {
