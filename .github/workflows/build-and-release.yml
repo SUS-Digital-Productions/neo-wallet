@@ -76,7 +76,7 @@ jobs:
 
     - name: Sign ZIP with Cosign
       run: |
-        cosign sign-blob --keyless --yes NeoWallet-Windows-x64.zip
+        cosign sign-blob --keyless --oidc-issuer https://token.actions.githubusercontent.com --yes NeoWallet-Windows-x64.zip
 
     - name: Create Release
       if: github.ref_type == 'tag'
