@@ -78,9 +78,18 @@ jobs:
         asset_name: NeoWallet-Windows-x64.zip.sig
         asset_content_type: application/octet-stream
 
-    - name: Upload Certificate (if exists)
+    - name: Check if Certificate Exists
+      id: cert_check
+      run: |
+        if [ -f "NeoWallet-Windows-x64.zip.cert" ]; then
+          echo "cert_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "cert_exists=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload Certificate
       uses: actions/upload-release-asset@v1
-      if: exists('./NeoWallet-Windows-x64.zip.cert')
+      if: steps.cert_check.outputs.cert_exists == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
