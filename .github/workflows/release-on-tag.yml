@@ -45,9 +45,10 @@ jobs:
           -o ./publish/win-x64
 
     - name: Read VERSION
+      shell: pwsh
       run: |
-        VERSION=$(cat VERSION)
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        $version = Get-Content VERSION -Raw
+        Add-Content -Path $env:GITHUB_ENV -Value "VERSION=$version"
 
     - name: Create Windows ZIP
       run: |
