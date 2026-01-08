@@ -87,12 +87,10 @@ try
     Console.WriteLine($"✓ Transaction built and signed");
     Console.WriteLine($"✓ Signatures: {signedTx.Signatures.Count}");
     Console.WriteLine($"✓ Packed size: {signedTx.PackedTransaction.Length / 2} bytes");
+    JsonSerializerOptions jsonSerializerOptions = new() { WriteIndented = true };
 
     // Display transaction JSON
-    var txJson = JsonSerializer.Serialize(
-        signedTx.Transaction,
-        new JsonSerializerOptions { WriteIndented = true }
-    );
+    var txJson = JsonSerializer.Serialize(signedTx.Transaction, jsonSerializerOptions);
     Console.WriteLine($"\n📄 Transaction Details:");
     Console.WriteLine(txJson);
 
@@ -116,10 +114,10 @@ try
 
         Console.WriteLine($"\n✅ Transaction successful!");
         Console.WriteLine($"Transaction ID: {result.TransactionId}");
-        Console.WriteLine($"Block: #{result.Processed.BlockNum}");
-        Console.WriteLine($"Block Time: {result.Processed.BlockTime}");
+        Console.WriteLine($"Block: #{result?.Processed?.BlockNum}");
+        Console.WriteLine($"Block Time: {result?.Processed?.BlockTime}");
         Console.WriteLine($"\n🔗 View on explorer:");
-        Console.WriteLine($"https://waxblock.io/transaction/{result.TransactionId}");
+        Console.WriteLine($"https://waxblock.io/transaction/{result?.TransactionId}");
     }
     else
     {

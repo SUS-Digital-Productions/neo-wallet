@@ -6,7 +6,7 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap rescap">
 
-  <Identity Name="com.companyname.sus.eos.neowallet" Publisher="CN=User Name" Version="1.0.0.0" />
+  <Identity Name="com.companyname.sus.eos.neowallet" Publisher="CN=SUS.EOS.NeoWallet" Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="83777349-EA04-460B-86D9-7BBC455957D2" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
