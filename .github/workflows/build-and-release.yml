@@ -9,11 +9,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     permissions:
       contents: write
       id-token: write  # Required for keyless signing with cosign
+
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
 
     steps:
     - name: Checkout code
@@ -139,3 +142,85 @@ jobs:
     #     asset_path: ./NeoWallet-${{ env.VERSION }}.zip.cert
     #     asset_name: NeoWallet-${{ env.VERSION }}.zip.cert
     #     asset_content_type: application/octet-stream
+
+  build-android:
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Install MAUI Workload
+      run: dotnet workload install maui
+
+    - name: Restore dependencies
+      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj
+
+    - name: Build Android APK
+      run: |
+        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj \
+          -c Release \
+          -f net10.0-android \
+          -p:AndroidPackageFormat=apk \
+          -o ./publish/android
+
+    - name: Upload Android APK
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.build-windows.outputs.upload_url }}
+        asset_path: ./publish/android/com.companyname.sus.eos.neowallet-Signed.apk
+        asset_name: NeoWallet-${{ github.ref_name }}-Android.apk
+        asset_content_type: application/vnd.android.package-archive
+
+  build-macos:
+    runs-on: macos-latest
+    if: github.ref_type == 'tag'
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Install MAUI Workload
+      run: dotnet workload install maui
+
+    - name: Restore dependencies
+      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj
+
+    - name: Build macOS App
+      run: |
+        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj \
+          -c Release \
+          -f net10.0-macos \
+          -o ./publish/macos
+
+    - name: Create macOS ZIP
+      run: |
+        cd ./publish/macos
+        zip -r ../../NeoWallet-${{ github.ref_name }}-macOS.zip .
+
+    - name: Upload macOS ZIP
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.build-windows.outputs.upload_url }}
+        asset_path: ./NeoWallet-${{ github.ref_name }}-macOS.zip
+        asset_name: NeoWallet-${{ github.ref_name }}-macOS.zip
+        asset_content_type: application/zip
