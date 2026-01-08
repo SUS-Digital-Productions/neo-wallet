@@ -127,14 +127,14 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
-    - name: Restore workloads
-      run: dotnet workload restore
+    - name: Restore workloads (project-specific)
+      run: dotnet workload restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj
 
     - name: Install MAUI Workload
       run: dotnet workload install maui
 
-    - name: Restore dependencies
-      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj
+    - name: Restore dependencies (mac)
+      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj -f net10.0-macos
 
     - name: Build macOS App
       run: |
