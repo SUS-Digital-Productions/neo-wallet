@@ -45,6 +45,32 @@ jobs:
       run: |
         Compress-Archive -Path ./publish/win-x64/* -DestinationPath NeoWallet-Windows-x64.zip
 
+    - name: Handle Versioning for Branch Push
+      if: github.ref_type == 'branch'
+      run: |
+        $version = Get-Content VERSION -Raw
+        $parts = $version.Trim().Split('.')
+        $patch = [int]$parts[2] + 1
+        $newVersion = "$($parts[0]).$($parts[1]).$patch"
+        $newVersion | Out-File VERSION -NoNewline
+        Write-Host "New version: $newVersion"
+        echo "NEW_VERSION=$newVersion" >> $env:GITHUB_ENV
+
+    - name: Commit Version Bump
+      if: github.ref_type == 'branch'
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git add VERSION
+        git commit -m "Bump version to ${{ env.NEW_VERSION }}" || echo "No changes to commit"
+        git push origin main
+
+    - name: Create Tag
+      if: github.ref_type == 'branch'
+      run: |
+        git tag v${{ env.NEW_VERSION }}
+        git push origin v${{ env.NEW_VERSION }}
+
     - name: Install Cosign
       uses: sigstore/cosign-installer@v3
 
@@ -53,6 +79,7 @@ jobs:
         cosign sign-blob --keyless --yes NeoWallet-Windows-x64.zip
 
     - name: Create Release
+      if: github.ref_type == 'tag'
       id: create_release
       uses: actions/create-release@v1
       env:
@@ -64,6 +91,7 @@ jobs:
         prerelease: false
 
     - name: Upload Release Asset
+      if: github.ref_type == 'tag'
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -74,6 +102,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload Signature
+      if: github.ref_type == 'tag'
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,6 +113,7 @@ jobs:
         asset_content_type: application/octet-stream
 
     - name: Check if Certificate Exists
+      if: github.ref_type == 'tag'
       id: cert_check
       run: |
         if [ -f "NeoWallet-Windows-x64.zip.cert" ]; then
@@ -93,8 +123,8 @@ jobs:
         fi
 
     - name: Upload Certificate
+      if: steps.cert_check.outputs.cert_exists == 'true' && github.ref_type == 'tag'
       uses: actions/upload-release-asset@v1
-      if: steps.cert_check.outputs.cert_exists == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
