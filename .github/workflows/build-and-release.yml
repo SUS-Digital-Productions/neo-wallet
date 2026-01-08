@@ -1,283 +1,50 @@
-name: Build and Release Windows EXE
+name: Version and Tag
 
 on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    permissions:
-      contents: write
-      id-token: write  # Required for keyless signing with cosign
-
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
-
-    - name: Install MAUI Workload
-      run: dotnet workload install maui
-
-    - name: Restore dependencies
-      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.WinUI/SUS.EOS.NeoWallet.WinUI.csproj
-
-    - name: Build and Publish Self-Contained EXE
-      run: |
-        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.WinUI/SUS.EOS.NeoWallet.WinUI.csproj `
-          -c Release `
-          -r win-x64 `
-          --self-contained true `
-          -p:PublishSingleFile=true `
-          -p:PublishTrimmed=true `
-          -p:WindowsPackageType=None `
-          -o ./publish/win-x64
-
-    - name: Handle Versioning for Branch Push
-      if: github.ref_type == 'branch'
-      run: |
-        $version = Get-Content VERSION -Raw
-        $parts = $version.Trim().Split('.')
-        $patch = [int]$parts[2] + 1
-        $newVersion = "$($parts[0]).$($parts[1]).$patch"
-        $newVersion | Out-File VERSION -NoNewline
-        Write-Host "New version: $newVersion"
-        echo "NEW_VERSION=$newVersion" >> $env:GITHUB_ENV
-
-    - name: Set Version
-      run: |
-        if ($env:GITHUB_REF_TYPE -eq 'tag') {
-          echo "VERSION=$env:GITHUB_REF_NAME" >> $env:GITHUB_ENV
-        } else {
-          echo "VERSION=$env:NEW_VERSION" >> $env:GITHUB_ENV
-        }
-
-    - name: Commit Version Bump
-      if: github.ref_type == 'branch'
-      run: |
-        git config --global user.name 'github-actions[bot]'
-        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-        git add VERSION
-        git commit -m "Bump version to ${{ env.NEW_VERSION }}" || echo "No changes to commit"
-        git push origin main
-
-    - name: Create Tag
-      if: github.ref_type == 'branch'
-      run: |
-        git tag v${{ env.NEW_VERSION }}
-        git push origin v${{ env.NEW_VERSION }}
-
-    - name: Create Windows ZIP
-      if: github.ref_type == 'tag'
-      run: |
-        Compress-Archive -Path ./publish/win-x64/* -DestinationPath NeoWallet-${{ env.VERSION }}.zip
-
-    - name: Upload Windows artifact
-      if: github.ref_type == 'tag'
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows-zip
-        path: NeoWallet-${{ env.VERSION }}.zip
-
-    # - name: Upload Signature
-    #   if: github.ref_type == 'tag'
-    #   uses: actions/upload-release-asset@v1
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #   with:
-    #     upload_url: ${{ steps.create_release.outputs.upload_url }}
-    #     asset_path: ./NeoWallet-${{ env.VERSION }}.zip.sig
-    #     asset_name: NeoWallet-${{ env.VERSION }}.zip.sig
-    #     asset_content_type: application/octet-stream
-
-    # - name: Check if Certificate Exists
-    #   if: github.ref_type == 'tag'
-    #   id: cert_check
-    #   run: |
-    #     if [ -f "NeoWallet-${{ env.VERSION }}.zip.cert" ]; then
-    #       echo "cert_exists=true" >> $GITHUB_OUTPUT
-    #     else
-    #       echo "cert_exists=false" >> $GITHUB_OUTPUT
-    #     fi
-
-    # - name: Upload Certificate
-    #   if: steps.cert_check.outputs.cert_exists == 'true' && github.ref_type == 'tag'
-    #   uses: actions/upload-release-asset@v1
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #   with:
-    #     upload_url: ${{ steps.create_release.outputs.upload_url }}
-    #     asset_path: ./NeoWallet-${{ env.VERSION }}.zip.cert
-    #     asset_name: NeoWallet-${{ env.VERSION }}.zip.cert
-    #     asset_content_type: application/octet-stream
-
-  build-android:
+  bump:
     runs-on: ubuntu-latest
-    if: github.ref_type == 'tag'
     permissions:
       contents: write
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
-
-    - name: Install MAUI Workload
-      run: dotnet workload install maui
-
-    - name: Restore dependencies
-      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj
-
-    - name: Build Android APK
-      run: |
-        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj \
-          -c Release \
-          -f net10.0-android \
-          -p:AndroidPackageFormat=apk \
-          -o ./publish/android
-
-    - name: Upload Android artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: android-apk
-        path: ./publish/android/**/*.apk
-
-  build-macos:
-    runs-on: macos-latest
-    if: github.ref_type == 'tag'
-    permissions:
-      contents: write
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
-
-    - name: Install MAUI Workload
-      run: dotnet workload install maui
-
-    - name: Restore dependencies
-      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj
-
-    - name: Build macOS App
-      run: |
-        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj \
-          -c Release \
-          -f net10.0-macos \
-          -o ./publish/macos
-
-    - name: Create macOS ZIP
-      run: |
-        cd ./publish/macos
-        zip -r ../../NeoWallet-${{ github.ref_name }}-macOS.zip .
-
-    - name: Upload macOS artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-zip
-        path: ./NeoWallet-${{ github.ref_name }}-macOS.zip
-
-  create-release:
-    runs-on: ubuntu-latest
-    if: github.ref_type == 'tag'
-    needs: [build-windows, build-android, build-macos]
-    permissions:
-      contents: write
-      id-token: write
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-
-    - name: Set VERSION
-      run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
-
-    - name: Download Windows artifact
-      uses: actions/download-artifact@v4
       with:
-        name: windows-zip
-        path: ./artifacts/windows
+        fetch-depth: 0
 
-    - name: Download Android artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: android-apk
-        path: ./artifacts/android
-
-    - name: Download macOS artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: macos-zip
-        path: ./artifacts/macos
-
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-
-    - name: Install Cosign
+    - name: Handle Versioning (patch bump)
+      id: version
       run: |
-        curl -L -o cosign https://github.com/sigstore/cosign/releases/download/v2.4.0/cosign-linux-amd64
-        chmod +x cosign
-
-    - name: Sign Windows artifact
-      id: sign_windows
-      env:
-        COSIGN_EXPERIMENTAL: 1
-      run: |
-        if [ -f ./artifacts/windows/NeoWallet-${{ github.ref_name }}.zip ]; then
-          ./cosign sign-blob --keyless --yes ./artifacts/windows/NeoWallet-${{ github.ref_name }}.zip > ./artifacts/windows/NeoWallet-${{ github.ref_name }}.zip.sig || true
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
+        if [ ! -f VERSION ]; then
+          echo "1.0.0" > VERSION
         fi
+        version=$(cat VERSION)
+        IFS='.' read -r major minor patch <<< "$version"
+        patch=$((patch + 1))
+        new_version="$major.$minor.$patch"
+        echo "$new_version" > VERSION
+        echo "NEW_VERSION=$new_version" >> $GITHUB_ENV
+        echo "Bumped version $version -> $new_version"
 
-    - name: Upload Windows asset
-      if: steps.sign_windows.outputs.exists == 'true'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./artifacts/windows/NeoWallet-${{ github.ref_name }}.zip
-        asset_name: NeoWallet-${{ github.ref_name }}.zip
-        asset_content_type: application/zip
+    - name: Commit and push VERSION
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add VERSION
+        git commit -m "Bump version to $NEW_VERSION" || echo "No changes to commit"
+        git push origin HEAD:main
 
-    - name: Upload Windows signature
-      if: steps.sign_windows.outputs.exists == 'true'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./artifacts/windows/NeoWallet-${{ github.ref_name }}.zip.sig
-        asset_name: NeoWallet-${{ github.ref_name }}.zip.sig
-        asset_content_type: application/octet-stream
+    - name: Create Tag
+      run: |
+        git tag v${{ env.NEW_VERSION }}
+        git push origin v${{ env.NEW_VERSION }}
+
 
     - name: Find Android APK
       id: find_apk
