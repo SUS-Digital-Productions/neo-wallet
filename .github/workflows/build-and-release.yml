@@ -23,6 +23,9 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
+    - name: Install MAUI Workload
+      run: dotnet workload install maui
+
     - name: Restore dependencies
       run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.WinUI/SUS.EOS.NeoWallet.WinUI.csproj
 
