@@ -170,6 +170,25 @@ jobs:
           echo "exists=false" >> $GITHUB_OUTPUT
         fi
 
+    - name: Debug Windows file
+      if: steps.sign_windows.outputs.exists == 'true'
+      run: |
+        echo "Listing file:"; ls -la ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip || true
+        echo "Size:"; stat -c%s ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip || stat -f%z ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip || true
+
+    - name: Delete existing Windows release asset if present
+      if: steps.sign_windows.outputs.exists == 'true'
+      run: |
+        echo "Checking for existing release assets for tag ${{ env.TAGNAME }}"
+        release=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.TAGNAME }})
+        asset_id=$(echo "$release" | jq -r --arg name "NeoWallet-${{ env.TAGNAME }}.zip" '.assets[] | select(.name == $name) | .id')
+        if [ -n "$asset_id" ] && [ "$asset_id" != "null" ]; then
+          echo "Deleting existing asset id $asset_id"
+          curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/releases/assets/$asset_id || true
+        else
+          echo "No existing asset to delete"
+        fi
+
     - name: Upload Windows asset
       if: steps.sign_windows.outputs.exists == 'true'
       uses: actions/upload-release-asset@v1
@@ -180,6 +199,24 @@ jobs:
         asset_path: ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip
         asset_name: NeoWallet-${{ env.TAGNAME }}.zip
         asset_content_type: application/zip
+
+    - name: Debug Windows signature file
+      if: steps.sign_windows.outputs.exists == 'true'
+      run: |
+        echo "Listing signature file:"; ls -la ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig || true
+        echo "Content preview:"; head -c 200 ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig || true
+
+    - name: Delete existing Windows signature asset if present
+      if: steps.sign_windows.outputs.exists == 'true'
+      run: |
+        release=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.TAGNAME }})
+        asset_id=$(echo "$release" | jq -r --arg name "NeoWallet-${{ env.TAGNAME }}.zip.sig" '.assets[] | select(.name == $name) | .id')
+        if [ -n "$asset_id" ] && [ "$asset_id" != "null" ]; then
+          echo "Deleting existing signature asset id $asset_id"
+          curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/releases/assets/$asset_id || true
+        else
+          echo "No existing signature asset to delete"
+        fi
 
     - name: Upload Windows signature
       if: steps.sign_windows.outputs.exists == 'true'
