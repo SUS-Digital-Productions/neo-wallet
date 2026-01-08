@@ -41,9 +41,17 @@ jobs:
           -p:WindowsPackageType=None `
           -o ./publish/win-x64
 
+    - name: Set Version
+      run: |
+        if ($env:GITHUB_REF_TYPE -eq 'tag') {
+          echo "VERSION=$env:GITHUB_REF_NAME" >> $env:GITHUB_ENV
+        } else {
+          echo "VERSION=$env:NEW_VERSION" >> $env:GITHUB_ENV
+        }
+
     - name: Create ZIP Archive
       run: |
-        Compress-Archive -Path ./publish/win-x64/* -DestinationPath NeoWallet-Windows-x64.zip
+        Compress-Archive -Path ./publish/win-x64/* -DestinationPath NeoWallet-${{ env.VERSION }}.zip
 
     - name: Handle Versioning for Branch Push
       if: github.ref_type == 'branch'
@@ -76,7 +84,7 @@ jobs:
 
     - name: Sign ZIP with Cosign
       run: |
-        cosign sign-blob --keyless --oidc-issuer https://token.actions.githubusercontent.com --yes NeoWallet-Windows-x64.zip
+        cosign sign-blob --keyless --oidc-issuer https://token.actions.githubusercontent.com --yes NeoWallet-${{ env.VERSION }}.zip
 
     - name: Create Release
       if: github.ref_type == 'tag'
@@ -97,8 +105,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./NeoWallet-Windows-x64.zip
-        asset_name: NeoWallet-Windows-x64.zip
+        asset_path: ./NeoWallet-${{ env.VERSION }}.zip
+        asset_name: NeoWallet-${{ env.VERSION }}.zip
         asset_content_type: application/zip
 
     - name: Upload Signature
@@ -108,15 +116,15 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./NeoWallet-Windows-x64.zip.sig
-        asset_name: NeoWallet-Windows-x64.zip.sig
+        asset_path: ./NeoWallet-${{ env.VERSION }}.zip.sig
+        asset_name: NeoWallet-${{ env.VERSION }}.zip.sig
         asset_content_type: application/octet-stream
 
     - name: Check if Certificate Exists
       if: github.ref_type == 'tag'
       id: cert_check
       run: |
-        if [ -f "NeoWallet-Windows-x64.zip.cert" ]; then
+        if [ -f "NeoWallet-${{ env.VERSION }}.zip.cert" ]; then
           echo "cert_exists=true" >> $GITHUB_OUTPUT
         else
           echo "cert_exists=false" >> $GITHUB_OUTPUT
@@ -129,6 +137,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./NeoWallet-Windows-x64.zip.cert
-        asset_name: NeoWallet-Windows-x64.zip.cert
+        asset_path: ./NeoWallet-${{ env.VERSION }}.zip.cert
+        asset_name: NeoWallet-${{ env.VERSION }}.zip.cert
         asset_content_type: application/octet-stream
