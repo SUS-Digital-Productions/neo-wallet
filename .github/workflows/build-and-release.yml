@@ -50,7 +50,7 @@ jobs:
 
     - name: Sign ZIP with Cosign
       run: |
-        cosign sign-blob --yes NeoWallet-Windows-x64.zip
+        cosign sign-blob --keyless --yes NeoWallet-Windows-x64.zip
 
     - name: Create Release
       id: create_release
