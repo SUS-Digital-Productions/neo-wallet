@@ -215,16 +215,7 @@ jobs:
         name: macos-zip
         path: ./artifacts/macos
 
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
-        draft: false
-        prerelease: false
+
 
     - name: Install Cosign
       run: |
@@ -250,8 +241,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./artifacts/windows/NeoWallet-${{ github.ref_name }}.zip
-        asset_name: NeoWallet-${{ github.ref_name }}.zip
+        asset_path: ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip
+        asset_name: NeoWallet-${{ env.TAGNAME }}.zip
         asset_content_type: application/zip
 
     - name: Upload Windows signature
@@ -261,8 +252,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./artifacts/windows/NeoWallet-${{ github.ref_name }}.zip.sig
-        asset_name: NeoWallet-${{ github.ref_name }}.zip.sig
+        asset_path: ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig
+        asset_name: NeoWallet-${{ env.TAGNAME }}.zip.sig
         asset_content_type: application/octet-stream
 
     - name: Find Android APK
@@ -291,7 +282,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ${{ steps.find_apk.outputs.apk }}
-        asset_name: NeoWallet-${{ github.ref_name }}-Android.apk
+        asset_name: NeoWallet-${{ env.TAGNAME }}-Android.apk
         asset_content_type: application/vnd.android.package-archive
 
     - name: Upload Android APK Signature
@@ -302,7 +293,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ${{ steps.find_apk.outputs.apk }}.sig
-        asset_name: NeoWallet-${{ github.ref_name }}-Android.apk.sig
+        asset_name: NeoWallet-${{ env.TAGNAME }}-Android.apk.sig
         asset_content_type: application/octet-stream
 
     - name: Sign macOS ZIP
@@ -324,8 +315,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./artifacts/macos/NeoWallet-${{ github.ref_name }}-macOS.zip
-        asset_name: NeoWallet-${{ github.ref_name }}-macOS.zip
+        asset_path: ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip
+        asset_name: NeoWallet-${{ env.TAGNAME }}-macOS.zip
         asset_content_type: application/zip
 
     - name: Upload macOS signature
@@ -335,6 +326,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./artifacts/macos/NeoWallet-${{ github.ref_name }}-macOS.zip.sig
-        asset_name: NeoWallet-${{ github.ref_name }}-macOS.zip.sig
+        asset_path: ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip.sig
+        asset_name: NeoWallet-${{ env.TAGNAME }}-macOS.zip.sig
         asset_content_type: application/octet-stream
