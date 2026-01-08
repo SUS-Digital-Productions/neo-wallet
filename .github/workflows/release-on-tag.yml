@@ -61,7 +61,7 @@ jobs:
         path: NeoWallet-${{ env.VERSION }}.zip
 
   build-android:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: write
 
@@ -84,22 +84,30 @@ jobs:
 
     - name: Build Android APK
       run: |
-        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj \
-          -c Release \
-          -f net10.0-android \
-          -p:AndroidPackageFormat=apk \
+        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj `
+          -c Release `
+          -f net10.0-android `
+          -p:AndroidPackageFormat=apk `
           -o ./publish/android
 
     - name: Read VERSION
+      shell: pwsh
       run: |
-        VERSION=$(cat VERSION)
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        $version = Get-Content VERSION -Raw
+        Add-Content -Path $env:GITHUB_ENV -Value "VERSION=$version"
+
+    - name: Create Android ZIP
+      shell: pwsh
+      run: |
+        $apk = Get-ChildItem -Path ./publish/android -Filter *.apk -Recurse | Select-Object -First 1
+        if ($null -eq $apk) { Write-Error "No APK found"; exit 1 }
+        Compress-Archive -Path $apk.FullName -DestinationPath "NeoWallet-${{ env.VERSION }}-Android.zip"
 
     - name: Upload Android artifact
       uses: actions/upload-artifact@v4
       with:
-        name: android-apk
-        path: ./publish/android/**/*.apk
+        name: android-zip
+        path: NeoWallet-${{ env.VERSION }}-Android.zip
 
   build-macos:
     runs-on: macos-latest
@@ -207,7 +215,7 @@ jobs:
     - name: Download Android artifact
       uses: actions/download-artifact@v4
       with:
-        name: android-apk
+        name: android-zip
         path: ./artifacts/android
 
     - name: Download macOS artifact
@@ -228,8 +236,8 @@ jobs:
       env:
         COSIGN_EXPERIMENTAL: 1
       run: |
-        if [ -f ./artifacts/windows/NeoWallet-${{ github.ref_name }}.zip ]; then
-          ./cosign sign-blob --keyless --yes ./artifacts/windows/NeoWallet-${{ github.ref_name }}.zip || true
+        if [ -f ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip ]; then
+          ./cosign sign-blob --keyless --yes ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip > ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig || true
           echo "exists=true" >> $GITHUB_OUTPUT
         else
           echo "exists=false" >> $GITHUB_OUTPUT
@@ -257,44 +265,44 @@ jobs:
         asset_name: NeoWallet-${{ env.TAGNAME }}.zip.sig
         asset_content_type: application/octet-stream
 
-    - name: Find Android APK
-      id: find_apk
+    - name: Find Android ZIP
+      id: find_android_zip
       run: |
-        apk=$(ls ./artifacts/android/**/*.apk | head -n1 || true)
-        echo "apk=$apk" >> $GITHUB_OUTPUT
+        zip=$(ls ./artifacts/android/*Android.zip | head -n1 || true)
+        echo "zip=$zip" >> $GITHUB_OUTPUT
 
-    - name: Sign Android APK
+    - name: Sign Android ZIP
       id: sign_android
       env:
         COSIGN_EXPERIMENTAL: 1
       run: |
-        if [ "${{ steps.find_apk.outputs.apk }}" != "" ]; then
-          ./cosign sign-blob --keyless --yes "${{ steps.find_apk.outputs.apk }}" || true
+        if [ "${{ steps.find_android_zip.outputs.zip }}" != "" ]; then
+          ./cosign sign-blob --keyless --yes "${{ steps.find_android_zip.outputs.zip }}" > "${{ steps.find_android_zip.outputs.zip }}.sig" || true
           echo "apk_exists=true" >> $GITHUB_OUTPUT
         else
           echo "apk_exists=false" >> $GITHUB_OUTPUT
         fi
 
-    - name: Upload Android APK
+    - name: Upload Android ZIP
       if: steps.sign_android.outputs.apk_exists == 'true'
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.find_apk.outputs.apk }}
-        asset_name: NeoWallet-${{ env.TAGNAME }}-Android.apk
-        asset_content_type: application/vnd.android.package-archive
+        asset_path: ${{ steps.find_android_zip.outputs.zip }}
+        asset_name: NeoWallet-${{ env.TAGNAME }}-Android.zip
+        asset_content_type: application/zip
 
-    - name: Upload Android APK Signature
+    - name: Upload Android ZIP Signature
       if: steps.sign_android.outputs.apk_exists == 'true'
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.find_apk.outputs.apk }}.sig
-        asset_name: NeoWallet-${{ env.TAGNAME }}-Android.apk.sig
+        asset_path: ${{ steps.find_android_zip.outputs.zip }}.sig
+        asset_name: NeoWallet-${{ env.TAGNAME }}-Android.zip.sig
         asset_content_type: application/octet-stream
 
     - name: Sign macOS ZIP
@@ -302,8 +310,8 @@ jobs:
       env:
         COSIGN_EXPERIMENTAL: 1
       run: |
-        if [ -f ./artifacts/macos/NeoWallet-${{ github.ref_name }}-macOS.zip ]; then
-          ./cosign sign-blob --keyless --yes ./artifacts/macos/NeoWallet-${{ github.ref_name }}-macOS.zip || true
+        if [ -f ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip ]; then
+          ./cosign sign-blob --keyless --yes ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip > ./artifacts/macos/NeoWallet-${{ env.VERSION }}-macOS.zip.sig || true
           echo "exists=true" >> $GITHUB_OUTPUT
         else
           echo "exists=false" >> $GITHUB_OUTPUT
