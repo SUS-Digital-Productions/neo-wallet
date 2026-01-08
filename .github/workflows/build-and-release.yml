@@ -81,6 +81,8 @@ jobs:
 
     - name: Install Cosign
       uses: sigstore/cosign-installer@v3
+      with:
+        version: 'v2.2.3'
 
     - name: Sign ZIP with Cosign
       run: |
