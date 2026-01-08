@@ -12,6 +12,7 @@ jobs:
   build:
     runs-on: windows-latest
     permissions:
+      contents: write
       id-token: write  # Required for keyless signing with cosign
 
     steps:
