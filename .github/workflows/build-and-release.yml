@@ -41,18 +41,6 @@ jobs:
           -p:WindowsPackageType=None `
           -o ./publish/win-x64
 
-    - name: Set Version
-      run: |
-        if ($env:GITHUB_REF_TYPE -eq 'tag') {
-          echo "VERSION=$env:GITHUB_REF_NAME" >> $env:GITHUB_ENV
-        } else {
-          echo "VERSION=$env:NEW_VERSION" >> $env:GITHUB_ENV
-        }
-
-    - name: Create ZIP Archive
-      run: |
-        Compress-Archive -Path ./publish/win-x64/* -DestinationPath NeoWallet-${{ env.VERSION }}.zip
-
     - name: Handle Versioning for Branch Push
       if: github.ref_type == 'branch'
       run: |
@@ -63,6 +51,14 @@ jobs:
         $newVersion | Out-File VERSION -NoNewline
         Write-Host "New version: $newVersion"
         echo "NEW_VERSION=$newVersion" >> $env:GITHUB_ENV
+
+    - name: Set Version
+      run: |
+        if ($env:GITHUB_REF_TYPE -eq 'tag') {
+          echo "VERSION=$env:GITHUB_REF_NAME" >> $env:GITHUB_ENV
+        } else {
+          echo "VERSION=$env:NEW_VERSION" >> $env:GITHUB_ENV
+        }
 
     - name: Commit Version Bump
       if: github.ref_type == 'branch'
@@ -79,13 +75,15 @@ jobs:
         git tag v${{ env.NEW_VERSION }}
         git push origin v${{ env.NEW_VERSION }}
 
-    - name: Install Cosign
-      run: |
-        Invoke-WebRequest -Uri https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-windows-amd64.exe -OutFile cosign.exe
+    # - name: Install Cosign
+    #   run: |
+    #     Invoke-WebRequest -Uri https://github.com/sigstore/cosign/releases/download/v2.4.0/cosign-windows-amd64.exe -OutFile cosign.exe
 
-    - name: Sign ZIP with Cosign
-      run: |
-        ./cosign.exe sign-blob --keyless --oidc-issuer https://token.actions.githubusercontent.com --yes NeoWallet-${{ env.VERSION }}.zip
+    # - name: Sign ZIP with Cosign
+    #   env:
+    #     COSIGN_EXPERIMENTAL: 1
+    #   run: |
+    #     ./cosign.exe sign-blob --keyless --oidc-issuer https://token.actions.githubusercontent.com --yes NeoWallet-${{ env.VERSION }}.zip
 
     - name: Create Release
       if: github.ref_type == 'tag'
@@ -110,34 +108,34 @@ jobs:
         asset_name: NeoWallet-${{ env.VERSION }}.zip
         asset_content_type: application/zip
 
-    - name: Upload Signature
-      if: github.ref_type == 'tag'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./NeoWallet-${{ env.VERSION }}.zip.sig
-        asset_name: NeoWallet-${{ env.VERSION }}.zip.sig
-        asset_content_type: application/octet-stream
+    # - name: Upload Signature
+    #   if: github.ref_type == 'tag'
+    #   uses: actions/upload-release-asset@v1
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #   with:
+    #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+    #     asset_path: ./NeoWallet-${{ env.VERSION }}.zip.sig
+    #     asset_name: NeoWallet-${{ env.VERSION }}.zip.sig
+    #     asset_content_type: application/octet-stream
 
-    - name: Check if Certificate Exists
-      if: github.ref_type == 'tag'
-      id: cert_check
-      run: |
-        if [ -f "NeoWallet-${{ env.VERSION }}.zip.cert" ]; then
-          echo "cert_exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "cert_exists=false" >> $GITHUB_OUTPUT
-        fi
+    # - name: Check if Certificate Exists
+    #   if: github.ref_type == 'tag'
+    #   id: cert_check
+    #   run: |
+    #     if [ -f "NeoWallet-${{ env.VERSION }}.zip.cert" ]; then
+    #       echo "cert_exists=true" >> $GITHUB_OUTPUT
+    #     else
+    #       echo "cert_exists=false" >> $GITHUB_OUTPUT
+    #     fi
 
-    - name: Upload Certificate
-      if: steps.cert_check.outputs.cert_exists == 'true' && github.ref_type == 'tag'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./NeoWallet-${{ env.VERSION }}.zip.cert
-        asset_name: NeoWallet-${{ env.VERSION }}.zip.cert
-        asset_content_type: application/octet-stream
+    # - name: Upload Certificate
+    #   if: steps.cert_check.outputs.cert_exists == 'true' && github.ref_type == 'tag'
+    #   uses: actions/upload-release-asset@v1
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #   with:
+    #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+    #     asset_path: ./NeoWallet-${{ env.VERSION }}.zip.cert
+    #     asset_name: NeoWallet-${{ env.VERSION }}.zip.cert
+    #     asset_content_type: application/octet-stream
