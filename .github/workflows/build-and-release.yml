@@ -1,0 +1,90 @@
+name: Build and Release Windows EXE
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      id-token: write  # Required for keyless signing with cosign
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.WinUI/SUS.EOS.NeoWallet.WinUI.csproj
+
+    - name: Build and Publish Self-Contained EXE
+      run: |
+        dotnet publish SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.WinUI/SUS.EOS.NeoWallet.WinUI.csproj `
+          -c Release `
+          -r win-x64 `
+          --self-contained true `
+          -p:PublishSingleFile=true `
+          -p:PublishTrimmed=true `
+          -o ./publish/win-x64
+
+    - name: Create ZIP Archive
+      run: |
+        Compress-Archive -Path ./publish/win-x64/* -DestinationPath NeoWallet-Windows-x64.zip
+
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+
+    - name: Sign ZIP with Cosign
+      run: |
+        cosign sign-blob --yes NeoWallet-Windows-x64.zip
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./NeoWallet-Windows-x64.zip
+        asset_name: NeoWallet-Windows-x64.zip
+        asset_content_type: application/zip
+
+    - name: Upload Signature
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./NeoWallet-Windows-x64.zip.sig
+        asset_name: NeoWallet-Windows-x64.zip.sig
+        asset_content_type: application/octet-stream
+
+    - name: Upload Certificate (if exists)
+      uses: actions/upload-release-asset@v1
+      if: exists('./NeoWallet-Windows-x64.zip.cert')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./NeoWallet-Windows-x64.zip.cert
+        asset_name: NeoWallet-Windows-x64.zip.cert
+        asset_content_type: application/octet-stream
