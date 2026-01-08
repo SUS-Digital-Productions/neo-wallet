@@ -211,7 +211,7 @@ jobs:
         run: .\build.ps1 -Platforms iOS,macOS -Configuration Release
       
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+dw        uses: actions/upload-artifact@v4
         with:
           name: build-output-${{ matrix.os }}
           path: build-output/

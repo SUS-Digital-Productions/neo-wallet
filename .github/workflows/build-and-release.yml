@@ -85,7 +85,7 @@ jobs:
 
     - name: Upload Windows artifact
       if: github.ref_type == 'tag'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: windows-zip
         path: NeoWallet-${{ env.VERSION }}.zip
@@ -152,7 +152,7 @@ jobs:
           -o ./publish/android
 
     - name: Upload Android artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: android-apk
         path: ./publish/android/**/*.apk
@@ -191,7 +191,7 @@ jobs:
         zip -r ../../NeoWallet-${{ github.ref_name }}-macOS.zip .
 
     - name: Upload macOS artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: macos-zip
         path: ./NeoWallet-${{ github.ref_name }}-macOS.zip
@@ -212,19 +212,19 @@ jobs:
       run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
 
     - name: Download Windows artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: windows-zip
         path: ./artifacts/windows
 
     - name: Download Android artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: android-apk
         path: ./artifacts/android
 
     - name: Download macOS artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: macos-zip
         path: ./artifacts/macos
