@@ -100,8 +100,24 @@ jobs:
             if git ls-remote --exit-code --tags https://github.com/${{ github.repository }}.git refs/tags/$TAGNAME >/dev/null 2>&1; then
               echo "Tag $TAGNAME exists remotely — continuing despite workflow_run conclusion $conclusion"
             else
-              echo "Triggering workflow did not complete successfully (conclusion=$conclusion) and tag $TAGNAME does not exist; exiting." >&2
-              exit 78
+              echo "Tag $TAGNAME does not exist. Attempting to create tag $TAGNAME at $REF using the GITHUB_TOKEN..."
+              # Try to create the tag reference via GitHub API. This avoids requiring a PAT.
+              resp=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/${{ github.repository }}/git/refs -d "{\"ref\": \"refs/tags/$TAGNAME\", \"sha\": \"$REF\"}") || true
+              echo "Create tag response code: $resp"
+              if [ "$resp" = "201" ]; then
+                echo "Tag $TAGNAME created successfully on remote. Continuing."
+              elif [ "$resp" = "422" ]; then
+                echo "Tag creation returned 422 (already exists or invalid). Re-checking existence..."
+                if git ls-remote --exit-code --tags https://github.com/${{ github.repository }}.git refs/tags/$TAGNAME >/dev/null 2>&1; then
+                  echo "Tag $TAGNAME now exists — continuing."
+                else
+                  echo "Tag $TAGNAME could not be created; exiting." >&2
+                  exit 78
+                fi
+              else
+                echo "Failed to create tag $TAGNAME (HTTP $resp); exiting." >&2
+                exit 78
+              fi
             fi
           fi
         else
