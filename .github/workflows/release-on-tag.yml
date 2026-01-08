@@ -79,8 +79,10 @@ jobs:
     - name: Install MAUI Workload
       run: dotnet workload install maui
 
-    - name: Restore dependencies
-      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj
+    - name: Restore dependencies (Android)
+      run: |
+        dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj -f net10.0-android
+        dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj -r android -f net10.0-android || true
 
     - name: Build Android APK
       run: |
@@ -124,6 +126,9 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '10.0.x'
+
+    - name: Restore workloads
+      run: dotnet workload restore
 
     - name: Install MAUI Workload
       run: dotnet workload install maui
