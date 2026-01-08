@@ -39,18 +39,30 @@ jobs:
           exit 1
         fi
 
-    - name: Commit and push VERSION using PAT
+    - name: Commit and push VERSION using PAT and author secrets
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
+        if [ -z "${{ secrets.RELEASE_AUTHOR_NAME }}" ] || [ -z "${{ secrets.RELEASE_AUTHOR_EMAIL }}" ]; then
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          author="github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+        else
+          git config user.name "${{ secrets.RELEASE_AUTHOR_NAME }}"
+          git config user.email "${{ secrets.RELEASE_AUTHOR_EMAIL }}"
+          author="${{ secrets.RELEASE_AUTHOR_NAME }} <${{ secrets.RELEASE_AUTHOR_EMAIL }}>"
+        fi
         git add VERSION
-        git commit -m "Bump version to $NEW_VERSION" || echo "No changes to commit"
+        git commit --author "$author" -m "Bump version to $NEW_VERSION" || echo "No changes to commit"
+        export GIT_COMMITTER_NAME="$(git config user.name)"
+        export GIT_COMMITTER_EMAIL="$(git config user.email)"
         git remote set-url origin https://${{ secrets.RELEASE_PAT }}@github.com/${{ github.repository }}.git
         git push origin HEAD:main
 
-    - name: Create Tag and push using PAT
+    - name: Create annotated Tag and push using PAT
       run: |
-        git tag v${{ env.NEW_VERSION }}
+        # use the same identity for tagger
+        git config user.name "$(git config user.name)"
+        git config user.email "$(git config user.email)"
+        git tag -a v${{ env.NEW_VERSION }} -m "Release v${{ env.NEW_VERSION }}"
         git remote set-url origin https://${{ secrets.RELEASE_PAT }}@github.com/${{ github.repository }}.git
         git push origin v${{ env.NEW_VERSION }}
 
