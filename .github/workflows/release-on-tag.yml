@@ -163,11 +163,32 @@ jobs:
       env:
         COSIGN_EXPERIMENTAL: 1
       run: |
+        # Default outputs
+        echo "zip_exists=false" >> $GITHUB_OUTPUT
+        echo "sig_exists=false" >> $GITHUB_OUTPUT
         if [ -f ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip ]; then
-          ./cosign sign-blob --keyless --yes ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip > ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig || true
-          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "Found zip, attempting to sign with cosign"
+          echo "zip_exists=true" >> $GITHUB_OUTPUT
+          # Sign and capture exit code and output
+          if ./cosign sign-blob --keyless --yes ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip > ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig 2> ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig.err; then
+            echo "cosign returned success"
+          else
+            echo "cosign failed; see error file:"; cat ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig.err || true
+            echo "Signature generation failed" >&2
+            exit 1
+          fi
+
+          # Ensure signature file is non-empty
+          if [ -s ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig ]; then
+            echo "sig_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Signature file is empty" >&2
+            ls -la ./artifacts/windows || true
+            cat ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig.err || true
+            exit 1
+          fi
         else
-          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "zip not found, skipping signing"
         fi
 
     - name: Debug Windows file
@@ -223,13 +244,13 @@ jobs:
         done
 
     - name: Debug Windows signature file
-      if: steps.sign_windows.outputs.exists == 'true'
+      if: steps.sign_windows.outputs.sig_exists == 'true'
       run: |
         echo "Listing signature file:"; ls -la ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig || true
         echo "Content preview:"; head -c 200 ./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig || true
 
     - name: Delete existing Windows signature asset if present
-      if: steps.sign_windows.outputs.exists == 'true'
+      if: steps.sign_windows.outputs.sig_exists == 'true'
       run: |
         release=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.TAGNAME }})
         asset_id=$(echo "$release" | jq -r --arg name "NeoWallet-${{ env.TAGNAME }}.zip.sig" '(.assets // []) | .[] | select(.name == $name) | .id // empty')
