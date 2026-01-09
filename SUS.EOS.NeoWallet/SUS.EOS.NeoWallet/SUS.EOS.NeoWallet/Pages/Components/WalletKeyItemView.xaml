@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="SUS.EOS.NeoWallet.Pages.Components.WalletKeyItemView">
+
+    <Grid Padding="15,10" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+        <Label
+            FontSize="24"
+            Text="🔑"
+            VerticalOptions="Center" />
+
+        <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+            <Label
+                x:Name="PublicKeyLabel"
+                FontAttributes="Bold"
+                FontSize="14"
+                LineBreakMode="MiddleTruncation"
+                TextColor="{DynamicResource Primary}" />
+            <Label
+                x:Name="AccountCountLabel"
+                FontSize="12"
+                TextColor="{DynamicResource Gray600}" />
+        </VerticalStackLayout>
+
+        <Button
+            Grid.Column="2"
+            x:Name="MenuButton"
+            BackgroundColor="Transparent"
+            FontSize="20"
+            HeightRequest="40"
+            Text="⋮"
+            TextColor="{DynamicResource Gray600}"
+            VerticalOptions="Center"
+            WidthRequest="40" />
+    </Grid>
+</ContentView>

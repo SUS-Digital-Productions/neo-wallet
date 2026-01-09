@@ -240,16 +240,26 @@ public class WalletAccountService : IWalletAccountService
         string password
     )
     {
-        // Validate password
-        if (!await _storageService.ValidatePasswordAsync(password))
-            return null;
+        // If no password provided, allow fallback to unlocked wallet state
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            // If wallet isn't unlocked we cannot proceed without a password
+            if (!_storageService.IsUnlocked)
+                return null;
+        }
+        else
+        {
+            // Validate password
+            if (!await _storageService.ValidatePasswordAsync(password))
+                return null;
+        }
 
         // Get account
         var walletAccount = await GetAccountAsync(account, authority, chainId);
         if (walletAccount == null)
             return null;
 
-        // Unlock wallet to access keys
+        // Unlock wallet to access keys if needed
         if (!_storageService.IsUnlocked)
         {
             if (!await _storageService.UnlockWalletAsync(password))

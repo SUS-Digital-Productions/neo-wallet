@@ -300,6 +300,7 @@
       <VerticalStackLayout Spacing="12">
         <Button
           x:Name="SendButton"
+          AutomationProperties.AutomationId="SendButton"
           Text="Review &amp; Send"
           BackgroundColor="{DynamicResource Primary}"
           TextColor="White"

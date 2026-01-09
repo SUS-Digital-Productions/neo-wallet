@@ -1,4 +1,3 @@
-#pragma warning disable CS0618 // DisplayActionSheet obsolete warning
 
 using SUS.EOS.EosioSigningRequest.Services;
 using SUS.EOS.NeoWallet.Services;
@@ -66,7 +65,7 @@ public partial class SettingsPage : ContentPage
             }
 
             var networkNames = networkList.Select(n => n.Name).ToArray();
-            var result = await DisplayActionSheet(
+            var result = await DisplayActionSheetAsync(
                 "Select Default Network",
                 "Cancel",
                 null,
@@ -184,14 +183,26 @@ public partial class SettingsPage : ContentPage
 
     private async void OnTestEsrClicked(object sender, EventArgs e)
     {
+        await ProcessTestEsrAsync(this);
+    }
+
+    /// <summary>
+    /// Extracted logic for testing — shows InputDialog and processes ESR if provided.
+    /// Made internal for unit testing.
+    /// </summary>
+    internal async Task ProcessTestEsrAsync(Page? parent = null)
+    {
         // Test ESR signing request popup
-        var esrUri = await DisplayPromptAsync(
-            "Test ESR Request",
-            "Enter ESR URI (esr://...) or paste ESR payload:",
-            "Test",
-            "Cancel",
-            keyboard: Keyboard.Url
+        var dialog = new SUS.EOS.NeoWallet.Pages.Components.InputDialog(
+            title: "Test ESR Request",
+            message: "Enter ESR URI (esr://...) or paste ESR payload:",
+            accept: "Test",
+            cancel: "Cancel",
+            isPassword: false
         );
+
+        dialog.EntryKeyboard = Keyboard.Url;
+        var esrUri = await dialog.ShowAsync(parent);
 
         if (string.IsNullOrEmpty(esrUri))
             return;
@@ -251,6 +262,20 @@ public partial class SettingsPage : ContentPage
             $"Status: {status}\n\nLink ID: {linkId}\n\nPublic Key:\n{publicKey}",
             "OK"
         );
+    }
+
+    private async void OnShowDiagnosticsClicked(object sender, EventArgs e)
+    {
+        var serviceProvider = Application.Current!.Handler.MauiContext!.Services;
+        var page = serviceProvider.GetService<DiagnosticsPage>();
+        if (page != null)
+        {
+            await Navigation.PushAsync(page);
+        }
+        else
+        {
+            await DisplayAlertAsync("Error", "Diagnostics page not available", "OK");
+        }
     }
 
     private async void OnDoneClicked(object sender, EventArgs e)

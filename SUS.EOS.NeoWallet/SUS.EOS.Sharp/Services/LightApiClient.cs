@@ -337,6 +337,9 @@ public class LightApiClient : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// Dispose the underlying HTTP client used by Light API client
+    /// </summary>
     public void Dispose()
     {
         if (!_disposed)
@@ -354,6 +357,9 @@ public class LightApiClient : IDisposable
 /// </summary>
 public class LightApiKeyResponse
 {
+    /// <summary>
+    /// Mapping of chain id to chain metadata
+    /// </summary>
     public Dictionary<string, LightApiChainData> Chains { get; set; } = new();
 }
 
@@ -362,10 +368,29 @@ public class LightApiKeyResponse
 /// </summary>
 public class LightApiChainData
 {
+    /// <summary>
+    /// Display name of the chain
+    /// </summary>
     public string ChainName { get; set; } = "";
+
+    /// <summary>
+    /// Chain ID
+    /// </summary>
     public string ChainId { get; set; } = "";
+
+    /// <summary>
+    /// System token symbol for the chain
+    /// </summary>
     public string SystemToken { get; set; } = "";
+
+    /// <summary>
+    /// Token decimals
+    /// </summary>
     public int Decimals { get; set; } = 4;
+
+    /// <summary>
+    /// Known accounts for this chain
+    /// </summary>
     public List<LightApiAccountPermission> Accounts { get; set; } = new();
 }
 
@@ -374,10 +399,29 @@ public class LightApiChainData
 /// </summary>
 public class LightApiAccountPermission
 {
+    /// <summary>
+    /// Account name
+    /// </summary>
     public string AccountName { get; set; } = "";
+
+    /// <summary>
+    /// Permission name
+    /// </summary>
     public string Permission { get; set; } = "active";
+
+    /// <summary>
+    /// Permission threshold
+    /// </summary>
     public int Threshold { get; set; } = 1;
+
+    /// <summary>
+    /// Whether the permission is controlled by a key
+    /// </summary>
     public bool IsKeyControlled { get; set; }
+
+    /// <summary>
+    /// Public keys associated with the permission
+    /// </summary>
     public List<string> PublicKeys { get; set; } = new();
 }
 
@@ -386,9 +430,24 @@ public class LightApiAccountPermission
 /// </summary>
 public class LightApiBalance
 {
+    /// <summary>
+    /// Contract account holding the balance
+    /// </summary>
     public string Contract { get; set; } = "";
+
+    /// <summary>
+    /// Balance amount as string
+    /// </summary>
     public string Amount { get; set; } = "0";
+
+    /// <summary>
+    /// Currency symbol
+    /// </summary>
     public string Currency { get; set; } = "";
+
+    /// <summary>
+    /// Token decimals
+    /// </summary>
     public int Decimals { get; set; } = 4;
 }
 
@@ -397,11 +456,34 @@ public class LightApiBalance
 /// </summary>
 public class LightApiAccountInfo
 {
+    /// <summary>
+    /// Account name
+    /// </summary>
     public string AccountName { get; set; } = "";
+
+    /// <summary>
+    /// Creation time string
+    /// </summary>
     public string Created { get; set; } = "";
+
+    /// <summary>
+    /// RAM quota in bytes
+    /// </summary>
     public long RamQuota { get; set; }
+
+    /// <summary>
+    /// RAM usage in bytes
+    /// </summary>
     public long RamUsage { get; set; }
+
+    /// <summary>
+    /// CPU weight (staking)
+    /// </summary>
     public long CpuWeight { get; set; }
+
+    /// <summary>
+    /// NET weight (staking)
+    /// </summary>
     public long NetWeight { get; set; }
 }
 

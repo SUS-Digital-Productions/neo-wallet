@@ -107,9 +107,20 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
     private readonly JsonSerializerOptions _jsonOptions;
     private bool _disposed;
 
+    /// <summary>
+    /// Network endpoint URL (base address)
+    /// </summary>
     public string Endpoint => _endpoint;
+
+    /// <summary>
+    /// Chain ID for the connected network (if known)
+    /// </summary>
     public string? ChainId { get; private set; }
 
+    /// <summary>
+    /// Creates a new HTTP client for the specified endpoint
+    /// </summary>
+    /// <param name="endpoint">Base URL for the Antelope node (e.g., https://wax.greymass.com)</param>
     public AntelopeHttpClient(string endpoint)
     {
         _endpoint = endpoint;
@@ -452,6 +463,9 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
         return result?.Args;
     }
 
+    /// <summary>
+    /// Dispose the underlying HTTP client and release resources
+    /// </summary>
     public void Dispose()
     {
         if (!_disposed)
@@ -489,8 +503,19 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
 /// </summary>
 public class TableRowsResult<T>
 {
+    /// <summary>
+    /// Returned rows for the table query
+    /// </summary>
     public List<T> Rows { get; set; } = new();
+
+    /// <summary>
+    /// True if there are more rows available
+    /// </summary>
     public bool More { get; set; }
+
+    /// <summary>
+    /// Cursor/key for fetching the next set of rows
+    /// </summary>
     public string? NextKey { get; set; }
 }
 
@@ -499,7 +524,14 @@ public class TableRowsResult<T>
 /// </summary>
 public class TransactionResult
 {
+    /// <summary>
+    /// Transaction ID (hex)
+    /// </summary>
     public string TransactionId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Processed transaction receipt
+    /// </summary>
     public TransactionReceipt? Processed { get; set; }
 }
 
@@ -508,30 +540,70 @@ public class TransactionResult
 /// </summary>
 public class TransactionReceipt
 {
+    /// <summary>
+    /// Transaction identifier
+    /// </summary>
     public string Id { get; set; } = string.Empty;
     
+    /// <summary>
+    /// Block number where the transaction was included
+    /// </summary>
     [JsonPropertyName("block_num")]
     public uint BlockNum { get; set; }
     
+    /// <summary>
+    /// Block time as string
+    /// </summary>
     [JsonPropertyName("block_time")]
     public string BlockTime { get; set; } = string.Empty;
     
+    /// <summary>
+    /// Producer block id, if provided
+    /// </summary>
     [JsonPropertyName("producer_block_id")]
     public string ProducerBlockId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Receipt header information
+    /// </summary>
     public TransactionReceiptHeader? Receipt { get; set; }
+
+    /// <summary>
+    /// Elapsed time for processing
+    /// </summary>
     public int Elapsed { get; set; }
     
+    /// <summary>
+    /// Net usage for the transaction
+    /// </summary>
     [JsonPropertyName("net_usage")]
     public int NetUsage { get; set; }
+
+    /// <summary>
+    /// Whether the transaction was scheduled
+    /// </summary>
     public bool Scheduled { get; set; }
     
+    /// <summary>
+    /// Action traces produced during processing
+    /// </summary>
     [JsonPropertyName("action_traces")]
     public List<object>? ActionTraces { get; set; }
     
+    /// <summary>
+    /// RAM delta information per account
+    /// </summary>
     [JsonPropertyName("account_ram_deltas")]
     public object? AccountRamDeltas { get; set; }
+
+    /// <summary>
+    /// Exception details, if any
+    /// </summary>
     public object? Except { get; set; }
     
+    /// <summary>
+    /// Error code returned by the chain
+    /// </summary>
     [JsonPropertyName("error_code")]
     public object? ErrorCode { get; set; }
 }
@@ -541,7 +613,18 @@ public class TransactionReceipt
 /// </summary>
 public class TransactionReceiptHeader
 {
+    /// <summary>
+    /// Status of the receipt
+    /// </summary>
     public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// CPU usage in microseconds
+    /// </summary>
     public int CpuUsageUs { get; set; }
+
+    /// <summary>
+    /// Net usage in 64-bit words
+    /// </summary>
     public int NetUsageWords { get; set; }
 }

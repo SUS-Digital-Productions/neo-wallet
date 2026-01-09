@@ -42,7 +42,14 @@ public sealed class EosioKey
     private readonly byte[] _publicKeyBytes;
     private readonly KeyFormat _format;
 
+    /// <summary>
+    /// The private key in Wallet Import Format (WIF) or modern PVT_* format used for display/persistence
+    /// </summary>
     public string PrivateKeyWif { get; }
+
+    /// <summary>
+    /// The public key string in EOSIO's modern 'PUB_K1_' or legacy 'EOS' format
+    /// </summary>
     public string PublicKey { get; }
     
     /// <summary>

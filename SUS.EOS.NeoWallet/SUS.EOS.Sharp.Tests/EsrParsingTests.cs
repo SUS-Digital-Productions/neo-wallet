@@ -30,9 +30,9 @@ public class EsrParsingTests
         Console.WriteLine($"Has Transaction: {request.Payload?.Transaction != null}");
 
         // This is an identity request (type 3), so it may not have action/transaction
-        // Verify the chain ID is correct for Jungle4 testnet (alias 10)
+        // Verify the chain ID is correct for alias 10 (WAX Mainnet)
         Assert.Equal(
-            "8fc6dce7942189f842170de953932b1f66693ad3788f766e777b6f9d22335c02",
+            "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4",
             request.ChainId
         );
     }

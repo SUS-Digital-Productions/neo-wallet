@@ -2,6 +2,7 @@
 <ContentPage
   xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
   xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  xmlns:components="clr-namespace:SUS.EOS.NeoWallet.Pages.Components"
   x:Class="SUS.EOS.NeoWallet.Pages.ImportWalletPage"
   Title="Import Keys"
   BackgroundColor="{DynamicResource PageBackgroundColor}">
@@ -69,9 +70,8 @@
         </HorizontalStackLayout>
 
         <!-- Step 1: Enter Private Key -->
-        <Border x:Name="Step1Content" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="True">
+        <components:CardView x:Name="Step1Content" Title="Step 1: Enter Private Key" IsVisible="True">
           <VerticalStackLayout Spacing="16">
-            <Label Text="Step 1: Enter Private Key" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
             <Label Text="Supported formats: WIF (5...), PVT_K1_..., PVT_R1_..., Hex (64 chars)" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
 
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto" ColumnSpacing="8">
@@ -121,12 +121,11 @@
               IsEnabled="False"
               Clicked="OnContinueToStep2Clicked" />
           </VerticalStackLayout>
-        </Border>
+        </components:CardView>
 
         <!-- Step 2: Set Password -->
-        <Border x:Name="Step2Content" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="False">
+        <components:CardView x:Name="Step2Content" Title="Step 2: Secure Your Wallet" IsVisible="False">
           <VerticalStackLayout Spacing="16">
-            <Label Text="Step 2: Secure Your Wallet" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
             <Label Text="Create a password to encrypt your private keys" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
 
             <VerticalStackLayout Spacing="4">
@@ -173,12 +172,11 @@
                 Clicked="OnContinueToStep3Clicked" />
             </Grid>
           </VerticalStackLayout>
-        </Border>
+        </components:CardView>
 
         <!-- Step 3: Find & Select Accounts -->
-        <Border x:Name="Step3Content" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="False">
+        <components:CardView x:Name="Step3Content" Title="Step 3: Select Accounts" IsVisible="False">
           <VerticalStackLayout Spacing="16">
-            <Label Text="Step 3: Select Accounts" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
             <Label Text="Select the accounts you want to import with this key" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
 
             <!-- Network Selection -->
@@ -268,13 +266,12 @@
                 Clicked="OnImportClicked" />
             </Grid>
           </VerticalStackLayout>
-        </Border>
+        </components:CardView>
       </VerticalStackLayout>
 
       <!-- ==================== RECOVERY PHRASE IMPORT ==================== -->
-      <Border x:Name="RecoveryPhraseSection" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="False">
+      <components:CardView x:Name="RecoveryPhraseSection" Title="Recovery Phrase Import" IsVisible="False">
         <VerticalStackLayout Spacing="16">
-          <Label Text="Recovery Phrase Import" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
           <Label Text="Enter your 12-word BIP39 recovery phrase" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
 
           <Editor
@@ -301,12 +298,11 @@
             IsEnabled="False"
             Clicked="OnImportFromPhraseClicked" />
         </VerticalStackLayout>
-      </Border>
+      </components:CardView>
 
       <!-- ==================== FILE IMPORT ==================== -->
-      <Border x:Name="FileImportSection" BackgroundColor="{DynamicResource Card}" StrokeShape="RoundRectangle 16" Stroke="{DynamicResource Border}" StrokeThickness="1" Padding="24" IsVisible="False">
+      <components:CardView x:Name="FileImportSection" Title="Import from File" IsVisible="False">
         <VerticalStackLayout Spacing="16">
-          <Label Text="Import from File" FontSize="18" FontAttributes="Bold" TextColor="{DynamicResource TextPrimary}" />
           <Label Text="Import wallet from encrypted backup file" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
 
           <Button
@@ -338,7 +334,7 @@
             IsVisible="False"
             Clicked="OnImportFromFileClicked" />
         </VerticalStackLayout>
-      </Border>
+      </components:CardView>
 
       <!-- Cancel Button -->
       <Button

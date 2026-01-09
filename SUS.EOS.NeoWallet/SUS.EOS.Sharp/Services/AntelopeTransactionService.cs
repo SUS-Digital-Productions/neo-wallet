@@ -321,6 +321,9 @@ public class BlockchainOperationsService : IBlockchainOperationsService
     private readonly IAntelopeBlockchainClient _client;
     private readonly IAntelopeTransactionService _transactionService;
 
+    /// <summary>
+    /// Creates a new <see cref="BlockchainOperationsService"/> with required dependencies
+    /// </summary>
     public BlockchainOperationsService(
         IAntelopeBlockchainClient client, 
         IAntelopeTransactionService transactionService)
@@ -477,11 +480,27 @@ public class BlockchainOperationsService : IBlockchainOperationsService
 
 /// <summary>
 /// Result of transaction building and signing
+/// Contains the typed or binary transaction, signatures, packed transaction hex, and public key used to sign
 /// </summary>
 public record SignedTransactionResult
 {
+    /// <summary>
+    /// The transaction object (typed or binary payload)
+    /// </summary>
     public required object Transaction { get; init; }
+
+    /// <summary>
+    /// Signatures produced when signing the transaction
+    /// </summary>
     public required List<string> Signatures { get; init; }
+
+    /// <summary>
+    /// Packed transaction hex string suitable for PushTransaction
+    /// </summary>
     public required string PackedTransaction { get; init; }
+
+    /// <summary>
+    /// Public key (WIF or EOSIO format) corresponding to the signing private key
+    /// </summary>
     public required string PublicKey { get; init; }
 }

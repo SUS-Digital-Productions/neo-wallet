@@ -12,6 +12,10 @@ public sealed class EosioTransactionBuilder<T>
     private DateTime _expiration;
     private readonly List<EosioAction<T>> _actions = new();
 
+    /// <summary>
+    /// Create a new transaction builder initialized with the given chain info
+    /// </summary>
+    /// <param name="chainInfo">Chain information used for TAPOS and timing</param>
     public EosioTransactionBuilder(ChainInfo chainInfo)
     {
         _chainInfo = chainInfo;

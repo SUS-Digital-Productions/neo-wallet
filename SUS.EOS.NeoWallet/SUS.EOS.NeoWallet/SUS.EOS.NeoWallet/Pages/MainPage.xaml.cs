@@ -1,4 +1,3 @@
-#pragma warning disable CS0618 // DisplayAlert/DisplayActionSheet obsolete warnings
 
 using System.Globalization;
 using SUS.EOS.EosioSigningRequest.Models;
@@ -165,7 +164,7 @@ public partial class MainPage : ContentPage
             var accountNames = accounts
                 .Select(a => $"{a.Data.Account}@{a.Data.Authority}")
                 .ToArray();
-            var result = await DisplayActionSheet("Select Account", "Cancel", null, accountNames);
+            var result = await DisplayActionSheetAsync("Select Account", "Cancel", null, accountNames);
 
             if (!string.IsNullOrEmpty(result) && result != "Cancel")
             {
@@ -207,7 +206,7 @@ public partial class MainPage : ContentPage
             }
 
             var networkNames = networkList.Select(n => n.Name).ToArray();
-            var result = await DisplayActionSheet("Select Network", "Cancel", null, networkNames);
+            var result = await DisplayActionSheetAsync("Select Network", "Cancel", null, networkNames);
 
             if (result != null && result != "Cancel")
             {
@@ -524,7 +523,7 @@ public partial class MainPage : ContentPage
             System.Diagnostics.Trace.WriteLine(
                 $"[MAINPAGE] Error showing signing popup: {ex.Message}"
             );
-            await DisplayAlert("Error", $"Failed to process signing request: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed to process signing request: {ex.Message}", "OK");
         }
     }
 
@@ -564,7 +563,7 @@ public partial class MainPage : ContentPage
                 $"[MAINPAGE] Error handling deep link ESR: {ex.Message}"
             );
             System.Diagnostics.Trace.WriteLine($"[MAINPAGE] Stack trace: {ex.StackTrace}");
-            await DisplayAlert("Error", $"Failed to process ESR link: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed to process ESR link: {ex.Message}", "OK");
         }
     }
 

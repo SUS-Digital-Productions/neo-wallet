@@ -3,6 +3,7 @@ using Microsoft.Maui.Controls.Shapes;
 using SUS.EOS.NeoWallet.Services.Interfaces;
 using SUS.EOS.NeoWallet.Services.Models;
 using SUS.EOS.NeoWallet.Services.Models.WalletData;
+using System.Windows.Input;
 using SUS.EOS.Sharp.Services;
 
 namespace SUS.EOS.NeoWallet.Pages;
@@ -15,7 +16,43 @@ public partial class KeyManagementPage : ContentPage
     private readonly IWalletContextService _walletContext;
 
     private readonly ObservableCollection<KeyItemViewModel> _keys = [];
-    private string? _sessionPassword;
+
+    // Expose an ICommand for Key Item menu actions so KeyItemView can bind to it
+    public ICommand KeyMenuCommand => new Command<object?>(async (param) =>
+    {
+        if (param is not KeyItemViewModel keyItem)
+            return;
+        await ShowKeyMenuFor(keyItem);
+    });
+
+    private async Task ShowKeyMenuFor(KeyItemViewModel keyItem)
+    {
+        var action = await DisplayActionSheetAsync("Key Actions", "Cancel", null, "Get Linked Accounts", "Copy Public Key", "View Private Key", "View Details", "Remove from Wallet");
+
+        switch (action)
+        {
+            case "Get Linked Accounts":
+                await GetLinkedAccountsForKeyAsync(keyItem);
+                break;
+
+            case "Copy Public Key":
+                await ShowCopyKeyDialogAsync(keyItem);
+                break;
+
+            case "View Private Key":
+                await ViewPrivateKeyAsync(keyItem);
+                break;
+
+            case "View Details":
+                await ShowKeyDetailsAsync(keyItem);
+                break;
+
+            case "Remove from Wallet":
+                await RemoveKeyFromWalletAsync(keyItem);
+                break;
+        }
+    }    private string? _sessionPassword;
+    private readonly IAppDiagnosticsService _diagnostics; 
 
     public KeyManagementPage(
         IWalletStorageService storageService,
@@ -32,56 +69,78 @@ public partial class KeyManagementPage : ContentPage
         _walletContext = walletContext;
 
         KeysCollectionView.ItemsSource = _keys;
+        // Resolve diagnostics service from DI if not injected via constructor
+        _diagnostics = Application.Current!.Handler.MauiContext!.Services.GetRequiredService<IAppDiagnosticsService>();
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+try { _diagnostics.Log("KEYMANAGEMENT", $"OnAppearing called; storage unlocked={_storageService.IsUnlocked}"); } catch { System.Diagnostics.Trace.WriteLine("[KEYMANAGEMENT] Diagnostics log failed on appear"); }
 
-        // Prompt for password on page entry
+        // Prompt for password on page entry unless wallet is already unlocked
         if (string.IsNullOrWhiteSpace(_sessionPassword))
         {
-            try
+            if (_storageService.IsUnlocked)
             {
-                var password = await ShowTextInputDialogAsync(
-                    "Wallet Password",
-                    "Enter your wallet password to access key management:",
-                    "OK",
-                    "Cancel",
-                    isPassword: true
-                );
-
-                if (string.IsNullOrWhiteSpace(password))
-                {
-                    // User cancelled, go back
-                    if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
-                    {
-                        await Navigation.PopAsync();
-                    }
-                    return;
-                }
-
-                if (!await _storageService.ValidatePasswordAsync(password))
-                {
-                    await DisplayAlertAsync("Error", "Invalid password", "OK");
-                    if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
-                    {
-                        await Navigation.PopAsync();
-                    }
-                    return;
-                }
-
-                _sessionPassword = password;
+                // Wallet is already unlocked elsewhere; use unlocked session without prompting
+                _sessionPassword = string.Empty; // sentinel to indicate unlocked
             }
-            catch (Exception ex)
+            else
             {
-                System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Error in password dialog: {ex.Message}");
-                // If dialog was dismissed or errored, go back
-                if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
+                try
                 {
-                    await Navigation.PopAsync();
+                    var password = await ShowTextInputDialogAsync(
+                        "Wallet Password",
+                        "Enter your wallet password to access key management:",
+                        "OK",
+                        "Cancel",
+                        isPassword: true
+                    );
+
+                    if (string.IsNullOrWhiteSpace(password))
+                    {
+                        // User cancelled, go back
+                        if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
+                        {
+                            await Navigation.PopAsync();
+                        }
+                        return;
+                    }
+
+                    if (!await _storageService.ValidatePasswordAsync(password))
+                    {
+                        await DisplayAlertAsync("Error", "Invalid password", "OK");
+                        if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
+                        {
+                            await Navigation.PopAsync();
+                        }
+                        return;
+                    }
+
+                    // Unlock wallet in the storage service so subsequent operations can use in-memory keys
+                    if (!await _storageService.UnlockWalletAsync(password))
+                    {
+                        await DisplayAlertAsync("Error", "Failed to unlock wallet", "OK");
+                        if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
+                        {
+                            await Navigation.PopAsync();
+                        }
+                        return;
+                    }
+
+                    _sessionPassword = password;
                 }
-                return;
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Error in password dialog: {ex.Message}");
+                    // If dialog was dismissed or errored, go back
+                    if (Navigation.NavigationStack.Count > 0 && Navigation.NavigationStack.Last() == this)
+                    {
+                        await Navigation.PopAsync();
+                    }
+                    return;
+                }
             }
         }
 
@@ -116,6 +175,21 @@ public partial class KeyManagementPage : ContentPage
                     Accounts = [.. g],
                 })
                 .ToList();
+
+            // Also include public keys that exist in encrypted storage even if they have no linked accounts
+            var storedPublicKeys = wallet?.Storage?.PublicKeys ?? [];
+            foreach (var pk in storedPublicKeys)
+            {
+                if (keyGroups.All(k => k.PublicKey != pk))
+                {
+                    keyGroups.Add(new KeyItemViewModel
+                    {
+                        PublicKey = pk,
+                        AccountCount = 0,
+                        Accounts = []
+                    });
+                }
+            }
 
             _keys.Clear();
             foreach (var key in keyGroups)
@@ -152,26 +226,42 @@ public partial class KeyManagementPage : ContentPage
             if (string.IsNullOrWhiteSpace(privateKey))
                 return;
 
-            var password = await ShowTextInputDialogAsync(
-                "Wallet Password",
-                "Enter your wallet password to encrypt the key:",
-                "Confirm",
-                "Cancel",
-                isPassword: true
-            );
-
-            if (string.IsNullOrWhiteSpace(password))
-                return;
-
-            // Validate password
-            if (!await _storageService.ValidatePasswordAsync(password))
+            // Determine password to use. If wallet is unlocked, we can reuse the in-memory password in the storage service
+            string? password;
+            if (_storageService.IsUnlocked)
             {
-                await DisplayAlertAsync("Error", "Invalid password", "OK");
-                return;
+                // Signal to storage layer to use its current in-memory password
+                password = string.Empty;
+            }
+            else if (!string.IsNullOrWhiteSpace(_sessionPassword))
+            {
+                password = _sessionPassword;
+            }
+            else
+            {
+                password = await ShowTextInputDialogAsync(
+                    "Wallet Password",
+                    "Enter your wallet password to encrypt the key:",
+                    "Confirm",
+                    "Cancel",
+                    isPassword: true
+                );
+
+                if (string.IsNullOrWhiteSpace(password))
+                    return;
+
+                // Validate password
+                if (!await _storageService.ValidatePasswordAsync(password))
+                {
+                    await DisplayAlertAsync("Error", "Invalid password", "OK");
+                    return;
+                }
             }
 
             // Import key - this will trigger get linked accounts
-            await GetAndAddLinkedAccountsAsync(privateKey.Trim(), password);
+            try { _diagnostics.Log("KEYMANAGEMENT", $"Import key attempt (first10)={privateKey[..Math.Min(10, privateKey.Length)]}..."); } catch { }
+            await GetAndAddLinkedAccountsAsync(privateKey.Trim(), password!);
+            try { _diagnostics.Log("KEYMANAGEMENT", "Import key flow returned (check persisted keys)"); } catch { }
         }
         catch (Exception ex)
         {
@@ -359,11 +449,46 @@ public partial class KeyManagementPage : ContentPage
 
             if (accounts.Count == 0)
             {
-                await DisplayAlertAsync(
+                var addAnyway = await DisplayAlertAsync(
                     "No Accounts Found",
-                    $"No accounts found using this key on the current network.\n\nPublic Key: {publicKey}",
-                    "OK"
+                    $"No accounts found using this key on the current network.\n\nPublic Key: {publicKey}\n\nWould you like to add this key to your wallet without linked accounts?",
+                    "Add Key",
+                    "Cancel"
                 );
+
+                if (!addAnyway)
+                    return;
+
+                // Add key to storage even though no linked accounts were found
+                System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Attempting to save key for {publicKey[..Math.Min(10, publicKey.Length)]}...");
+                _diagnostics.Log("KEYMANAGEMENT", $"Attempting to save key {publicKey[..Math.Min(10, publicKey.Length)]}...");
+                var added = await _storageService.AddKeyToStorageAsync(privateKey, publicKey, password);
+                System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] AddKeyToStorageAsync returned: {added}");
+                _diagnostics.Log("KEYMANAGEMENT", $"AddKeyToStorageAsync returned: {added}");
+                if (!added)
+                {
+                    await DisplayAlertAsync("Error", "Failed to add key to wallet storage", "OK");
+                    return;
+                }
+
+                // If wallet wasn't unlocked, try unlocking now with the provided password so the key is available in-memory
+                if (!_storageService.IsUnlocked && !string.IsNullOrWhiteSpace(password))
+                {
+                    var unlockedNow = await _storageService.UnlockWalletAsync(password);
+                    System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] Unlock after add returned: {unlockedNow}");
+                }
+
+                // Double-check the wallet persisted the public key
+                var reloaded = await _storageService.LoadWalletAsync();
+                var contains = reloaded?.Storage?.PublicKeys?.Contains(publicKey) == true;
+                System.Diagnostics.Trace.WriteLine($"[KEYMANAGEMENT] After save: persistedPublicKeyFound={contains}; totalPublicKeys={reloaded?.Storage?.PublicKeys?.Count ?? 0}");
+
+                await DisplayAlertAsync("Success", "Key added to wallet (no linked accounts found)", "OK");
+
+                // Reload keys and refresh context
+                await LoadKeysAsync();
+                await _walletContext.RefreshAsync();
+
                 return;
             }
 
@@ -967,112 +1092,16 @@ public partial class KeyManagementPage : ContentPage
         bool isPassword = false
     )
     {
-        var tcs = new TaskCompletionSource<string?>();
+        // Reuse the centralized InputDialog component
+        var dialog = new SUS.EOS.NeoWallet.Pages.Components.InputDialog(
+            title: title,
+            message: message,
+            accept: accept,
+            cancel: cancel,
+            isPassword: isPassword
+        );
 
-        var dialogPage = new ContentPage
-        {
-            BackgroundColor = Color.FromArgb("#80000000"), // Semi-transparent overlay
-        };
-
-        // Handle hardware/software back button on the dialog
-        dialogPage.Disappearing += (s, e) =>
-        {
-            // If the dialog is dismissed without button click, cancel the operation
-            tcs.TrySetResult(null);
-        };
-
-        var entry = new Entry
-        {
-            Placeholder = message,
-            IsPassword = isPassword,
-            BackgroundColor = Colors.White,
-            TextColor = Colors.Black,
-            FontSize = 16,
-            Margin = new Thickness(0, 10),
-        };
-
-        var acceptButton = new Button
-        {
-            Text = accept,
-            BackgroundColor = Color.FromArgb("#007AFF"),
-            TextColor = Colors.White,
-            CornerRadius = 8,
-            Padding = new Thickness(20, 10),
-        };
-
-        var cancelButton = new Button
-        {
-            Text = cancel,
-            BackgroundColor = Color.FromArgb("#8E8E93"),
-            TextColor = Colors.White,
-            CornerRadius = 8,
-            Padding = new Thickness(20, 10),
-        };
-
-        acceptButton.Clicked += async (s, e) =>
-        {
-            await Navigation.PopModalAsync();
-            tcs.TrySetResult(entry.Text);
-        };
-
-        cancelButton.Clicked += async (s, e) =>
-        {
-            await Navigation.PopModalAsync();
-            tcs.TrySetResult(null);
-        };
-
-        entry.Completed += async (s, e) =>
-        {
-            await Navigation.PopModalAsync();
-            tcs.TrySetResult(entry.Text);
-        };
-
-        var dialogFrame = new Border
-        {
-            BackgroundColor = Colors.White,
-            StrokeThickness = 0,
-            Padding = 20,
-            MaximumWidthRequest = 400,
-            VerticalOptions = LayoutOptions.Center,
-            HorizontalOptions = LayoutOptions.Center,
-            StrokeShape = new RoundRectangle { CornerRadius = 12 },
-            Content = new VerticalStackLayout
-            {
-                Spacing = 15,
-                Children =
-                {
-                    new Label
-                    {
-                        Text = title,
-                        FontSize = 20,
-                        FontAttributes = FontAttributes.Bold,
-                        TextColor = Colors.Black,
-                        HorizontalOptions = LayoutOptions.Center,
-                    },
-                    new Label
-                    {
-                        Text = message,
-                        FontSize = 14,
-                        TextColor = Color.FromArgb("#666666"),
-                        HorizontalOptions = LayoutOptions.Start,
-                    },
-                    entry,
-                    new HorizontalStackLayout
-                    {
-                        Spacing = 10,
-                        HorizontalOptions = LayoutOptions.End,
-                        Children = { cancelButton, acceptButton },
-                    },
-                },
-            },
-        };
-
-        dialogPage.Content = dialogFrame;
-
-        await Navigation.PushModalAsync(dialogPage, true);
-        entry.Focus();
-
-        return await tcs.Task;
+        return await dialog.ShowAsync(this);
     }
 
     /// <summary>
@@ -1081,25 +1110,7 @@ public partial class KeyManagementPage : ContentPage
     /// </summary>
     private static bool KeysMatchIgnoringChecksum(string key1, string key2)
     {
-        if (key1 == key2)
-            return true;
-        if (string.IsNullOrEmpty(key1) || string.IsNullOrEmpty(key2))
-            return false;
-
-        // Strip prefixes
-        var k1 = key1.Replace("EOS", "").Replace("PUB_K1_", "").Replace("PUB_R1_", "");
-        var k2 = key2.Replace("EOS", "").Replace("PUB_K1_", "").Replace("PUB_R1_", "");
-
-        // If lengths differ significantly, not a match
-        if (Math.Abs(k1.Length - k2.Length) > 5)
-            return false;
-
-        // Compare first N-5 characters (ignoring last 5 which contain checksum)
-        var compareLength = Math.Min(k1.Length, k2.Length) - 5;
-        if (compareLength <= 0)
-            return false;
-
-        return k1[..compareLength] == k2[..compareLength];
+        return SUS.EOS.NeoWallet.Services.Utils.PublicKeyUtils.KeysMatchIgnoringChecksum(key1, key2);
     }
 }
 

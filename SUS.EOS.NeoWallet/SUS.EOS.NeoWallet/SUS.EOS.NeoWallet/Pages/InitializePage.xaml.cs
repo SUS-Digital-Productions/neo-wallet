@@ -68,11 +68,15 @@ public partial class InitializePage : ContentPage
             var jsonContent = await reader.ReadToEndAsync();
 
             // Prompt for password to unlock the imported wallet
-            var password = await DisplayPromptAsync(
-                "Wallet Password",
-                "Enter the password for this wallet:",
-                placeholder: "Password"
+            var pwDialog = new SUS.EOS.NeoWallet.Pages.Components.InputDialog(
+                title: "Wallet Password",
+                message: "Enter the password for this wallet:",
+                accept: "OK",
+                cancel: "Cancel",
+                isPassword: true
             );
+
+            var password = await pwDialog.ShowAsync(this);
 
             if (string.IsNullOrWhiteSpace(password))
                 return;

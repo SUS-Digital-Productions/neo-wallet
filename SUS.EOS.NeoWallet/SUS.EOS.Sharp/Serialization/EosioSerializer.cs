@@ -356,14 +356,49 @@ public static class EosioSerializer
 /// </summary>
 public record EosioTransaction<T>
 {
+    /// <summary>
+    /// Expiration time in ISO format
+    /// </summary>
     public string Expiration { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Reference block number for TAPOS
+    /// </summary>
     public ushort RefBlockNum { get; init; }
+
+    /// <summary>
+    /// Reference block prefix for TAPOS
+    /// </summary>
     public uint RefBlockPrefix { get; init; }
+
+    /// <summary>
+    /// Maximum net usage (words)
+    /// </summary>
     public uint MaxNetUsageWords { get; init; }
+
+    /// <summary>
+    /// Maximum CPU usage (ms)
+    /// </summary>
     public byte MaxCpuUsageMs { get; init; }
+
+    /// <summary>
+    /// Delay seconds
+    /// </summary>
     public uint DelaySec { get; init; }
+
+    /// <summary>
+    /// Context-free actions
+    /// </summary>
     public List<EosioAction<T>> ContextFreeActions { get; init; } = new();
+
+    /// <summary>
+    /// Actions in the transaction
+    /// </summary>
     public List<EosioAction<T>> Actions { get; init; } = new();
+
+    /// <summary>
+    /// Transaction extensions
+    /// </summary>
     public List<object> TransactionExtensions { get; init; } = new();
 }
 
@@ -372,9 +407,24 @@ public record EosioTransaction<T>
 /// </summary>
 public record EosioAction<T>
 {
+    /// <summary>
+    /// Contract account providing the action
+    /// </summary>
     public string Account { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Action name
+    /// </summary>
     public string Name { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Authorization list for this action
+    /// </summary>
     public List<EosioAuthorization> Authorization { get; init; } = new();
+
+    /// <summary>
+    /// Action data (typed)
+    /// </summary>
     public T? Data { get; init; }
     
     /// <summary>
@@ -388,6 +438,13 @@ public record EosioAction<T>
 /// </summary>
 public record EosioAuthorization
 {
+    /// <summary>
+    /// Actor account name for authorization
+    /// </summary>
     public string Actor { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Permission name for authorization
+    /// </summary>
     public string Permission { get; init; } = string.Empty;
 }

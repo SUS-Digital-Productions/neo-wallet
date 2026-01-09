@@ -75,9 +75,9 @@
 
           <!-- Scrollable JSON Display -->
           <ScrollView HeightRequest="400">
-            <Frame BackgroundColor="{DynamicResource Gray100}" Padding="12" HasShadow="False">
+            <Border BackgroundColor="{DynamicResource Gray100}" Padding="12" StrokeThickness="0">
               <Label x:Name="TableDataLabel" Text="{}{}" FontFamily="Courier" FontSize="12" LineBreakMode="WordWrap" />
-            </Frame>
+            </Border>
           </ScrollView>
 
           <Grid ColumnDefinitions="*,*" ColumnSpacing="12">

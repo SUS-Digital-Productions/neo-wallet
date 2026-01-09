@@ -112,17 +112,30 @@
                                 TextColor="White" />
                         </Border>
                         <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
-                            <Label 
-                                x:Name="AccountNameLabel"
-                                Text="myaccount"
-                                FontSize="16"
-                                FontAttributes="Bold"
-                                TextColor="{DynamicResource TextPrimary}" />
+                            <Border
+                                BackgroundColor="{DynamicResource Surface}"
+                                StrokeShape="RoundRectangle 8"
+                                Stroke="{DynamicResource Border}"
+                                Padding="8"
+                                HeightRequest="48">
+                                <Picker
+                                    x:Name="AccountPicker"
+                                    Title="Select account"
+                                    SelectedIndexChanged="OnAccountPickerChanged"
+                                    AutomationProperties.AutomationId="Esr_AccountPicker"
+                                    FontSize="16"
+                                    TextColor="{DynamicResource TextPrimary}"
+                                    HorizontalOptions="FillAndExpand"
+                                    VerticalOptions="Center" />
+                            </Border>
+
                             <Label 
                                 x:Name="AccountPermissionLabel"
-                                Text="@active"
+                                Text=""
                                 FontSize="12"
-                                TextColor="{DynamicResource TextSecondary}" />
+                                Margin="2,4,0,0"
+                                TextColor="{DynamicResource TextSecondary}"
+                                AutomationProperties.AutomationId="Esr_AccountPermissionLabel" />
                         </VerticalStackLayout>
                     </Grid>
                 </VerticalStackLayout>
@@ -255,6 +268,7 @@
                 <Button
                     Grid.Column="0"
                     x:Name="CancelButton"
+                    AutomationProperties.AutomationId="Esr_CancelButton"
                     Text="Cancel"
                     BackgroundColor="{DynamicResource Surface}"
                     TextColor="{DynamicResource TextPrimary}"
@@ -266,6 +280,7 @@
                 <Button
                     Grid.Column="2"
                     x:Name="SignButton"
+                    AutomationProperties.AutomationId="Esr_SignButton"
                     Text="Sign"
                     BackgroundColor="{DynamicResource Success}"
                     TextColor="White"

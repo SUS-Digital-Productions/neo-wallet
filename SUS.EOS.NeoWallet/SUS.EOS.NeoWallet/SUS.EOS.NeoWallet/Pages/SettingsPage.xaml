@@ -169,6 +169,21 @@
                             </VerticalStackLayout>
                             <Label Grid.Column="2" Text="›" FontSize="18" TextColor="{DynamicResource TextSecondary}" VerticalOptions="Center" />
                         </Grid>
+
+                        <BoxView HeightRequest="1" Color="{DynamicResource Border}" />
+
+                        <!-- Diagnostics -->
+                        <Grid Padding="16" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnShowDiagnosticsClicked" />
+                            </Grid.GestureRecognizers>
+                            <Label Grid.Column="0" Text="📋" FontSize="20" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="Diagnostics Logs" FontSize="14" TextColor="{DynamicResource TextPrimary}" />
+                                <Label Text="View and export internal logs" FontSize="12" TextColor="{DynamicResource TextSecondary}" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="›" FontSize="18" TextColor="{DynamicResource TextSecondary}" VerticalOptions="Center" />
+                        </Grid>
                     </VerticalStackLayout>
                 </Border>
             </VerticalStackLayout>

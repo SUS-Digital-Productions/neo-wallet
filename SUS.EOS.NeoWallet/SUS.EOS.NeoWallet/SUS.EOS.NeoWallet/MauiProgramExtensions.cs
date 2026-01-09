@@ -82,6 +82,10 @@ namespace SUS.EOS.NeoWallet
             builder.Services.AddTransient<ContractActionsPage>();
             builder.Services.AddTransient<AccountManagementPage>();
 
+            // Diagnostics service and page for collecting trace output
+            builder.Services.AddSingleton<IAppDiagnosticsService, AppDiagnosticsService>();
+            builder.Services.AddTransient<DiagnosticsPage>();
+
 #if DEBUG
             builder.Logging.AddDebug();
 #endif

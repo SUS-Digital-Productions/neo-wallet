@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\SUS.EOS.Sharp\SUS.EOS.Sharp.csproj" />
     <ProjectReference Include="..\SUS.EOS.EosioSigningRequest\SUS.EOS.EosioSigningRequest.csproj" />
+    <!-- Include an external test file (created at repository root during development) -->
+    <ProjectReference Include="..\SUS.EOS.NeoWallet\SUS.EOS.NeoWallet\SUS.EOS.NeoWallet.csproj" />
   </ItemGroup>
 
   <ItemGroup>

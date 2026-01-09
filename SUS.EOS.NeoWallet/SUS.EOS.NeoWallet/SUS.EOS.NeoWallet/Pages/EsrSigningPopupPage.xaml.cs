@@ -1,4 +1,3 @@
-#pragma warning disable CS0618 // DisplayAlert/DisplayActionSheet obsolete warnings
 
 using System.Text;
 using System.Text.Json;
@@ -28,6 +27,93 @@ public partial class EsrSigningPopupPage : ContentPage
     private string? _rawPayload;
     private string? _callbackUrl;
     private TaskCompletionSource<EsrSigningResult>? _completionSource;
+
+    // Available accounts for current network (populated when showing the request)
+    private List<SUS.EOS.NeoWallet.Services.Models.WalletAccount> _availableAccounts = new();
+
+    private void OnAccountPickerChanged(object sender, EventArgs e)
+    {
+        try
+        {
+            if (AccountPicker.SelectedIndex >= 0 && AccountPicker.SelectedIndex < _availableAccounts.Count)
+            {
+                var sel = _availableAccounts[AccountPicker.SelectedIndex];
+                AccountPermissionLabel.Text = $"@{sel.Data.Authority}";
+
+                // Clear title so selected text is displayed
+                AccountPicker.Title = string.Empty;
+            }
+            else
+            {
+                AccountPermissionLabel.Text = string.Empty;
+            }
+        }
+        catch
+        {
+            // Ignore UI update errors
+        }
+    }
+
+    private static bool TryGetRequestedAuth(EsrRequest? request, out string? actor, out string? permission)
+    {
+        actor = null;
+        permission = null;
+
+        if (request == null)
+            return false;
+
+        try
+        {
+            // Handle single action
+            if (request.Payload.IsAction && request.Payload.Action != null)
+            {
+                var json = JsonSerializer.Serialize(request.Payload.Action);
+                var el = JsonSerializer.Deserialize<JsonElement>(json);
+                if (el.TryGetProperty("authorization", out var authArr) && authArr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var a in authArr.EnumerateArray())
+                    {
+                        if (a.TryGetProperty("actor", out var actorEl) && a.TryGetProperty("permission", out var permEl))
+                        {
+                            actor = actorEl.GetString();
+                            permission = permEl.GetString();
+                            return actor != null && permission != null;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            // Handle transaction with actions
+            if (request.Payload.IsTransaction && request.Payload.Transaction != null)
+            {
+                var json = JsonSerializer.Serialize(request.Payload.Transaction);
+                var el = JsonSerializer.Deserialize<JsonElement>(json);
+                if (el.TryGetProperty("actions", out var actionsArr) && actionsArr.ValueKind == JsonValueKind.Array && actionsArr.GetArrayLength() > 0)
+                {
+                    var firstAction = actionsArr[0];
+                    if (firstAction.TryGetProperty("authorization", out var authArr) && authArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var a in authArr.EnumerateArray())
+                        {
+                            if (a.TryGetProperty("actor", out var actorEl) && a.TryGetProperty("permission", out var permEl))
+                            {
+                                actor = actorEl.GetString();
+                                permission = permEl.GetString();
+                                return actor != null && permission != null;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // swallow parsing errors
+        }
+
+        return false;
+    }
 
     public EsrSigningPopupPage(
         IWalletContextService walletContext,
@@ -74,17 +160,77 @@ public partial class EsrSigningPopupPage : ContentPage
             DAppChainLabel.Text = network?.Name ?? request.ChainId[..8] + "...";
         }
 
-        // Set account info from wallet context
-        var account = _walletContext.ActiveAccount;
-        if (account != null)
+        // Populate account picker from wallet context and try to auto-select the requested actor/permission from ESR
+        _availableAccounts = await _walletContext.GetAccountsForActiveNetworkAsync();
+        var pickerItems = new List<string>();
+        foreach (var a in _availableAccounts)
         {
-            AccountNameLabel.Text = account.Data.Account;
-            AccountPermissionLabel.Text = $"@{account.Data.Authority}";
+            pickerItems.Add($"{a.Data.Account}@{a.Data.Authority}");
+        }
+
+        if (pickerItems.Count == 0)
+        {
+            AccountPicker.ItemsSource = new List<string> { "No account available" };
+            AccountPicker.IsEnabled = false;
+            SignButton.IsEnabled = false;
+            AccountPicker.SelectedIndex = 0;
+            AccountPermissionLabel.Text = "";
         }
         else
         {
-            AccountNameLabel.Text = "No account selected";
-            AccountPermissionLabel.Text = "";
+            AccountPicker.ItemsSource = pickerItems;
+
+            // Ensure picker is enabled
+            AccountPicker.IsEnabled = true;
+            SignButton.IsEnabled = true;
+
+            // Try to get requested actor/permission from the ESR payload
+            if (TryGetRequestedAuth(_request, out var reqActor, out var reqPerm))
+            {
+                var idx = _availableAccounts.FindIndex(a =>
+                    string.Equals(a.Data.Account, reqActor, StringComparison.Ordinal) &&
+                    string.Equals(a.Data.Authority, reqPerm, StringComparison.Ordinal)
+                );
+
+                if (idx >= 0)
+                {
+                    AccountPicker.SelectedIndex = idx;
+                }
+                else
+                {
+                    // Fall back to active account
+                    var activeIdx = _availableAccounts.FindIndex(a =>
+                        _walletContext.ActiveAccount != null &&
+                        a.Data.Account == _walletContext.ActiveAccount.Data.Account &&
+                        a.Data.Authority == _walletContext.ActiveAccount.Data.Authority
+                    );
+                    AccountPicker.SelectedIndex = activeIdx >= 0 ? activeIdx : 0;
+                }
+            }
+            else
+            {
+                var activeIdx = _availableAccounts.FindIndex(a =>
+                    _walletContext.ActiveAccount != null &&
+                    a.Data.Account == _walletContext.ActiveAccount.Data.Account &&
+                    a.Data.Authority == _walletContext.ActiveAccount.Data.Authority
+                );
+                AccountPicker.SelectedIndex = activeIdx >= 0 ? activeIdx : 0;
+            }
+
+            // Ensure SelectedIndex is valid
+            if (AccountPicker.SelectedIndex < 0)
+                AccountPicker.SelectedIndex = 0;
+
+            // Update permission label for selected index
+            var sel = _availableAccounts[AccountPicker.SelectedIndex];
+            AccountPermissionLabel.Text = $"@{sel.Data.Authority}";
+
+            // Ensure the Picker displays the selected item (clears Title placeholder)
+            if (pickerItems != null && AccountPicker.SelectedIndex >= 0 && AccountPicker.SelectedIndex < pickerItems.Count)
+            {
+                AccountPicker.SelectedItem = pickerItems[AccountPicker.SelectedIndex];
+                AccountPicker.Title = string.Empty;
+            }
         }
 
         // Set actions
@@ -356,26 +502,38 @@ public partial class EsrSigningPopupPage : ContentPage
 
         try
         {
-            var account = _walletContext.ActiveAccount;
-            if (account == null)
-                throw new InvalidOperationException("No active account selected");
+            // Determine which wallet account the user selected for signing
+            SUS.EOS.NeoWallet.Services.Models.WalletAccount? signingAccount = null;
+            if (AccountPicker.SelectedIndex >= 0 && AccountPicker.SelectedIndex < _availableAccounts.Count)
+            {
+                signingAccount = _availableAccounts[AccountPicker.SelectedIndex];
+            }
+            else
+            {
+                signingAccount = _walletContext.ActiveAccount;
+            }
+
+            if (signingAccount == null)
+                throw new InvalidOperationException("No signing account available");
 
             // Get private key
             string? privateKey;
             if (_storageService.IsUnlocked)
             {
-                privateKey = _storageService.GetUnlockedPrivateKey(account.Data.PublicKey);
+                privateKey = _storageService.GetUnlockedPrivateKey(signingAccount.Data.PublicKey);
             }
             else
             {
                 // Show password prompt
-                var password = await DisplayPromptAsync(
-                    "Wallet Locked",
-                    "Enter your password to sign the transaction:",
-                    "Sign",
-                    "Cancel",
-                    keyboard: Keyboard.Default
+                var passwordDialog = new SUS.EOS.NeoWallet.Pages.Components.InputDialog(
+                    title: "Wallet Locked",
+                    message: "Enter your password to sign the transaction:",
+                    accept: "Sign",
+                    cancel: "Cancel",
+                    isPassword: true
                 );
+
+                var password = await passwordDialog.ShowAsync(this);
 
                 if (string.IsNullOrEmpty(password))
                 {
@@ -392,9 +550,9 @@ public partial class EsrSigningPopupPage : ContentPage
                 }
 
                 privateKey = await _accountService.GetPrivateKeyAsync(
-                    account.Data.Account,
-                    account.Data.Authority,
-                    account.Data.ChainId,
+                    signingAccount.Data.Account,
+                    signingAccount.Data.Authority,
+                    signingAccount.Data.ChainId,
                     password
                 );
             }
@@ -406,20 +564,20 @@ public partial class EsrSigningPopupPage : ContentPage
             var keyObj = SUS.EOS.Sharp.Cryptography.EosioKey.FromPrivateKey(privateKey);
             System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] ========== KEY VERIFICATION ==========");
             System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] Private key corresponds to public key: {keyObj.PublicKey}");
-            System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] Account stored public key: {account.Data.PublicKey}");
-            System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] Signing as: {account.Data.Account}@{account.Data.Authority}");
+            System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] Account stored public key: {signingAccount.Data.PublicKey}");
+            System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] Signing as: {signingAccount.Data.Account}@{signingAccount.Data.Authority}");
             
             // Fetch on-chain account to verify authorized keys
             try
             {
-                var onChainAccount = await _blockchainClient.GetAccountAsync(account.Data.Account);
+                var onChainAccount = await _blockchainClient.GetAccountAsync(signingAccount.Data.Account);
                 System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] On-chain account fetched successfully");
                 
                 // Find the permission we're trying to use
-                var permission = onChainAccount.Permissions?.FirstOrDefault(p => p.PermName == account.Data.Authority);
+                var permission = onChainAccount.Permissions?.FirstOrDefault(p => p.PermName == signingAccount.Data.Authority);
                 if (permission != null)
                 {
-                    System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] On-chain {account.Data.Authority} permission found");
+                    System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] On-chain {signingAccount.Data.Authority} permission found");
                     System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] Required auth threshold: {permission.RequiredAuth?.Threshold}");
                     System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] Authorized keys count: {permission.RequiredAuth?.Keys?.Count ?? 0}");
                     
@@ -437,7 +595,7 @@ public partial class EsrSigningPopupPage : ContentPage
                 }
                 else
                 {
-                    System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] ⚠️ Permission '{account.Data.Authority}' not found on-chain!");
+                    System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] ⚠️ Permission '{signingAccount.Data.Authority}' not found on-chain!");
                 }
             }
             catch (Exception ex)
@@ -448,12 +606,12 @@ public partial class EsrSigningPopupPage : ContentPage
 
             // Sign the request with blockchain client (for chain info only)
             // DO NOT broadcast - Anchor Link protocol requires the dApp/callback service to broadcast
-            var chainId = _request.ChainId ?? account.Data.ChainId;
+            var chainId = _request.ChainId ?? signingAccount.Data.ChainId;
             var response = await _esrService.SignRequestAsync(
                 _request,
                 privateKey,
-                account.Data.Account,
-                account.Data.Authority,
+                signingAccount.Data.Account,
+                signingAccount.Data.Authority,
                 _blockchainClient,
                 broadcast: false, // Anchor Link: dApp broadcasts via callback, not wallet
                 CancellationToken.None
@@ -539,8 +697,8 @@ public partial class EsrSigningPopupPage : ContentPage
                         // Required callback fields
                         sig = response.Signatures?.FirstOrDefault() ?? "",  // First signature
                         tx = response.PackedTransaction ?? "",               // Transaction ID (hex)
-                        sa = account.Data.Account,                           // Signer account
-                        sp = account.Data.Authority,                         // Signer permission
+                        sa = signingAccount.Data.Account,                           // Signer account
+                        sp = signingAccount.Data.Authority,                         // Signer permission
                         rbn = response.RefBlockNum?.ToString() ?? "0",       // Reference block num
                         rid = response.RefBlockPrefix?.ToString() ?? "0",    // Reference block prefix (uint32)
                         ex = expiration,                                     // Expiration time
@@ -571,7 +729,7 @@ public partial class EsrSigningPopupPage : ContentPage
 
                     if (callbackResponse.IsSuccessStatusCode)
                     {
-                        await DisplayAlert(
+                        await DisplayAlertAsync(
                             "Success",
                             "Transaction signed and session established!",
                             "OK"
@@ -583,7 +741,7 @@ public partial class EsrSigningPopupPage : ContentPage
                     System.Diagnostics.Trace.WriteLine(
                         $"[ESRSIGNING] Callback failed: {ex.Message}"
                     );
-                    await DisplayAlert(
+                    await DisplayAlertAsync(
                         "Warning",
                         $"Transaction signed but callback failed: {ex.Message}",
                         "OK"
@@ -644,8 +802,8 @@ public partial class EsrSigningPopupPage : ContentPage
                             Signature = response.Signatures?.FirstOrDefault(),
                             BlockNum = response.BlockNum,
                             TransactionId = response.PackedTransaction,
-                            SignerActor = account.Data.Account,
-                            SignerPermission = account.Data.Authority
+                            SignerActor = signingAccount.Data.Account,
+                            SignerPermission = signingAccount.Data.Authority
                         };
                         
                         try
@@ -653,9 +811,9 @@ public partial class EsrSigningPopupPage : ContentPage
                             await _esrSessionManager.SendCallbackAsync(callbackPayload);
                             System.Diagnostics.Trace.WriteLine("[ESRSIGNING] Callback sent via session manager");
                             
-                            await DisplayAlert(
+                            await DisplayAlertAsync(
                                 "Identity Verified",
-                                $"Your identity has been verified as {account.Data.Account}@{account.Data.Authority}.\n\n" +
+                                $"Your identity has been verified as {signingAccount.Data.Account}@{signingAccount.Data.Authority}.\n\n" +
                                 "The website should update shortly.",
                                 "OK"
                             );
@@ -679,7 +837,7 @@ public partial class EsrSigningPopupPage : ContentPage
                         "[ESRSIGNING] Transaction broadcast completed"
                     );
 
-                    await DisplayAlert(
+                    await DisplayAlertAsync(
                         "Transaction Signed",
                         $"Signature: {response.Signatures?.FirstOrDefault()?[..16]}...\n\n"
                             + $"The transaction has been broadcast to the blockchain.",
@@ -700,8 +858,8 @@ public partial class EsrSigningPopupPage : ContentPage
                     Success = true,
                     TransactionId = txId,
                     Signatures = response.Signatures,
-                    Account = account.Data.Account,
-                    Permission = account.Data.Authority,
+                    Account = signingAccount.Data.Account,
+                    Permission = signingAccount.Data.Authority,
                 }
             );
 
@@ -713,7 +871,7 @@ public partial class EsrSigningPopupPage : ContentPage
                 new EsrSigningResult { Success = false, Error = ex.Message }
             );
 
-            await DisplayAlert("Signing Failed", ex.Message, "OK");
+            await DisplayAlertAsync("Signing Failed", ex.Message, "OK");
         }
         finally
         {
@@ -808,7 +966,7 @@ public partial class EsrSigningPopupPage : ContentPage
 
             if (callbackResponse.IsSuccessStatusCode)
             {
-                await DisplayAlert(
+                await DisplayAlertAsync(
                     "Success",
                     "Identity verified successfully!",
                     "OK"
@@ -816,7 +974,7 @@ public partial class EsrSigningPopupPage : ContentPage
             }
             else
             {
-                await DisplayAlert(
+                await DisplayAlertAsync(
                     "Warning",
                     $"Callback returned status {callbackResponse.StatusCode}",
                     "OK"
@@ -826,7 +984,7 @@ public partial class EsrSigningPopupPage : ContentPage
         catch (Exception ex)
         {
             System.Diagnostics.Trace.WriteLine($"[ESRSIGNING] Callback to {url} failed: {ex.Message}");
-            await DisplayAlert(
+            await DisplayAlertAsync(
                 "Warning",
                 $"Failed to send callback: {ex.Message}",
                 "OK"
@@ -842,7 +1000,7 @@ public partial class EsrSigningPopupPage : ContentPage
         var account = _walletContext.ActiveAccount;
         var signature = response.Signatures?.FirstOrDefault();
         
-        await DisplayAlert(
+        await DisplayAlertAsync(
             "Identity Proof Generated",
             $"Account: {account?.Data.Account}@{account?.Data.Authority}\n" +
             $"Signature: {signature?[..Math.Min(16, signature?.Length ?? 0)]}...\n\n" +

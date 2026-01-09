@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.Components.InputDialog"
+  BackgroundColor="Transparent"
+>
+  <Grid Padding="20" RowDefinitions="*" ColumnDefinitions="*">
+    <Border
+      BackgroundColor="White"
+      StrokeThickness="0"
+      Padding="20"
+      VerticalOptions="Center"
+      HorizontalOptions="Center"
+      StrokeShape="RoundRectangle 12"
+      MaximumWidthRequest="420"
+    >
+      <VerticalStackLayout Spacing="12">
+        <Label
+          x:Name="TitleLabel"
+          FontSize="20"
+          FontAttributes="Bold"
+          TextColor="Black"
+          HorizontalOptions="Center"
+          AutomationProperties.AutomationId="InputDialog_Title"
+        />
+        <Label x:Name="MessageLabel" FontSize="14" TextColor="#666" AutomationProperties.AutomationId="InputDialog_Message" />
+        <Entry x:Name="InputEntry" BackgroundColor="White" TextColor="Black" AutomationProperties.AutomationId="InputDialog_InputEntry" />
+        <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
+          <Button
+            x:Name="CancelButton"
+            Text="Cancel"
+            BackgroundColor="#8E8E93"
+            TextColor="White"
+            CornerRadius="8"
+            Padding="12,8"
+            AutomationProperties.AutomationId="InputDialog_CancelButton"
+          />
+          <Button
+            x:Name="AcceptButton"
+            Text="OK"
+            BackgroundColor="#007AFF"
+            TextColor="White"
+            CornerRadius="8"
+            Padding="12,8"
+            AutomationProperties.AutomationId="InputDialog_AcceptButton"
+          />
+        </HorizontalStackLayout>
+      </VerticalStackLayout>
+    </Border>
+  </Grid>
+</ContentPage>

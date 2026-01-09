@@ -3,6 +3,8 @@
     x:Class="SUS.EOS.NeoWallet.Pages.KeyManagementPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:components="clr-namespace:SUS.EOS.NeoWallet.Pages.Components"
+    x:Name="ThisPage"
     Title="Key Management"
     BackgroundColor="{DynamicResource PageBackgroundColor}">
 
@@ -30,91 +32,47 @@
                 Text="➕ Import Key" />
 
             <!-- Keys List -->
-            <Frame
-                Padding="0"
-                BackgroundColor="{DynamicResource CardBackground}"
-                BorderColor="{DynamicResource Gray200}"
-                CornerRadius="12"
-                HasShadow="True">
+            <components:CardView Title="Stored Keys">
+                <!-- Loading Indicator -->
+                <ActivityIndicator
+                    x:Name="LoadingIndicator"
+                    HeightRequest="50"
+                    IsRunning="True"
+                    IsVisible="True"
+                    Color="{DynamicResource Primary}" />
 
-                <VerticalStackLayout>
+                <!-- Empty State -->
+                <VerticalStackLayout
+                    x:Name="EmptyState"
+                    Padding="20"
+                    IsVisible="False"
+                    Spacing="10">
                     <Label
-                        Padding="20,15,20,10"
-                        FontAttributes="Bold"
                         FontSize="16"
-                        Text="Stored Keys"
-                        TextColor="{DynamicResource Primary}" />
-
-                    <!-- Loading Indicator -->
-                    <ActivityIndicator
-                        x:Name="LoadingIndicator"
-                        HeightRequest="50"
-                        IsRunning="True"
-                        IsVisible="True"
-                        Color="{DynamicResource Primary}" />
-
-                    <!-- Empty State -->
-                    <VerticalStackLayout
-                        x:Name="EmptyState"
-                        Padding="20"
-                        IsVisible="False"
-                        Spacing="10">
-                        <Label
-                            FontSize="16"
-                            HorizontalOptions="Center"
-                            Text="No keys stored"
-                            TextColor="{DynamicResource Gray600}" />
-                        <Label
-                            FontSize="14"
-                            HorizontalOptions="Center"
-                            HorizontalTextAlignment="Center"
-                            Text="Import a key to start using the wallet"
-                            TextColor="{DynamicResource Gray500}" />
-                    </VerticalStackLayout>
-
-                    <!-- Keys Collection -->
-                    <CollectionView x:Name="KeysCollectionView" SelectionMode="None">
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Padding="15,10" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                                    <!-- Key Icon -->
-                                    <Label
-                                        FontSize="24"
-                                        Text="🔑"
-                                        VerticalOptions="Center" />
-
-                                    <!-- Key Info -->
-                                    <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
-                                        <Label
-                                            FontAttributes="Bold"
-                                            FontSize="14"
-                                            LineBreakMode="MiddleTruncation"
-                                            Text="{Binding PublicKey}"
-                                            TextColor="{DynamicResource Primary}" />
-                                        <Label
-                                            FontSize="12"
-                                            Text="{Binding AccountCountText}"
-                                            TextColor="{DynamicResource Gray600}" />
-                                    </VerticalStackLayout>
-
-                                    <!-- 3-Dot Menu Button -->
-                                    <Button
-                                        Grid.Column="2"
-                                        BackgroundColor="Transparent"
-                                        Clicked="OnKeyMenuClicked"
-                                        CommandParameter="{Binding .}"
-                                        FontSize="20"
-                                        HeightRequest="40"
-                                        Text="⋮"
-                                        TextColor="{DynamicResource Gray600}"
-                                        VerticalOptions="Center"
-                                        WidthRequest="40" />
-                                </Grid>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
+                        HorizontalOptions="Center"
+                        Text="No keys stored"
+                        TextColor="{DynamicResource Gray600}" />
+                    <Label
+                        FontSize="14"
+                        HorizontalOptions="Center"
+                        HorizontalTextAlignment="Center"
+                        Text="Import a key to start using the wallet"
+                        TextColor="{DynamicResource Gray500}" />
                 </VerticalStackLayout>
-            </Frame>
+
+                <!-- Keys Collection -->
+                <CollectionView x:Name="KeysCollectionView" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <components:WalletKeyItemView
+                                PublicKey="{Binding PublicKey}"
+                                AccountCountText="{Binding AccountCountText}"
+                                MenuCommand="{Binding Source={x:Reference ThisPage}, Path=KeyMenuCommand}" />
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+            </components:CardView>
 
         </VerticalStackLayout>
     </ScrollView>

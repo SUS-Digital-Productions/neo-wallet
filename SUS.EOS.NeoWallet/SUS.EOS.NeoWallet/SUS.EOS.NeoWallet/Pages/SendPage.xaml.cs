@@ -126,12 +126,16 @@ public partial class SendPage : ContentPage
             string? password = null;
             if (!_storageService.IsUnlocked)
             {
-                password = await DisplayPromptAsync(
-                    "Password Required",
-                    "Enter your wallet password to sign the transaction:",
-                    placeholder: "Password"
+                var dialog = new SUS.EOS.NeoWallet.Pages.Components.InputDialog(
+                    title: "Password Required",
+                    message: "Enter your wallet password to sign the transaction:",
+                    accept: "OK",
+                    cancel: "Cancel",
+                    isPassword: true
                 );
-                
+
+                password = await dialog.ShowAsync(this);
+
                 if (string.IsNullOrWhiteSpace(password))
                 {
                     SendButton.IsEnabled = true;

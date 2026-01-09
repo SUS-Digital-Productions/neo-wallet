@@ -1,5 +1,4 @@
-﻿#pragma warning disable CS0618 // Application.MainPage obsolete warning
-
+﻿
 using SUS.EOS.NeoWallet.Services.Interfaces;
 using SUS.EOS.NeoWallet.Pages;
 using SUS.EOS.EosioSigningRequest.Models;
@@ -28,6 +27,22 @@ public partial class App : Application
         
         System.Diagnostics.Trace.WriteLine($"[APP] Protocol handlers registered. esr:// default: {protocolHandler.IsDefaultHandler("esr")}");
         System.Diagnostics.Trace.WriteLine($"[APP] Protocol handlers registered. anchor:// default: {protocolHandler.IsDefaultHandler("anchor")}");
+
+        // Attach diagnostics trace listener so all Trace.WriteLine messages are captured in-app
+        try
+        {
+            var diag = _serviceProvider.GetService<SUS.EOS.NeoWallet.Services.Interfaces.IAppDiagnosticsService>();
+            if (diag != null)
+            {
+                var listener = new SUS.EOS.NeoWallet.Services.AppDiagnosticsTraceListener(diag);
+                System.Diagnostics.Trace.Listeners.Add(listener);
+                System.Diagnostics.Trace.WriteLine("[APP] Diagnostics trace listener attached");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[APP] Failed to attach diagnostics listener: {ex.Message}");
+        }
     }
     
     /// <summary>
@@ -81,19 +96,21 @@ public partial class App : Application
             // Wait for app to be ready
             await Task.Delay(500);
             
-            System.Diagnostics.Trace.WriteLine($"[APP] MainPage type: {Application.Current?.MainPage?.GetType().Name}");
+            System.Diagnostics.Trace.WriteLine($"[APP] MainPage type: {Application.Current?.Windows?.FirstOrDefault()?.Page?.GetType().Name}");
             
             MainPage? mainPage = null;
             
             // Handle different navigation structures
-            if (Application.Current?.MainPage is AppShell shell)
+            var rootPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+
+            if (rootPage is AppShell shell)
             {
                 System.Diagnostics.Trace.WriteLine($"[APP] Found AppShell, CurrentPage: {shell.CurrentPage?.GetType().Name}");
                 await shell.GoToAsync("//MainPage");
                 await Task.Delay(100);
                 mainPage = shell.CurrentPage as MainPage;
             }
-            else if (Application.Current?.MainPage is NavigationPage navPage)
+            else if (rootPage is NavigationPage navPage)
             {
                 System.Diagnostics.Trace.WriteLine($"[APP] Found NavigationPage, CurrentPage: {navPage.CurrentPage?.GetType().Name}");
                 
@@ -114,7 +131,7 @@ public partial class App : Application
                     }
                 }
             }
-            else if (Application.Current?.MainPage is MainPage mp)
+            else if (rootPage is MainPage mp)
             {
                 mainPage = mp;
             }
@@ -169,13 +186,14 @@ public partial class App : Application
             
             // Get the current page to show popup on
             Page? currentPage = null;
-            if (Application.Current?.MainPage is NavigationPage navPage)
+            var rootPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+            if (rootPage is NavigationPage navPage)
             {
                 currentPage = navPage.CurrentPage;
             }
             else
             {
-                currentPage = Application.Current?.MainPage;
+                currentPage = rootPage;
             }
             
             if (currentPage != null)

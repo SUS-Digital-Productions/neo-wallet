@@ -19,6 +19,13 @@ public class WalletStorageService : IWalletStorageService
     private bool _isUnlocked;
     private Dictionary<string, KeyPair> _unlockedKeys = new();
 
+    // Keep the current unlock password in memory while wallet is unlocked
+    // This is cleared on LockWallet for security
+    private string? _currentPassword;
+
+    // Diagnostics service for recording important events
+    private readonly IAppDiagnosticsService _diagnostics;
+
     // JSON serialization options for consistent formatting
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -30,10 +37,12 @@ public class WalletStorageService : IWalletStorageService
     public WalletStorageService(
         ICryptographyService cryptographyService,
         INetworkRepository networkRepository,
+        SUS.EOS.NeoWallet.Services.Interfaces.IAppDiagnosticsService diagnostics,
         string? walletPath = null
     )
     {
         _cryptographyService = cryptographyService;
+        _diagnostics = diagnostics;
         //_networkService = networkService;
 
         // Default to user's application data directory
@@ -43,6 +52,7 @@ public class WalletStorageService : IWalletStorageService
 
         _walletFilePath = walletPath ?? Path.Combine(walletDir, "wallet.json");
         _networkRepository = networkRepository;
+        _diagnostics.Log("WALLETSERVICE", "WalletStorageService initialized");
     }
 
     public bool IsUnlocked => _isUnlocked;
@@ -92,6 +102,7 @@ public class WalletStorageService : IWalletStorageService
 
             await File.WriteAllTextAsync(_walletFilePath, jsonContent);
             _currentWallet = walletData;
+            _diagnostics.Log("WALLETSERVICE", $"Saved wallet to {_walletFilePath}. publicKeys={walletData.Storage?.PublicKeys?.Count ?? 0}");
         }
         catch (Exception ex)
         {
@@ -353,6 +364,7 @@ public class WalletStorageService : IWalletStorageService
     {
         _isUnlocked = false;
         _unlockedKeys.Clear();
+        _currentPassword = null;
 
         // Clear sensitive data from memory
         GC.Collect();
@@ -390,6 +402,9 @@ public class WalletStorageService : IWalletStorageService
             }
 
             _isUnlocked = true;
+            // Store password in memory while unlocked so callers can add/remove keys without re-prompting
+            _currentPassword = password;
+            _diagnostics.Log("WALLETSERVICE", $"Wallet unlocked; keys loaded={_unlockedKeys.Count}");
             return true;
         }
         catch (Exception ex)
@@ -421,12 +436,42 @@ public class WalletStorageService : IWalletStorageService
     {
         try
         {
-            if (!await ValidatePasswordAsync(password))
+            // Support passing an empty password when wallet is already unlocked
+            System.Diagnostics.Trace.WriteLine($"[WALLETSERVICE] AddKeyToStorageAsync starting for publicKey={publicKey[..Math.Min(10, publicKey.Length)]}...");
+            _diagnostics.Log("WALLETSERVICE", $"AddKeyToStorageAsync start for {publicKey[..Math.Min(10, publicKey.Length)]}...");
+
+            var effectivePassword = password;
+            if (string.IsNullOrWhiteSpace(effectivePassword))
+            {
+                if (_isUnlocked && !string.IsNullOrEmpty(_currentPassword))
+                {
+                    effectivePassword = _currentPassword;
+                    System.Diagnostics.Trace.WriteLine($"[WALLETSERVICE] Using in-memory unlocked password fallback (no plaintext displayed)");
+                    _diagnostics.Log("WALLETSERVICE", "Using in-memory unlocked password fallback");
+                }
+                else
+                {
+                    System.Diagnostics.Trace.WriteLine($"[WALLETSERVICE] No password provided and wallet not unlocked; aborting add.");
+                    _diagnostics.Log("WALLETSERVICE", "Add aborted: no password and wallet locked");
+                    return false;
+                }
+            }
+
+            if (!await ValidatePasswordAsync(effectivePassword))
+            {
+                System.Diagnostics.Trace.WriteLine("[WALLETSERVICE] ValidatePasswordAsync failed in AddKeyToStorageAsync");
                 return false;
+            }
 
             var wallet = _currentWallet ?? await LoadWalletAsync();
             if (wallet == null)
+            {
+                System.Diagnostics.Trace.WriteLine("[WALLETSERVICE] No wallet loaded in AddKeyToStorageAsync");
                 return false;
+            }
+
+            // Ensure storage object exists
+            wallet.Storage ??= new SUS.EOS.NeoWallet.Services.Models.EncryptedStorage();
 
             // Decrypt existing storage
             var keyPairs = new List<KeyPair>();
@@ -434,7 +479,7 @@ public class WalletStorageService : IWalletStorageService
             {
                 var decryptedData = _cryptographyService.Decrypt(
                     wallet.Storage.EncryptedData,
-                    password
+                    effectivePassword
                 );
                 keyPairs =
                     JsonSerializer.Deserialize<List<KeyPair>>(decryptedData, JsonOptions)
@@ -457,7 +502,7 @@ public class WalletStorageService : IWalletStorageService
             // Update storage
             wallet.Storage.EncryptedData = _cryptographyService.Encrypt(
                 JsonSerializer.Serialize(keyPairs, JsonOptions),
-                password
+                effectivePassword
             );
 
             // Update public keys list
@@ -465,10 +510,15 @@ public class WalletStorageService : IWalletStorageService
 
             await SaveWalletAsync(wallet);
 
+            System.Diagnostics.Trace.WriteLine($"[WALLETSERVICE] SaveWalletAsync completed; publicKeysCount={wallet.Storage.PublicKeys?.Count ?? 0}");
+            _diagnostics.Log("WALLETSERVICE", $"Saved key, totalPublicKeys={wallet.Storage.PublicKeys?.Count ?? 0}");
+
             // Update in-memory keys if unlocked
             if (_isUnlocked)
             {
                 _unlockedKeys[publicKey] = keyPairs.First(k => k.PublicKey == publicKey);
+                System.Diagnostics.Trace.WriteLine($"[WALLETSERVICE] In-memory unlocked keys updated for {publicKey[..Math.Min(10, publicKey.Length)]}...");
+                _diagnostics.Log("WALLETSERVICE", $"In-memory unlocked key added: {publicKey[..Math.Min(10, publicKey.Length)]}...");
             }
 
             return true;
@@ -486,7 +536,22 @@ public class WalletStorageService : IWalletStorageService
     {
         try
         {
-            if (!await ValidatePasswordAsync(password))
+            // Support empty password when wallet is unlocked
+            var effectivePassword = password;
+            if (string.IsNullOrWhiteSpace(effectivePassword))
+            {
+                if (_isUnlocked && !string.IsNullOrEmpty(_currentPassword))
+                {
+                    effectivePassword = _currentPassword;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            _diagnostics.Log("WALLETSERVICE", $"RemoveKeyFromStorageAsync start for {publicKey[..Math.Min(10, publicKey.Length)]}...");
+            if (!await ValidatePasswordAsync(effectivePassword))
                 return false;
 
             var wallet = _currentWallet ?? await LoadWalletAsync();
@@ -496,8 +561,9 @@ public class WalletStorageService : IWalletStorageService
             // Decrypt existing storage
             var decryptedData = _cryptographyService.Decrypt(
                 wallet.Storage.EncryptedData,
-                password
+                effectivePassword
             );
+            _diagnostics.Log("WALLETSERVICE", $"Key removal decrypted storage; publicKeysBefore={wallet.Storage.PublicKeys?.Count ?? 0}");
             var keyPairs =
                 JsonSerializer.Deserialize<List<KeyPair>>(decryptedData, JsonOptions)
                 ?? new List<KeyPair>();
@@ -508,7 +574,7 @@ public class WalletStorageService : IWalletStorageService
             // Update storage
             wallet.Storage.EncryptedData = _cryptographyService.Encrypt(
                 JsonSerializer.Serialize(keyPairs, JsonOptions),
-                password
+                effectivePassword
             );
 
             // Update public keys list

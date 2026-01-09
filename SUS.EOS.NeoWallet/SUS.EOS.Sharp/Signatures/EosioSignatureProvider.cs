@@ -12,11 +12,18 @@ public sealed class EosioSignatureProvider
 {
     private readonly EosioKey _key;
 
+    /// <summary>
+    /// Construct a signature provider from a private key in WIF format
+    /// </summary>
+    /// <param name="privateKeyWif">Private key in WIF format</param>
     public EosioSignatureProvider(string privateKeyWif)
     {
         _key = EosioKey.FromWif(privateKeyWif);
     }
 
+    /// <summary>
+    /// Public key corresponding to the private key (EOSIO format)
+    /// </summary>
     public string PublicKey => _key.PublicKey;
 
     /// <summary>

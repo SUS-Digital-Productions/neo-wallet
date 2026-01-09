@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="SUS.EOS.NeoWallet.Pages.DiagnosticsPage"
+  Title="Diagnostics"
+  BackgroundColor="{DynamicResource PageBackgroundColor}">
+
+  <VerticalStackLayout Padding="16" Spacing="12">
+    <Label Text="Diagnostics Logs" FontSize="20" FontAttributes="Bold" />
+
+    <HorizontalStackLayout Spacing="8">
+      <Button x:Name="RefreshButton" AutomationProperties.AutomationId="Diagnostics_RefreshButton" Text="Refresh" Clicked="OnRefreshClicked" />
+      <Button x:Name="ExportButton" AutomationProperties.AutomationId="Diagnostics_ExportButton" Text="Export" Clicked="OnExportClicked" />
+      <Button x:Name="ClearButton" AutomationProperties.AutomationId="Diagnostics_ClearButton" Text="Clear" Clicked="OnClearClicked" />
+    </HorizontalStackLayout>
+
+    <CollectionView x:Name="LogsCollectionView" SelectionMode="None">
+      <CollectionView.ItemTemplate>
+        <DataTemplate>
+          <Label Text="{Binding .}" FontSize="12" LineBreakMode="NoWrap" />
+        </DataTemplate>
+      </CollectionView.ItemTemplate>
+    </CollectionView>
+
+  </VerticalStackLayout>
+</ContentPage>

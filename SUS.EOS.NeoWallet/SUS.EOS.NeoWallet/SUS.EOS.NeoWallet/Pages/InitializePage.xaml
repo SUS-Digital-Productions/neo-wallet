@@ -2,6 +2,7 @@
 <ContentPage
   xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
   xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  xmlns:components="clr-namespace:SUS.EOS.NeoWallet.Pages.Components"
   x:Class="SUS.EOS.NeoWallet.Pages.InitializePage"
   Title="Welcome">
   <ScrollView>
@@ -29,11 +30,7 @@
         Margin="0,0,0,40" />
 
       <!-- Main Actions Card -->
-      <Frame
-        BorderColor="{DynamicResource Gray200}"
-        CornerRadius="12"
-        Padding="20"
-        HasShadow="True">
+      <components:CardView Title="Get Started">
         <VerticalStackLayout Spacing="16">
           <Label
             Text="Get Started"
@@ -50,6 +47,7 @@
 
           <Button
             x:Name="CreateWalletButton"
+            AutomationProperties.AutomationId="CreateWalletButton"
             Text="🔐 Create New Wallet"
             BackgroundColor="{DynamicResource Primary}"
             TextColor="White"
@@ -67,6 +65,7 @@
 
           <Button
             x:Name="ImportWalletButton"
+            AutomationProperties.AutomationId="ImportWalletButton"
             Text="📁 Import wallet.json"
             BackgroundColor="{DynamicResource Secondary}"
             TextColor="White"
@@ -84,6 +83,7 @@
 
           <Button
             x:Name="RecoverWalletButton"
+            AutomationProperties.AutomationId="RecoverWalletButton"
             Text="🔑 Recover from Phrase"
             BackgroundColor="Transparent"
             TextColor="{DynamicResource Primary}"
@@ -101,7 +101,7 @@
             HorizontalTextAlignment="Center"
             Margin="0,-8,0,0" />
         </VerticalStackLayout>
-      </Frame>
+      </components:CardView>
 
       <!-- Footer -->
       <Label

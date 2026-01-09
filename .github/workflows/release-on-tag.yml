@@ -196,13 +196,18 @@ jobs:
       run: |
         set -e
         upload_url='${{ steps.create_release.outputs.upload_url }}'
+        # Strip template part ("{?name,label}") if present
+        upload_base="${upload_url%\{*}"
         asset_path=./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip
         asset_name=NeoWallet-${{ env.TAGNAME }}.zip
-        echo "Upload URL: $upload_url"
-        if [ -z "$upload_url" ]; then echo "upload_url missing"; exit 1; fi
+        echo "Original upload_url: $upload_url"
+        echo "Upload base: $upload_base"
+        if [ -z "$upload_base" ]; then echo "upload_url missing"; exit 1; fi
+        endpoint="$upload_base?name=$asset_name"
+        echo "Resolved endpoint: $endpoint"
         for i in 1 2 3; do
           echo "Attempt $i: uploading $asset_name"
-          http_code=$(curl -s -o /tmp/upload_response_body -w "%{http_code}" -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/zip" --data-binary @"$asset_path" "$upload_url?name=$asset_name") || true
+          http_code=$(curl -s -L -o /tmp/upload_response_body -w "%{http_code}" -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/zip" --data-binary @"$asset_path" "$endpoint") || true
           body=$(cat /tmp/upload_response_body || true)
           if [ "$http_code" = "201" ]; then echo "Upload succeeded"; break; fi
           echo "Upload failed (HTTP $http_code): $body"
@@ -242,13 +247,18 @@ jobs:
       run: |
         set -e
         upload_url='${{ steps.create_release.outputs.upload_url }}'
+        # Strip template part ("{?name,label}") if present
+        upload_base="${upload_url%\{*}"
         asset_path=./artifacts/windows/NeoWallet-${{ env.VERSION }}.zip.sig
         asset_name=NeoWallet-${{ env.TAGNAME }}.zip.sig
-        echo "Upload URL: $upload_url"
-        if [ -z "$upload_url" ]; then echo "upload_url missing"; exit 1; fi
+        echo "Original upload_url: $upload_url"
+        echo "Upload base: $upload_base"
+        if [ -z "$upload_base" ]; then echo "upload_url missing"; exit 1; fi
+        endpoint="$upload_base?name=$asset_name"
+        echo "Resolved endpoint: $endpoint"
         for i in 1 2 3; do
           echo "Attempt $i: uploading $asset_name"
-          http_code=$(curl -s -o /tmp/upload_response_body -w "%{http_code}" -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$asset_path" "$upload_url?name=$asset_name") || true
+          http_code=$(curl -s -L -o /tmp/upload_response_body -w "%{http_code}" -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$asset_path" "$endpoint") || true
           body=$(cat /tmp/upload_response_body || true)
           if [ "$http_code" = "201" ]; then echo "Upload succeeded"; break; fi
           echo "Upload failed (HTTP $http_code): $body"

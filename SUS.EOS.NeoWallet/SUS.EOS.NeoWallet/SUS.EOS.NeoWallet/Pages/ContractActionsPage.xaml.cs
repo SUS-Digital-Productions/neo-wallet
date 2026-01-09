@@ -417,115 +417,14 @@ public partial class ContractActionsPage : ContentPage
 
     private async Task<string?> ShowPasswordDialogAsync()
     {
-        var tcs = new TaskCompletionSource<string?>();
+        var dialog = new SUS.EOS.NeoWallet.Pages.Components.InputDialog(
+            title: "Password Required",
+            message: "Enter your wallet password to sign the transaction:",
+            accept: "OK",
+            cancel: "Cancel",
+            isPassword: true
+        );
 
-        var dialogPage = new ContentPage
-        {
-            BackgroundColor = Color.FromArgb("#80000000"),
-        };
-
-        dialogPage.Disappearing += (s, e) => 
-        { 
-            System.Diagnostics.Trace.WriteLine("[CONTRACTACTIONS] Password dialog disappearing (dismissed)");
-            tcs.TrySetResult(null); 
-        };
-
-        var entry = new Entry
-        {
-            Placeholder = "Enter password",
-            IsPassword = true,
-            BackgroundColor = Colors.White,
-            TextColor = Colors.Black,
-            FontSize = 16,
-            Margin = new Thickness(0, 10),
-        };
-
-        var okButton = new Button
-        {
-            Text = "OK",
-            BackgroundColor = Color.FromArgb("#007AFF"),
-            TextColor = Colors.White,
-            CornerRadius = 8,
-            Padding = new Thickness(20, 10),
-        };
-
-        var cancelButton = new Button
-        {
-            Text = "Cancel",
-            BackgroundColor = Color.FromArgb("#8E8E93"),
-            TextColor = Colors.White,
-            CornerRadius = 8,
-            Padding = new Thickness(20, 10),
-        };
-
-        okButton.Clicked += async (s, e) =>
-        {
-            System.Diagnostics.Trace.WriteLine("[CONTRACTACTIONS] OK button clicked in password dialog");
-            var result = entry.Text;
-            tcs.TrySetResult(result);
-            await Navigation.PopModalAsync();
-        };
-
-        cancelButton.Clicked += async (s, e) =>
-        {
-            System.Diagnostics.Trace.WriteLine("[CONTRACTACTIONS] Cancel button clicked in password dialog");
-            tcs.TrySetResult(null);
-            await Navigation.PopModalAsync();
-        };
-
-        entry.Completed += async (s, e) =>
-        {
-            System.Diagnostics.Trace.WriteLine("[CONTRACTACTIONS] Enter key pressed in password dialog");
-            var result = entry.Text;
-            tcs.TrySetResult(result);
-            await Navigation.PopModalAsync();
-        };
-
-        var dialogFrame = new Border
-        {
-            BackgroundColor = Colors.White,
-            StrokeThickness = 0,
-            Padding = 20,
-            MaximumWidthRequest = 400,
-            VerticalOptions = LayoutOptions.Center,
-            HorizontalOptions = LayoutOptions.Center,
-            StrokeShape = new RoundRectangle { CornerRadius = 12 },
-            Content = new VerticalStackLayout
-            {
-                Spacing = 15,
-                Children =
-                {
-                    new Label
-                    {
-                        Text = "Password Required",
-                        FontSize = 20,
-                        FontAttributes = FontAttributes.Bold,
-                        TextColor = Colors.Black,
-                        HorizontalOptions = LayoutOptions.Center,
-                    },
-                    new Label
-                    {
-                        Text = "Enter your wallet password to sign the transaction:",
-                        FontSize = 14,
-                        TextColor = Color.FromArgb("#666666"),
-                        HorizontalOptions = LayoutOptions.Start,
-                    },
-                    entry,
-                    new HorizontalStackLayout
-                    {
-                        Spacing = 10,
-                        HorizontalOptions = LayoutOptions.End,
-                        Children = { cancelButton, okButton },
-                    },
-                },
-            },
-        };
-
-        dialogPage.Content = dialogFrame;
-
-        await Navigation.PushModalAsync(dialogPage, true);
-        entry.Focus();
-
-        return await tcs.Task;
+        return await dialog.ShowAsync(this);
     }
 }
