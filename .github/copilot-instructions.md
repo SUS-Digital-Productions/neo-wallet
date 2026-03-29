@@ -1,178 +1,59 @@
 # SUS.EOS.NeoWallet - AI Coding Instructions
 
 ## Project Overview
-This is a cross-platform Neo blockchain wallet built with .NET MAUI targeting .NET 10.0. The solution follows a single-project architecture pattern with platform-specific head projects inspired by the Anchor wallet (greymass/anchor).
+This repository no longer contains the MAUI wallet application. The UI layer was removed in favor of a planned desktop architecture built around Tauri, React, and a local .NET backend.
 
-**Key Features:**
-- Multi-blockchain support (WAX, EOS, Telos, and other Antelope chains)
-- ESR (EOSIO Signing Request) protocol for dApp integration
-- Anchor Link compatible WebSocket listener for real-time signing requests
-- Secure wallet management with encrypted storage
-- Modern async/await architecture throughout
+## Current Repository Scope
+- **SUS.EOS.Sharp** - Antelope blockchain client, cryptography, serialization, and transaction helpers
+- **SUS.EOS.EosioSigningRequest** - ESR protocol models and services
+- **SUS.EOS.Sharp.Tests / TestAction** - test and example projects
 
-## Architecture Pattern
-
-### Project Structure
-- **SUS.EOS.NeoWallet** - Shared core project containing all UI, business logic, and cross-platform code
-- **SUS.EOS.NeoWallet.Droid** - Android platform head (targets `net10.0-android`, min SDK 21)
-- **SUS.EOS.NeoWallet.iOS** - iOS platform head
-- **SUS.EOS.NeoWallet.Mac** - macOS platform head
-- **SUS.EOS.NeoWallet.WinUI** - Windows platform head (targets `net10.0-windows10.0.19041.0`)
-- **SUS.EOS.Sharp** - Antelope blockchain client library (.NET 10.0)
-- **SUS.EOS.EosioSigningRequest** - Dedicated ESR protocol library (.NET 10.0)
-
-### Dependency Chain
+## Intended Desktop Architecture
 ```
-SUS.EOS.Sharp (blockchain client, crypto, models)
+React + Vite renderer
     ↓
-SUS.EOS.EosioSigningRequest (ESR protocol, parsing, signing)
+Tauri desktop shell
     ↓
-SUS.EOS.NeoWallet (MAUI wallet app, UI, storage)
+Local .NET backend / sidecar
+    ↓
+SUS.EOS.EosioSigningRequest
+    ↓
+SUS.EOS.Sharp
 ```
 
-### Single-Project MAUI Pattern
-All platform heads use the `UseSharedMauiApp()` extension method defined in [MauiProgramExtensions.cs](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/MauiProgramExtensions.cs). Each platform's `MauiProgram.cs` simply calls:
-```csharp
-builder.UseSharedMauiApp();
-```
-This centralizes configuration (fonts, logging, etc.) in the shared project.
+## Coding Guidance
 
-### Navigation
-Uses Shell-based navigation defined in [AppShell.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/AppShell.xaml) with `FlyoutBehavior="Disabled"` for single-page flows. Navigation uses Shell routing with `Shell.Current.GoToAsync()`:
-- Absolute routes: `//PageRoute` (e.g., `//DashboardPage`)
-- Relative back: `..` to go back one level
+### Primary Direction
+- Prefer changes that strengthen the reusable backend surface.
+- Keep wallet secrets, signing, protocol handling, and chain access in .NET.
+- Treat React/Tauri as the future UI shell, not the future signing layer.
 
-## Page Structure and Organization
+### Modern C# Features
+- Use file-scoped namespaces.
+- Keep nullable reference types enabled.
+- Prefer records or immutable DTOs where appropriate.
+- All async I/O should accept `CancellationToken cancellationToken = default`.
+- Use `using` declarations and implement `IDisposable` where resources require it.
 
-### Initialization Flow
-1. [InitializePage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/InitializePage.xaml) - Main entry point with options to create/import/recover wallet
-2. [CreateAccountPage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/CreateAccountPage.xaml) - New wallet creation with password setup and validation
-3. [WalletSetupPage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/WalletSetupPage.xaml) - Multi-step setup flow showing seed phrase
-4. [ImportWalletPage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/ImportWalletPage.xaml) - Import via recovery phrase, private key, or file
-5. [RecoverAccountPage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/RecoverAccountPage.xaml) - Recover wallet from backup
-6. [EnterPasswordPage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/EnterPasswordPage.xaml) - Password entry for unlocking wallet
-
-### Main Wallet Pages
-1. [DashboardPage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/DashboardPage.xaml) - Main overview with balance, assets, and recent transactions
-2. [SendPage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/SendPage.xaml) - Send NEO/GAS with fee selection
-3. [ReceivePage.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/Pages/ReceivePage.xaml) - Display QR code and address for receiving assets
-
-## Code Conventions and Best Practices
-
-### Modern C# Features (Use These!)
-- ✅ **File-scoped namespaces**: `namespace SUS.EOS.NeoWallet.Pages;` (no braces)
-- ✅ **Nullable reference types**: Enabled throughout (`<Nullable>enable</Nullable>`)
-- ✅ **Records for immutable data**: Use `record` for DTOs and configuration objects
-- ✅ **Init-only properties**: Use `init` instead of `set` for immutable properties
-- ✅ **CancellationToken support**: All async methods should accept `CancellationToken cancellationToken = default`
-- ✅ **IDisposable pattern**: Implement for resources (WebSockets, HTTP clients, etc.)
-- ✅ **using declarations**: Prefer `using var client = ...` over `using (var client = ...) { }`
-
-### Namespaces
-- Root namespace: `SUS.EOS.NeoWallet`
-- Pages: `namespace SUS.EOS.NeoWallet.Pages;`
-- Services: `namespace SUS.EOS.NeoWallet.Services;`
-- Models: `namespace SUS.EOS.NeoWallet.Services.Models.{Category};`
-- Sharp library: `namespace SUS.EOS.Sharp.{Category};`
-- ESR library: `namespace SUS.EOS.EosioSigningRequest.{Models|Services};`
-
-### Service Layer Architecture
-**All services follow interface-first design:**
-
-1. **Create interface in** `Services/Interfaces/I{ServiceName}.cs`
-2. **Implement in** `Services/{ServiceName}.cs`
-3. **Register in** `MauiProgramExtensions.cs`
-
-**Service Registration Pattern:**
-```csharp
-// Singleton for stateful services (storage, context, session managers)
-builder.Services.AddSingleton<IWalletStorageService, WalletStorageService>();
-builder.Services.AddSingleton<IWalletContextService, WalletContextService>();
-builder.Services.AddSingleton<IEsrSessionManager, EsrSessionManager>();
-
-// Transient for stateless operations
-builder.Services.AddTransient<IAntelopeTransactionService, AntelopeTransactionService>();
-
-// HttpClient registration
-builder.Services.AddHttpClient();
-```
-
-### Dependency Injection in Pages
-**ALWAYS use constructor injection:**
-```csharp
-public partial class MainPage : ContentPage
-{
-    private readonly IWalletAccountService _accountService;
-    private readonly IWalletStorageService _storageService;
-    private readonly IAntelopeBlockchainClient _blockchainClient;
-
-    public MainPage(
-        IWalletAccountService accountService,
-        IWalletStorageService storageService,
-        IAntelopeBlockchainClient blockchainClient
-    )
-    {
-        InitializeComponent();
-        _accountService = accountService;
-        _storageService = storageService;
-        _blockchainClient = blockchainClient;
-    }
-}
-```
-
-**Register pages as transient in MauiProgramExtensions.cs:**
-```csharp
-builder.Services.AddTransient<MainPage>();
-builder.Services.AddTransient<DashboardPage>();
-```
-
-### Async/Await Best Practices
-✅ **DO:**
-- Use `async`/`await` for all I/O operations
-- Always provide `CancellationToken` parameter
-- Return `Task` or `Task<T>`, never `async void` (except event handlers)
-- Use `ConfigureAwait(false)` for library code (not in UI code)
-
-```csharp
-public async Task<WalletAccount> AddAccountAsync(
-    string account,
-    string authority,
-    string chainId,
-    string privateKey,
-    string password,
-    WalletMode mode = WalletMode.Hot
-)
-{
-    var wallet = await _storageService.LoadWalletAsync();
-    // ... implementation
-}
-```
-
-❌ **DON'T:**
-- Use `.Result` or `.Wait()` (causes deadlocks)
-- Use `async void` except for event handlers
-- Forget to pass `CancellationToken` through the call chain
+### Architecture Conventions
+- Favor interface-first services.
+- Keep transport and protocol boundaries explicit.
+- Avoid introducing UI concerns into the remaining .NET libraries.
+- If desktop-shell-facing behavior is needed, prefer documenting or defining a local API contract rather than reintroducing UI code.
 
 ### Error Handling
-**Use try-catch with specific logging:**
-```csharp
-try
-{
-    var result = await _service.PerformOperationAsync();
-    return result;
-}
-catch (HttpRequestException ex)
-{
-    System.Diagnostics.Trace.WriteLine($"[SERVICE] Network error: {ex.Message}");
-    throw new InvalidOperationException("Network request failed", ex);
-}
-catch (Exception ex)
-{
-    System.Diagnostics.Trace.WriteLine($"[SERVICE] Unexpected error: {ex.Message}");
-    System.Diagnostics.Trace.WriteLine($"[SERVICE] Stack trace: {ex.StackTrace}");
-    throw;
-}
-```
+- Use explicit logging with `System.Diagnostics.Trace.WriteLine`.
+- Log context-rich messages with a stable `[COMPONENT]` prefix.
+- Throw coherent exceptions instead of swallowing errors.
+
+### Documentation Expectations
+- Keep docs aligned with the Tauri/React plus local .NET architecture.
+- Remove or update documentation immediately when it references deleted MAUI behavior.
+
+### What Not To Reintroduce
+- Do not add new MAUI pages, Shell routes, or platform heads.
+- Do not add UI logic to the remaining .NET libraries.
+- Do not route private keys or signing through JavaScript unless explicitly asked for that tradeoff.
 
 ### Debug Logging Pattern
 **Use System.Diagnostics.Trace for debug output:**

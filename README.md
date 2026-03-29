@@ -1,71 +1,49 @@
 # neo-wallet
 
-```
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║   ⚠️  WARNING: THIS CODE WAS FULLY AI-GENERATED (VIBED) ⚠️           ║
-║                                                                       ║
-║   This wallet implementation was created using AI assistance and     ║
-║   has NOT undergone professional security audit or extensive real-   ║
-║   world testing. USE AT YOUR OWN RISK!                               ║
-║                                                                       ║
-║   🔐 SECURITY NOTICE:                                                 ║
-║   • Do NOT use with large amounts of cryptocurrency                  ║
-║   • Always test on testnets first                                    ║
-║   • Back up your private keys externally                             ║
-║   • Review the code yourself before use                              ║
-║   • No warranty or guarantees provided                               ║
-║                                                                       ║
-║   By using this software, you acknowledge and accept full            ║
-║   responsibility for any potential loss of funds or data.            ║
-║                                                                       ║
-╚═══════════════════════════════════════════════════════════════════════╝
-```
+Desktop Antelope wallet built with Tauri + React for the UI and a local .NET backend for wallet logic, signing, and blockchain access.
 
-## SUS.EOS.NeoWallet
+## Repository Layout
 
-A cross-platform EOSIO/Antelope blockchain wallet built with .NET MAUI, inspired by the [Greymass Anchor wallet](https://github.com/greymass/anchor).
+| Directory | Purpose |
+|-----------|---------|
+| `desktop/app/` | Tauri 2 + React + Vite renderer shell |
+| `desktop/backend/` | ASP.NET Core sidecar (wallet storage, signing, ESR, chain RPC) |
+| `SUS.EOS.NeoWallet/SUS.EOS.Sharp/` | Reusable Antelope blockchain client library |
+| `SUS.EOS.NeoWallet/SUS.EOS.EosioSigningRequest/` | ESR protocol parsing, signing-request models, session services |
+| `SUS.EOS.NeoWallet/SUS.EOS.Sharp.Tests/` | xUnit tests for the libraries |
+| `docs/` | Architecture and API documentation |
 
-### Features
+## Quick Start
 
-- 🔐 **Secure Storage**: AES-256-CBC encryption with PBKDF2 key derivation (4500 iterations)
-- 🌐 **Multi-Chain Support**: Compatible with WAX, EOS, Telos, and any Antelope blockchain
-- 📱 **Cross-Platform**: Windows, macOS, iOS, Android (via .NET MAUI)
-- 🔑 **Multiple Import Methods**: Private key, BIP39 mnemonic, file import
-- 💾 **Encrypted Backup**: Anchor-compatible wallet.json format
-- 🔗 **ESR Support**: EOSIO Signing Request protocol for external apps
-- 🎯 **Anchor Callbacks**: Compatible callback system for dApp integration
-- 🔧 **Full EOSIO Library**: Complete transaction signing and blockchain operations
+```powershell
+# Build all .NET projects
+dotnet build SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.slnx
 
-### Architecture
+# Run the backend
+cd desktop/backend
+dotnet run
 
-This project consists of two main components:
-
-1. **SUS.EOS.NeoWallet** - Cross-platform wallet UI (MAUI)
-2. **SUS.EOS.Sharp** - Reusable EOSIO/Antelope blockchain library
-
-### Quick Start
-
-```bash
-# Clone repository
-git clone https://github.com/yourusername/neo-wallet.git
-cd neo-wallet
-
-# Build and run
-cd SUS.EOS.NeoWallet
-dotnet build
-dotnet run --project SUS.EOS.NeoWallet.WinUI  # or .Droid, .iOS, .Mac
+# In another terminal — run the React dev server
+cd desktop/app
+npm install
+npm run dev
 ```
 
-### Documentation
+See [desktop/README.md](desktop/README.md) for full development bootstrap, Tauri setup, and production build instructions.
 
-- [Implementation Summary](IMPLEMENTATION_SUMMARY.md) - Complete technical documentation
-- [Cryptography Implementation](SUS.EOS.NeoWallet/SUS.EOS.Sharp.Tests/CRYPTO_IMPLEMENTATION.md) - Cryptographic details
+## Documentation
 
-### License
+- [Desktop Shell README](desktop/README.md)
+- [Tauri React Desktop Integration](docs/tauri-react-desktop.md)
+- [Local Backend API Outline](docs/local-backend-api.md)
+- [SUS.EOS.Sharp README](SUS.EOS.NeoWallet/SUS.EOS.Sharp/README.md)
+- [NuGet Package Notes](NUGET_PACKAGE.md)
 
-MIT License - See [LICENSE](LICENSE) file for details
+## Status
 
----
+- .NET backend libraries (`SUS.EOS.Sharp`, `SUS.EOS.EosioSigningRequest`) — stable
+- Desktop backend sidecar (`NeoWallet.Backend`) — scaffolded with stub endpoints
+- Tauri + React shell (`desktop/app/`) — scaffolded with API client and dashboard page
+- Wiring real blockchain operations into endpoints — in progress
 
-**Disclaimer**: This is experimental software. The developers are not responsible for any loss of funds or data.
+MIT License - See [LICENSE](LICENSE) file for details.

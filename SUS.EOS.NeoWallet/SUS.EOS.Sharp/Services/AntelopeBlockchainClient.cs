@@ -47,6 +47,20 @@ public interface IAntelopeBlockchainClient : IDisposable
     );
 
     /// <summary>
+    /// Gets table rows from a smart contract with extended query parameters
+    /// </summary>
+    Task<TableRowsResult<T>> GetTableRowsAsync<T>(
+        string contract,
+        string scope,
+        string table,
+        int limit,
+        string? lowerBound = null,
+        string? upperBound = null,
+        bool reverse = false,
+        CancellationToken cancellationToken = default
+    );
+
+    /// <summary>
     /// Gets currency balance for an account
     /// </summary>
     Task<List<string>> GetCurrencyBalanceAsync(
@@ -295,17 +309,40 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
         CancellationToken cancellationToken = default
     )
     {
-        var request = new
+        return await GetTableRowsAsync<T>(contract, scope, table, 1000, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets table rows from a smart contract with extended query parameters
+    /// </summary>
+    public async Task<TableRowsResult<T>> GetTableRowsAsync<T>(
+        string contract,
+        string scope,
+        string table,
+        int limit,
+        string? lowerBound = null,
+        string? upperBound = null,
+        bool reverse = false,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var requestDict = new Dictionary<string, object?>
         {
-            code = contract,
-            scope = scope,
-            table = table,
-            json = true,
-            limit = 1000,
+            ["code"] = contract,
+            ["scope"] = scope,
+            ["table"] = table,
+            ["json"] = true,
+            ["limit"] = limit,
+            ["reverse"] = reverse,
         };
 
+        if (!string.IsNullOrWhiteSpace(lowerBound))
+            requestDict["lower_bound"] = lowerBound;
+        if (!string.IsNullOrWhiteSpace(upperBound))
+            requestDict["upper_bound"] = upperBound;
+
         var requestContent = new StringContent(
-            JsonSerializer.Serialize(request, _jsonOptions),
+            JsonSerializer.Serialize(requestDict, _jsonOptions),
             System.Text.Encoding.UTF8,
             "application/json"
         );

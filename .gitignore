@@ -416,3 +416,9 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Tauri / Rust
+desktop/app/src-tauri/target/
+
+# Vite build output
+desktop/app/dist/

@@ -1,0 +1,28 @@
+name: Libraries CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore solution
+      run: dotnet restore SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.slnx
+
+    - name: Build libraries and tests
+      run: dotnet build SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.slnx --configuration Release --no-restore
+
+    - name: Run tests
+      run: dotnet test SUS.EOS.NeoWallet/SUS.EOS.Sharp.Tests/SUS.EOS.Sharp.Tests.csproj --configuration Release --no-build

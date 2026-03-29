@@ -1,6 +1,6 @@
 # SUS.EOS.Sharp
 
-A modern .NET 10 library for interacting with EOS-based blockchains, inspired by [eos-sharp](https://github.com/GetScatter/eos-sharp) but rebuilt with modern .NET best practices.
+A modern .NET 10 library for interacting with Antelope blockchains, inspired by [eos-sharp](https://github.com/GetScatter/eos-sharp) but rebuilt with modern .NET practices and intended for reuse by a local desktop-wallet backend.
 
 ## Features
 
@@ -137,28 +137,20 @@ Console.WriteLine($"Transaction ID: {txId}");
 | Disposal | Manual | IDisposable pattern |
 | Documentation | Partial | Complete XML docs |
 
-## Integration with Neo Wallet
+## Intended Integration
 
-This library is designed to be integrated with the SUS.EOS.NeoWallet MAUI application. See the wallet's `MockWalletService` for example usage patterns.
+This library is intended to sit behind a local desktop wallet backend process. The current repository direction is a Tauri plus React shell with .NET handling storage, ESR, signing, and chain operations.
 
 ## Status
 
-⚠️ **Development Status**: Core structure complete, API integration pending.
+⚠️ **Development Status**: Active library surface under transition into a desktop sidecar architecture.
 
 Completed:
 - ✅ Modern .NET 10 project structure
 - ✅ Core model types (Transaction, Account, Asset, ChainInfo)
 - ✅ Provider interfaces (ISignatureProvider, IAbiSerializationProvider)
-- ✅ EosClient with basic method signatures
+- ✅ EosClient with live chain/account/balance and push-transaction paths
 - ✅ Asset parsing and formatting
-
-Pending:
-- ⏳ HTTP API implementation
-- ⏳ ABI serialization implementation
-- ⏳ Default signature provider
-- ⏳ Transaction signing implementation
-- ⏳ Error handling and exceptions
-- ⏳ Unit tests
 
 ## License
 

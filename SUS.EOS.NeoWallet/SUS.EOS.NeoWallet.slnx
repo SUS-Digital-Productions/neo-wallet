@@ -1,19 +1,7 @@
 <Solution>
   <Project Path="SUS.EOS.EosioSigningRequest/SUS.EOS.EosioSigningRequest.csproj" Id="04dc03be-de3f-4f60-b914-28742febbee2" />
-  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.Droid/SUS.EOS.NeoWallet.Droid.csproj">
-    <Deploy />
-  </Project>
-  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.iOS/SUS.EOS.NeoWallet.iOS.csproj">
-    <Deploy />
-  </Project>
-  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.Mac/SUS.EOS.NeoWallet.Mac.csproj">
-    <Deploy Solution="Release|*" />
-  </Project>
-  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.WinUI/SUS.EOS.NeoWallet.WinUI.csproj">
-    <Platform Project="x64" />
-  </Project>
-  <Project Path="SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj" />
   <Project Path="SUS.EOS.Sharp.TestAction/SUS.EOS.Sharp.TestAction.csproj" />
   <Project Path="SUS.EOS.Sharp.Tests/SUS.EOS.Sharp.Tests.csproj" />
   <Project Path="SUS.EOS.Sharp/SUS.EOS.Sharp.csproj" />
+  <Project Path="../desktop/backend/NeoWallet.Backend.csproj" />
 </Solution>

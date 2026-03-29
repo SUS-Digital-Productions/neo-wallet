@@ -1,0 +1,99 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@layer base {
+  * {
+    @apply border-border;
+    cursor: default;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Noto Sans", system-ui, sans-serif;
+  }
+
+  button,
+  a,
+  [role="button"],
+  [role="link"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  select,
+  label[for],
+  .cursor-pointer {
+    cursor: pointer;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  textarea {
+    cursor: text;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 222 70% 8%;
+    --foreground: 210 40% 98%;
+    --card: 222 60% 12%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 65% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 85% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 35% 22%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 30% 20%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 50% 28%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 35% 24%;
+    --input: 217 35% 24%;
+    --ring: 217 85% 60%;
+    --radius: 0.5rem;
+    --chart-1: 217 75% 60%;
+    --chart-2: 200 70% 55%;
+    --chart-3: 240 65% 60%;
+    --chart-4: 190 75% 55%;
+    --chart-5: 220 70% 65%;
+  }
+}
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius));
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+}

@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using SUS.EOS.Sharp.Models;
 using SUS.EOS.Sharp.Providers;
 
@@ -13,6 +15,12 @@ public sealed class EosClient : IDisposable
     private readonly IAbiSerializationProvider? _abiSerializer;
     private readonly ISignatureProvider? _signatureProvider;
     private bool _disposed;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+    };
 
     /// <summary>
     /// Creates a new EOS client instance
@@ -42,11 +50,16 @@ public sealed class EosClient : IDisposable
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Chain information</returns>
-    public Task<ChainInfo> GetInfoAsync(CancellationToken cancellationToken = default)
+    public async Task<ChainInfo> GetInfoAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        // TODO: Implement actual API call
-        throw new NotImplementedException("API integration pending");
+
+        var response = await _httpClient.PostAsync("/v1/chain/get_info", null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var info = JsonSerializer.Deserialize<ChainInfo>(json, JsonOptions)
+                   ?? throw new InvalidOperationException("Failed to deserialize chain info");
+        return info;
     }
 
     /// <summary>
@@ -55,12 +68,20 @@ public sealed class EosClient : IDisposable
     /// <param name="accountName">Account name</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Account information</returns>
-    public Task<Account> GetAccountAsync(string accountName, CancellationToken cancellationToken = default)
+    public async Task<Account> GetAccountAsync(string accountName, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrWhiteSpace(accountName);
-        // TODO: Implement actual API call
-        throw new NotImplementedException("API integration pending");
+
+        var request = new { account_name = accountName };
+        var content = new StringContent(
+            JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync("/v1/chain/get_account", content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var account = JsonSerializer.Deserialize<Account>(json, JsonOptions)
+                      ?? throw new InvalidOperationException($"Failed to deserialize account '{accountName}'");
+        return account;
     }
 
     /// <summary>
@@ -71,7 +92,7 @@ public sealed class EosClient : IDisposable
     /// <param name="symbol">Token symbol (e.g., "EOS")</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Account balance</returns>
-    public Task<Asset?> GetBalanceAsync(
+    public async Task<Asset?> GetBalanceAsync(
         string accountName,
         string tokenContract,
         string symbol,
@@ -81,8 +102,22 @@ public sealed class EosClient : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(accountName);
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenContract);
         ArgumentException.ThrowIfNullOrWhiteSpace(symbol);
-        // TODO: Implement actual API call
-        throw new NotImplementedException("API integration pending");
+
+        var request = new { code = tokenContract, account = accountName, symbol };
+        var content = new StringContent(
+            JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync("/v1/chain/get_currency_balance", content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var balances = JsonSerializer.Deserialize<List<string>>(json, JsonOptions) ?? [];
+
+        foreach (var balance in balances)
+        {
+            if (Asset.TryParse(balance, out var asset) && asset is not null && asset.Symbol == symbol)
+                return asset;
+        }
+
+        return null;
     }
 
     #endregion
@@ -144,8 +179,24 @@ public sealed class EosClient : IDisposable
         
         var signedTransaction = await SignTransactionAsync(transaction, requiredKeys, cancellationToken);
         
-        // TODO: Implement actual broadcast to blockchain
-        throw new NotImplementedException("Transaction broadcast pending");
+        var pushRequest = new
+        {
+            signatures = signedTransaction.Signatures,
+            compression = 0,
+            packed_context_free_data = "",
+            packed_trx = Convert.ToHexString(signedTransaction.PackedTransaction).ToLowerInvariant()
+        };
+
+        var content = new StringContent(
+            JsonSerializer.Serialize(pushRequest, JsonOptions), Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync("/v1/chain/push_transaction", content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.TryGetProperty("transaction_id", out var txId)
+            ? txId.GetString() ?? throw new InvalidOperationException("Transaction ID was null")
+            : throw new InvalidOperationException("Response did not contain transaction_id");
     }
 
     #endregion
