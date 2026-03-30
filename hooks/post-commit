@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#
+# post-commit hook — create a git tag from the VERSION file.
+#
+# After the commit is made (with the bumped VERSION from pre-commit),
+# this hook creates a v{version} tag pointing at HEAD.
+#
+# When you `git push --tags` (or `git push origin main --tags`),
+# the tag triggers the Publish workflow on GitHub Actions.
+#
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+VERSION_FILE="$ROOT/VERSION"
+
+if [[ ! -f "$VERSION_FILE" ]]; then
+  exit 0
+fi
+
+VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
+TAG="v${VERSION}"
+
+# Only create the tag if it doesn't already exist
+if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+  git tag "$TAG"
+  echo "Tagged: $TAG"
+  echo "Run 'git push origin main --tags' to trigger the Publish workflow."
+fi

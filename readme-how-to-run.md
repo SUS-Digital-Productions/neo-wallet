@@ -173,9 +173,33 @@ To run a published desktop app:
 ./publish/linux-x64/NeoWallet.Backend --browser   # Opens in browser
 ```
 
+### Git Hooks (Auto Version Bump)
+
+The `hooks/` directory contains git hooks that automatically bump the patch version on every commit and tag it for release.
+
+**One-time setup:**
+
+```powershell
+# PowerShell
+.\hooks\install.ps1
+```
+
+```bash
+# Bash
+chmod +x hooks/*
+./hooks/install.sh
+```
+
+This runs `git config core.hooksPath hooks`. After that:
+
+- **Pre-commit**: Increments the patch number in `VERSION` (e.g. `1.0.4` → `1.0.5`) and stages it
+- **Post-commit**: Creates a `v{version}` tag (e.g. `v1.0.5`) pointing at the new commit
+
+To skip the auto-bump (merge commits, etc.): `git commit --no-verify`
+
 ### CI/CD (GitHub Actions)
 
-The repository has three workflows that form a pipeline:
+The repository has three workflows:
 
 #### 1. Libraries CI (`.github/workflows/libraries-ci.yml`)
 
@@ -183,17 +207,7 @@ Runs automatically on every push to `main` and on pull requests:
 - Restores, builds, and tests all .NET projects
 - Gate-keeps code quality before merging
 
-#### 2. Version Bump (`.github/workflows/version-bump.yml`)
-
-Manual dispatch from the GitHub Actions tab. Choose a bump type:
-- **patch** — `1.0.4` → `1.0.5`
-- **minor** — `1.0.4` → `1.1.0`
-- **major** — `1.0.4` → `2.0.0`
-- Optional pre-release label: `1.1.0-beta`, `2.0.0-rc.1`
-
-This updates the `VERSION` file, commits, creates a `v{version}` tag, and pushes — which automatically triggers the Publish workflow.
-
-#### 3. Publish (`.github/workflows/publish.yml`)
+#### 2. Publish (`.github/workflows/publish.yml`)
 
 Triggers on version tags (`v*`) or manual dispatch:
 - Builds the React frontend once, shares it across all jobs
@@ -210,14 +224,23 @@ platforms: "android,ios"            # Mobile only
 platforms: "windows,android"        # Mix
 ```
 
+#### 3. Version Bump (`.github/workflows/version-bump.yml`)
+
+Manual dispatch for **major/minor** bumps (patch is automatic via git hook):
+- **minor** — `1.0.5` → `1.1.0`
+- **major** — `1.0.5` → `2.0.0`
+- Optional pre-release label: `2.0.0-beta`
+- Commits, tags, and triggers the Publish workflow via API
+
 #### Typical release flow
 
 ```
-1. Push code to main          → Libraries CI runs (build + test)
-2. Go to Actions → Version Bump → Run workflow (patch/minor/major)
-3. Version bump commits, tags v1.0.5, pushes
-4. Publish workflow triggers   → builds all platforms, creates GitHub Release
+1. Make changes, commit        → hook bumps VERSION (patch), creates tag
+2. git push origin main --tags → CI tests + Publish workflow triggers
+3. Publish builds all platforms, creates GitHub Release
 ```
+
+For major/minor releases, use the Version Bump workflow from the GitHub Actions tab instead.
 
 ---
 

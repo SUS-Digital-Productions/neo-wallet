@@ -1,10 +1,14 @@
 name: Version Bump
 
+# Manual workflow for major/minor version bumps.
+# Patch versions are bumped automatically by the pre-commit hook.
+# This workflow commits, tags, and triggers a publish via workflow_dispatch.
+
 on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Version bump type"
+        description: "Version bump type (patch is automatic via git hook)"
         required: true
         type: choice
         options:
@@ -70,7 +74,7 @@ jobs:
           git push origin HEAD --tags
 
       # Tags pushed with GITHUB_TOKEN don't trigger other workflows,
-      # so we explicitly call the Publish workflow.
+      # so we explicitly dispatch the Publish workflow.
       - name: Trigger Publish workflow
         uses: actions/github-script@v7
         with:
