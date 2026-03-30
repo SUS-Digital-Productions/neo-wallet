@@ -95,99 +95,65 @@ public class WalletAccount
 }
 ```
 
-### XAML Files
-- All XAML files use the MAUI 2021 schema: `http://schemas.microsoft.com/dotnet/2021/maui`
-- Pages stored in `Pages/` directory with `.xaml` and `.xaml.cs` code-behind
-- Use `x:Name` for controls that need code-behind access
-- WinUI project sets `EnableDefaultMauiItems=false` to process XAML as WinUI XAML
-
-### UI Patterns
-- Pages use `ContentPage` with `ScrollView` > `VerticalStackLayout` for scrollable content
-- Forms use `Frame` containers with rounded corners (`CornerRadius="12"`) and shadows
-- Color references use `{DynamicResource Primary}`, `{DynamicResource Gray600}`, etc.
-- Validation messages use named `Label` controls with `IsVisible` binding (e.g., `ErrorLabel`)
-- Event handlers follow pattern: `OnActionClicked` (e.g., `OnLoginClicked`, `OnSendClicked`)
-- Password fields use `Grid` with `Entry` and toggle visibility `Button` (eye icon: 👁)
-
-### UI Components Patterns
-**Card-Style Frames:**
-```xml
-<Frame BorderColor="{DynamicResource Gray200}" CornerRadius="12" Padding="20" HasShadow="True">
-  <VerticalStackLayout Spacing="16">
-    <!-- Content -->
-  </VerticalStackLayout>
-</Frame>
-```
-
-**Password Strength Indicators:**
-Use 4 `Frame` elements with dynamic `BackgroundColor` based on strength level (see CreateAccountPage.xaml)
-
-**Quick Action Buttons:**
-Circular buttons with emoji icons in grid layout (see DashboardPage.xaml)
-
-**Asset List Items:**
-Grid with icon, name/value, and balance (see DashboardPage.xaml assets section)
-
 ## Key Files
 
-- [MauiProgramExtensions.cs](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/MauiProgramExtensions.cs) - Shared app configuration entry point
-- [AppShell.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/AppShell.xaml) - Shell navigation definition with all page routes
-- [SUS.EOS.NeoWallet.csproj](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet.csproj) - Core project with `SingleProject=true`
+- `SUS.EOS.NeoWallet/SUS.EOS.Sharp/SUS.EOS.Sharp.csproj` - Antelope blockchain client library
+- `SUS.EOS.NeoWallet/SUS.EOS.EosioSigningRequest/SUS.EOS.EosioSigningRequest.csproj` - ESR protocol library
+- `desktop/backend/Program.cs` - .NET local backend entry point
+- `desktop/backend/ServiceRegistration.cs` - DI registration for backend services
+- `desktop/app/src/App.tsx` - React router and page layout
+- `desktop/app/src/api/client.ts` - Frontend API client for backend communication
 
 ## Adding New Features
 
-### New Pages
-1. Create `.xaml` and `.xaml.cs` in `Pages/` directory
-2. Add route in [AppShell.xaml](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/AppShell.xaml):
-   ```xml
-   <ShellContent
-     Title="Your Page"
-     ContentTemplate="{DataTemplate local:Pages.YourPage}"
-     Route="YourPage"
-   />
-   ```
-3. Add to `.csproj`:
-   ```xml
-   <MauiXaml Update="Pages\YourPage.xaml">
-     <Generator>MSBuild:Compile</Generator>
-   </MauiXaml>
-   ```
+### New React Pages
+1. Create a new `.tsx` file in `desktop/app/src/pages/`
+2. Add a route in `desktop/app/src/App.tsx`
+3. Add a nav link in `desktop/app/src/Layout.tsx` if needed
 
-### Services
-- Empty `Services/` directory exists in shared project - add dependency injection services here
-- Register services in `MauiProgramExtensions.UseSharedMauiApp()` using `builder.Services.AddSingleton/AddTransient`
+### New Backend Endpoints
+1. Create an endpoint class in `desktop/backend/Endpoints/`
+2. Add DTOs in `desktop/backend/Dto/`
+3. Map the endpoint in `desktop/backend/Program.cs`
+4. Add corresponding API client function in `desktop/app/src/api/client.ts`
 
-### Navigation Between Pages
-```csharp
-// Navigate to absolute route
-await Shell.Current.GoToAsync("//DashboardPage");
-
-// Navigate back
-await Shell.Current.GoToAsync("..");
-
-// Navigate with parameters (register routes with Shell.Routing.RegisterRoute first)
-await Shell.Current.GoToAsync($"Details?id={itemId}");
-```
+### Backend Services
+- Services live in `desktop/backend/Services/`
+- Register services in `desktop/backend/ServiceRegistration.cs`
 
 ## Build & Debug
 
-### Platform Selection
-Build specific platform projects:
-- Android: `SUS.EOS.NeoWallet.Droid.csproj`
-- Windows: `SUS.EOS.NeoWallet.WinUI.csproj` (requires platform: x64, x86, or ARM64)
-- iOS/Mac: Requires macOS build host
+### .NET Backend
+```bash
+cd desktop/backend
+dotnet run
+```
+The backend starts on `http://localhost:5199` and prints `BACKEND_TOKEN=...` to stdout.
 
-### Debug Configuration
-Debug logging enabled via `#if DEBUG` in [MauiProgramExtensions.cs](SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/SUS.EOS.NeoWallet/MauiProgramExtensions.cs) using `Microsoft.Extensions.Logging.Debug`.
+### React Frontend
+```bash
+cd desktop/app
+npm install
+npm run dev
+```
+The dev server starts on `http://localhost:1420`.
+
+### Full Solution Build
+```bash
+cd SUS.EOS.NeoWallet
+dotnet build SUS.EOS.NeoWallet.slnx
+```
+
+### Debug Logging
+Use `System.Diagnostics.Trace.WriteLine` with `[COMPONENT]` prefix (see Debug Logging Pattern section).
 
 ## Current State
-- Active development: 10 pages implemented (9 wallet pages + MainPage navigation hub)
-- **MainPage**: Navigation hub with wallet overview, quick actions, assets, and recent transactions
-- **Shell Navigation**: Flyout menu enabled with Home, Wallet, and Account sections
-- UI inspired by Anchor wallet (greymass/anchor) adapted for Neo blockchain
+- **Architecture**: Tauri 2 + React 19 + Vite 6 + .NET 10 local backend sidecar
+- **Frontend**: 7 pages (Dashboard, Send, Receive, Import, Unlock, Settings, ESR Approval)
+- **Backend**: Minimal API with real blockchain wiring via SUS.EOS.Sharp
+- **Wallet Storage**: AES-256-CBC encrypted wallet file at `%LocalAppData%/NeoWallet/wallet.json`
+- **Auth**: Bearer token middleware with exemptions for health/create/unlock endpoints
 - **SUS.EOS.Sharp Library**: Modern .NET 10 blockchain library based on eos-sharp with improvements
-- **Mock Services**: `MockWalletService` provides fake data for demonstration
-- All pages have TODO markers for actual blockchain integration
 - Uses nullable reference types (`<Nullable>enable</Nullable>`)
 - Implicit usings enabled across all projects
 
@@ -383,54 +349,28 @@ private async Task ProcessRequest(EsrRequest request)
 
 ## Services Layer
 
-### Service Organization
-All NeoWallet services follow this structure:
-- Interface in `Services/Interfaces/I{Name}.cs`
-- Implementation in `Services/{Name}.cs`
-- Models in `Services/Models/{Category}/`
-- Registration in `MauiProgramExtensions.cs`
+### Backend Service Organization
+Services live in `desktop/backend/Services/` and are registered in `desktop/backend/ServiceRegistration.cs`.
 
 ### Core Services
 
-**IWalletStorageService** - Secure wallet storage:
-- Load/save wallet with encryption
-- Key management with password protection
-- Secure preferences storage
+**IWalletStorageService** - Encrypted wallet file on disk:
+- AES-256-CBC with PBKDF2 key derivation
+- Create / unlock / lock / save wallet file
+- Stored at `%LocalAppData%/NeoWallet/wallet.json`
 
-**IWalletAccountService** - Account management:
-- Add/remove wallet accounts
-- Get account list
-- Set active account
-- Import from private key
+**IWalletStateService** - Wallet state management:
+- Lock/unlock, active account/network
+- Import/remove accounts with key validation via `EosioKey`
+- Retrieve private keys for signing
 
-**IWalletContextService** - Application-wide state:
-- Active account tracking
-- Active network tracking
-- Initialization and state change events
+**IChainClientFactory** - Blockchain client creation:
+- `CreateRpcClient(chainId)` → `AntelopeHttpClient`
+- `CreateLightApiClient(chainId)` → `LightApiClient`
 
-**INetworkService** - Network management:
-- Get available networks (WAX, EOS, Telos, etc.)
-- Get default network
-- Get network by chain ID
+**IAntelopeTransactionService** - Transaction building and signing
 
-**ICryptographyService** - Encryption operations:
-- Encrypt/decrypt with password
-- Hash generation
-- Key derivation
-
-**IAnchorCallbackService** - Anchor protocol integration:
-- Register callback handlers
-- Execute callbacks
-- Session persistence
-
-**IEsrSessionManager** - ESR session lifecycle:
-- WebSocket connection management
-- dApp session tracking
-- Real-time signing request handling
-
-**IPriceFeedService** - Price data:
-- Get token prices
-- Cache management
+**IEsrService** - ESR parsing, signing, and callbacks
 
 ### Service Implementation Pattern
 ```csharp
@@ -482,102 +422,19 @@ public class MyService : IMyService, IDisposable
 
 ## Navigation Structure
 
-### MainPage (Home)
-- Wallet overview with balance and address
-- Quick action buttons (Dashboard, Send, Receive, Import)
-- Assets list with balances
-- Recent transactions (3 most recent)
-- Account management section
-- **ESR Listener**: Automatically connects to WebSocket on appear
-
-### Shell Flyout Menu
+### Sidebar Navigation (Layout.tsx)
 ```
-Home
-  └─ Main (MainPage)
-Wallet
-  ├─ Dashboard (DashboardPage)
-  ├─ Send (SendPage)
-  └─ Receive (ReceivePage)
-Account
-  ├─ Create Account (CreateAccountPage)
-  ├─ Import Wallet (ImportWalletPage)
-  └─ Recover Account (RecoverAccountPage)
-Developer Tools
-  ├─ Contract Tables (ContractTablesPage)
-  ├─ Contract Actions (ContractActionsPage)
-  └─ Settings (SettingsPage)
-Hidden Routes (IsVisible=False)
-  ├─ Initialize (InitializePage)
-  ├─ Wallet Setup (WalletSetupPage)
-  └─ Enter Password (EnterPasswordPage)
-```
-- Assets list with balances
-- Recent transactions (3 most recent)
-- Account management section
-
-### Shell Flyout Menu
-```
-Home
-  └─ Main (MainPage)
-Wallet
-  ├─ Dashboard (DashboardPage)
-  ├─ Send (SendPage)
-  └─ Receive (ReceivePage)
-Account
-  ├─ Create Account (CreateAccountPage)
-  ├─ Import Wallet (ImportWalletPage)
-  └─ Recover Account (RecoverAccountPage)
-Hidden Routes (IsVisible=False)
-  ├─ Initialize (InitializePage)
-  ├─ Wallet Setup (WalletSetupPage)
-  └─ Enter Password (EnterPasswordPage)
+Dashboard  → /
+Send       → /send
+Receive    → /receive
+Import     → /import
+Settings   → /settings
+ESR        → /esr
 ```
 
-## TODO Integration Points
-- BIP39 seed phrase generation and validation
-- Neo private key/address generation
-- Wallet encryption/decryption
-- Neo blockchain RPC communication
-- QR code generation and scanning
-- Transaction signing and broadcasting
-- Balance and transaction history fetching
-
-## Event Handling Best Practices
-
-### Subscribe to Events in Constructor
-```csharp
-public MainPage(IWalletContextService walletContext, IEsrSessionManager esrManager)
-{
-    InitializeComponent();
-    _walletContext = walletContext;
-    _esrManager = esrManager;
-
-    // Subscribe to context changes
-    _walletContext.ActiveAccountChanged += OnActiveAccountChanged;
-    _walletContext.ActiveNetworkChanged += OnActiveNetworkChanged;
-
-    // Subscribe to ESR events
-    _esrManager.SigningRequestReceived += OnEsrSigningRequestReceived;
-    _esrManager.StatusChanged += OnEsrStatusChanged;
-}
-```
-
-### Event Handler Pattern
-```csharp
-private async void OnEsrSigningRequestReceived(object? sender, EsrSigningRequestEventArgs e)
-{
-    try
-    {
-        System.Diagnostics.Trace.WriteLine($"[MAINPAGE] ESR request received: {e.Request.ChainId}");
-        await ProcessSigningRequestAsync(e);
-    }
-    catch (Exception ex)
-    {
-        System.Diagnostics.Trace.WriteLine($"[MAINPAGE] Error: {ex.Message}");
-        await DisplayAlert("Error", $"Failed: {ex.Message}", "OK");
-    }
-}
-```
+### Routes (App.tsx)
+- All main routes wrapped in `<Layout />` with sidebar
+- `/unlock` is a standalone page (no sidebar)
 
 ## Security Best Practices
 
@@ -592,26 +449,4 @@ ArgumentException.ThrowIfNullOrWhiteSpace(account);
 ArgumentException.ThrowIfNullOrWhiteSpace(privateKey);
 if (!IsValidFormat(account))
     throw new ArgumentException("Invalid format", nameof(account));
-```
-
-## UI Event Handler Pattern
-```csharp
-private async void OnActionClicked(object sender, EventArgs e)
-{
-    try
-    {
-        LoadingIndicator.IsVisible = true;
-        var result = await _service.PerformAsync();
-        await DisplayAlert("Success", "Done!", "OK");
-    }
-    catch (Exception ex)
-    {
-        System.Diagnostics.Trace.WriteLine($"[PAGE] Error: {ex.Message}");
-        await DisplayAlert("Error", ex.Message, "OK");
-    }
-    finally
-    {
-        LoadingIndicator.IsVisible = false;
-    }
-}
 ```

@@ -1,29 +1,20 @@
-import { useEffect, useState } from "react";
-import { Copy, QrCode } from "lucide-react";
+import { Copy, QrCode, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { WalletSummary } from "@/api/types";
-import { getWalletSummary } from "@/api/client";
+import { EmptyState } from "@/components/EmptyState";
+import { useWalletSummary } from "@/api/hooks";
 
 export default function Receive() {
-  const [summary, setSummary] = useState<WalletSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getWalletSummary()
-      .then(setSummary)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: summary, isLoading } = useWalletSummary();
 
   function copyToClipboard(text: string, label: string) {
     navigator.clipboard.writeText(text).then(
       () => toast.success(`${label} copied`),
-      () => toast.error("Copy failed")
+      () => toast.error("Copy failed"),
     );
   }
 
@@ -47,13 +38,17 @@ export default function Receive() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-3">
               <Skeleton className="h-5 w-40" />
               <Skeleton className="h-5 w-64" />
             </div>
           ) : !account ? (
-            <p className="text-muted-foreground">No active account</p>
+            <EmptyState
+              icon={UserX}
+              title="No active account"
+              description="Import an account to see your receive details"
+            />
           ) : (
             <>
               {/* Account name */}

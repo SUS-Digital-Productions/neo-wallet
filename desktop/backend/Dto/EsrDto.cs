@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace NeoWallet.Backend.Dto;
@@ -26,4 +27,11 @@ public sealed record EsrApproveRequest(
 public sealed record EsrRejectRequest(
     [property: JsonPropertyName("requestId")] string RequestId,
     [property: JsonPropertyName("reason")] string? Reason
+);
+
+/// <summary>Sign raw JSON actions.</summary>
+public sealed record SignRawRequest(
+    [property: JsonPropertyName("chainId")] string ChainId,
+    [property: JsonPropertyName("actions")] JsonElement Actions,
+    [property: JsonPropertyName("broadcast")] bool Broadcast = true
 );

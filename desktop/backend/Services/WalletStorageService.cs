@@ -48,6 +48,9 @@ public sealed class WalletAccount
 
     [JsonPropertyName("publicKey")]
     public string PublicKey { get; set; } = "";
+
+    [JsonPropertyName("chainId")]
+    public string ChainId { get; set; } = "";
 }
 
 /// <summary>

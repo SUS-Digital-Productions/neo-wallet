@@ -31,12 +31,17 @@ public sealed class WalletStateService : IWalletStateService
     public NetworkDto? ActiveNetwork => _activeNetwork;
     public AccountDto? ActiveAccount => _activeAccount;
 
+    public string GetChainName(string chainId) =>
+        Networks.Find(n => n.ChainId == chainId)?.Name ?? "Unknown";
+
     public IReadOnlyList<AccountDto> GetAccounts()
     {
         var data = _storage.CurrentData;
         if (data is null) return [];
         return data.Accounts
-            .Select(a => new AccountDto(a.Account, a.Authority, a.PublicKey))
+            .Select(a => new AccountDto(
+                a.Account, a.Authority, a.PublicKey,
+                a.ChainId, GetChainName(a.ChainId)))
             .ToList();
     }
 
@@ -45,11 +50,13 @@ public sealed class WalletStateService : IWalletStateService
     public void SetActiveAccount(string account, string authority, string chainId)
     {
         var data = _storage.CurrentData ?? throw new InvalidOperationException("Wallet is locked.");
-        var match = data.Accounts.Find(a => a.Account == account && a.Authority == authority);
+        var match = data.Accounts.Find(a =>
+            a.Account == account && a.Authority == authority && a.ChainId == chainId);
         if (match is null)
-            throw new InvalidOperationException($"Account {account}@{authority} not found.");
-        _activeAccount = new AccountDto(match.Account, match.Authority, match.PublicKey);
-        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Active account set to {account}@{authority}");
+            throw new InvalidOperationException($"Account {account}@{authority} on {chainId[..16]}… not found.");
+        _activeAccount = new AccountDto(match.Account, match.Authority, match.PublicKey,
+            match.ChainId, GetChainName(match.ChainId));
+        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Active account set to {account}@{authority} on {GetChainName(chainId)}");
     }
 
     public void SetActiveNetwork(string chainId)
@@ -80,7 +87,8 @@ public sealed class WalletStateService : IWalletStateService
         if (data.Accounts.Count > 0)
         {
             var first = data.Accounts[0];
-            _activeAccount = new AccountDto(first.Account, first.Authority, first.PublicKey);
+            _activeAccount = new AccountDto(first.Account, first.Authority, first.PublicKey,
+                first.ChainId, GetChainName(first.ChainId));
         }
 
         System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Wallet unlocked, {data.Accounts.Count} accounts");
@@ -95,50 +103,76 @@ public sealed class WalletStateService : IWalletStateService
         System.Diagnostics.Trace.WriteLine("[WALLETSTATE] Wallet locked");
     }
 
-    public AccountDto ImportAccount(string privateKeyWif, string account, string authority, string password)
+    public IReadOnlyList<AccountDto> ImportAccounts(string privateKeyWif, IEnumerable<ImportAccountEntry> accounts)
     {
         var data = _storage.CurrentData ?? throw new InvalidOperationException("Wallet is locked.");
+        var password = _password ?? throw new InvalidOperationException("Wallet is locked.");
 
-        // Validate the private key and derive the public key
         var key = EosioKey.FromPrivateKey(privateKeyWif);
         var publicKey = key.PublicKey;
+        var imported = new List<AccountDto>();
 
-        // Check for duplicates
-        if (data.Accounts.Any(a => a.Account == account && a.Authority == authority))
-            throw new InvalidOperationException($"Account {account}@{authority} already exists.");
-
-        data.Accounts.Add(new WalletAccount
+        foreach (var entry in accounts)
         {
-            Account = account,
-            Authority = authority,
-            PrivateKeyWif = key.PrivateKeyWif,
-            PublicKey = publicKey,
-        });
+            // Skip duplicates
+            if (data.Accounts.Any(a =>
+                a.Account == entry.Account && a.Authority == entry.Authority && a.ChainId == entry.ChainId))
+            {
+                System.Diagnostics.Trace.WriteLine(
+                    $"[WALLETSTATE] Skipped duplicate {entry.Account}@{entry.Authority} on {GetChainName(entry.ChainId)}");
+                continue;
+            }
 
-        _storage.Save(password, data);
+            data.Accounts.Add(new WalletAccount
+            {
+                Account = entry.Account,
+                Authority = entry.Authority,
+                PrivateKeyWif = key.PrivateKeyWif,
+                PublicKey = publicKey,
+                ChainId = entry.ChainId,
+            });
 
-        var dto = new AccountDto(account, authority, publicKey);
-        _activeAccount ??= dto;
+            var dto = new AccountDto(entry.Account, entry.Authority, publicKey,
+                entry.ChainId, GetChainName(entry.ChainId));
+            imported.Add(dto);
+            System.Diagnostics.Trace.WriteLine(
+                $"[WALLETSTATE] Imported {entry.Account}@{entry.Authority} on {GetChainName(entry.ChainId)}");
+        }
 
-        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Imported {account}@{authority} ({publicKey[..16]}…)");
-        return dto;
+        if (imported.Count > 0)
+        {
+            _storage.Save(password, data);
+            _activeAccount ??= imported[0];
+        }
+
+        return imported;
     }
 
-    public bool RemoveAccount(string account, string authority, string password)
+    public bool RemoveAccount(string account, string authority, string chainId)
     {
         var data = _storage.CurrentData ?? throw new InvalidOperationException("Wallet is locked.");
-        var removed = data.Accounts.RemoveAll(a => a.Account == account && a.Authority == authority);
+        var password = _password ?? throw new InvalidOperationException("Wallet is locked.");
+
+        var removed = data.Accounts.RemoveAll(a =>
+            a.Account == account && a.Authority == authority && a.ChainId == chainId);
         if (removed == 0) return false;
 
         _storage.Save(password, data);
 
         // Clear active if it was removed
-        if (_activeAccount is not null && _activeAccount.Account == account && _activeAccount.Authority == authority)
+        if (_activeAccount is not null &&
+            _activeAccount.Account == account &&
+            _activeAccount.Authority == authority &&
+            _activeAccount.ChainId == chainId)
+        {
             _activeAccount = data.Accounts.Count > 0
-                ? new AccountDto(data.Accounts[0].Account, data.Accounts[0].Authority, data.Accounts[0].PublicKey)
+                ? new AccountDto(data.Accounts[0].Account, data.Accounts[0].Authority,
+                    data.Accounts[0].PublicKey, data.Accounts[0].ChainId,
+                    GetChainName(data.Accounts[0].ChainId))
                 : null;
+        }
 
-        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Removed {account}@{authority}");
+        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Removed {account}@{authority} on {GetChainName(chainId)}");
         return true;
     }
 

@@ -1,0 +1,275 @@
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Platforms to build (comma-separated: windows,linux,mac,android,ios or 'all')"
+        required: false
+        default: "all"
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  NODE_VERSION: "20"
+
+jobs:
+  # ── Determine which platforms to build ──────────────────
+  matrix-setup:
+    runs-on: ubuntu-latest
+    outputs:
+      desktop: ${{ steps.set.outputs.desktop }}
+      build-android: ${{ steps.set.outputs.android }}
+      build-ios: ${{ steps.set.outputs.ios }}
+    steps:
+      - id: set
+        run: |
+          INPUT="${{ github.event.inputs.platforms || 'all' }}"
+
+          # Desktop matrix
+          if [[ "$INPUT" == "all" ]]; then
+            echo 'desktop=[{"rid":"win-x64","os":"windows-latest"},{"rid":"win-arm64","os":"windows-latest"},{"rid":"linux-x64","os":"ubuntu-latest"},{"rid":"linux-arm64","os":"ubuntu-latest"},{"rid":"osx-x64","os":"macos-13"},{"rid":"osx-arm64","os":"macos-latest"}]' >> "$GITHUB_OUTPUT"
+            echo "android=true"  >> "$GITHUB_OUTPUT"
+            echo "ios=true"      >> "$GITHUB_OUTPUT"
+          else
+            MATRIX="["
+            SEP=""
+            if echo "$INPUT" | grep -qi "windows"; then
+              MATRIX="${MATRIX}${SEP}{\"rid\":\"win-x64\",\"os\":\"windows-latest\"},{\"rid\":\"win-arm64\",\"os\":\"windows-latest\"}"
+              SEP=","
+            fi
+            if echo "$INPUT" | grep -qi "linux"; then
+              MATRIX="${MATRIX}${SEP}{\"rid\":\"linux-x64\",\"os\":\"ubuntu-latest\"},{\"rid\":\"linux-arm64\",\"os\":\"ubuntu-latest\"}"
+              SEP=","
+            fi
+            if echo "$INPUT" | grep -qi "mac"; then
+              MATRIX="${MATRIX}${SEP}{\"rid\":\"osx-x64\",\"os\":\"macos-13\"},{\"rid\":\"osx-arm64\",\"os\":\"macos-latest\"}"
+              SEP=","
+            fi
+            MATRIX="${MATRIX}]"
+
+            # Default to all desktop if only mobile was selected
+            if [[ "$MATRIX" == "[]" ]]; then
+              MATRIX='[{"rid":"win-x64","os":"windows-latest"},{"rid":"linux-x64","os":"ubuntu-latest"},{"rid":"osx-arm64","os":"macos-latest"}]'
+            fi
+
+            echo "desktop=${MATRIX}" >> "$GITHUB_OUTPUT"
+            echo "android=$(echo $INPUT | grep -qi android && echo true || echo false)" >> "$GITHUB_OUTPUT"
+            echo "ios=$(echo $INPUT | grep -qi ios && echo true || echo false)"         >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Build React frontend (shared across all targets) ───
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: desktop/app/package-lock.json
+
+      - name: Install & build frontend
+        working-directory: desktop/app
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/app/dist/
+          retention-days: 1
+
+  # ── Desktop builds (matrix) ────────────────────────────
+  desktop:
+    needs: [matrix-setup, build-frontend]
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.matrix-setup.outputs.desktop) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/app/dist/
+
+      - name: Publish ${{ matrix.rid }}
+        run: |
+          dotnet publish desktop/backend/NeoWallet.Backend.csproj \
+            --configuration Release \
+            --runtime ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            --output publish/${{ matrix.rid }}
+        shell: bash
+
+      - name: Create archive
+        shell: bash
+        run: |
+          cd publish/${{ matrix.rid }}
+          if [[ "${{ matrix.rid }}" == win-* ]]; then
+            7z a -tzip ../../NeoWallet-${{ matrix.rid }}.zip .
+          else
+            chmod +x NeoWallet.Backend
+            tar czf ../../NeoWallet-${{ matrix.rid }}.tar.gz .
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeoWallet-${{ matrix.rid }}
+          path: NeoWallet-${{ matrix.rid }}.*
+          retention-days: 30
+
+  # ── Android build (Capacitor) ──────────────────────────
+  android:
+    needs: [matrix-setup, build-frontend]
+    if: needs.matrix-setup.outputs.build-android == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: desktop/app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/app/dist/
+
+      - name: Install dependencies & init Capacitor
+        working-directory: desktop/app
+        run: |
+          npm ci
+          npm install @capacitor/core @capacitor/cli @capacitor/android --save
+
+          # Add the Android platform if not present
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+
+          npx cap sync android
+
+      - name: Build Android APK
+        working-directory: desktop/app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Collect APK
+        run: |
+          mkdir -p publish/android
+          find desktop/app/android -name "*.apk" -path "*/release/*" -exec cp {} publish/android/NeoWallet.apk \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeoWallet-android
+          path: publish/android/NeoWallet.apk
+          retention-days: 30
+
+  # ── iOS build (Capacitor + Xcode) ──────────────────────
+  ios:
+    needs: [matrix-setup, build-frontend]
+    if: needs.matrix-setup.outputs.build-ios == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: desktop/app/package-lock.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/app/dist/
+
+      - name: Install dependencies & init Capacitor
+        working-directory: desktop/app
+        run: |
+          npm ci
+          npm install @capacitor/core @capacitor/cli @capacitor/ios --save
+
+          # Add the iOS platform if not present
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+
+          npx cap sync ios
+
+      - name: Build iOS (unsigned archive)
+        working-directory: desktop/app/ios/App
+        run: |
+          xcodebuild archive \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/NeoWallet.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            -destination "generic/platform=iOS" \
+            | tail -20
+
+      - name: Collect archive
+        run: |
+          mkdir -p publish/ios
+          cp -R "$RUNNER_TEMP/NeoWallet.xcarchive" publish/ios/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeoWallet-ios
+          path: publish/ios/
+          retention-days: 30
+
+  # ── Create GitHub Release on tag push ──────────────────
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, android, ios]
+    # Allow release even if optional mobile jobs were skipped
+    if: always() && needs.desktop.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          pattern: NeoWallet-*
+          merge-multiple: false
+
+      - name: Collect release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.apk" \) -exec cp {} release/ \;
+          ls -la release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}

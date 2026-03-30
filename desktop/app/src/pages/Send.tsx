@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { ArrowUpRight, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,73 +13,79 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { AccountInfo, NetworkInfo } from "@/api/types";
-import {
-  getAccounts,
-  getNetworks,
-  getWalletSummary,
-  sendTransfer,
-} from "@/api/client";
+import { EmptyState } from "@/components/EmptyState";
+import { useAccounts, useNetworks, useWalletSummary, useSendTransfer } from "@/api/hooks";
 
 export default function Send() {
   const navigate = useNavigate();
 
-  const [accounts, setAccounts] = useState<AccountInfo[]>([]);
-  const [networks, setNetworks] = useState<NetworkInfo[]>([]);
+  const accounts = useAccounts();
+  const networks = useNetworks();
+  const summary = useWalletSummary();
+  const transfer = useSendTransfer();
+
   const [from, setFrom] = useState("");
   const [chainId, setChainId] = useState("");
   const [to, setTo] = useState("");
   const [quantity, setQuantity] = useState("");
   const [memo, setMemo] = useState("");
-  const [sending, setSending] = useState(false);
 
-  useEffect(() => {
-    async function init() {
-      try {
-        const [accs, nets, summary] = await Promise.all([
-          getAccounts(),
-          getNetworks(),
-          getWalletSummary(),
-        ]);
-        setAccounts(accs);
-        setNetworks(nets);
-        if (summary.activeAccount) {
-          setFrom(
-            `${summary.activeAccount.account}@${summary.activeAccount.authority}`
-          );
-        }
-        if (summary.activeNetwork) {
-          setChainId(summary.activeNetwork.chainId);
-        }
-      } catch {
-        /* empty – user can still fill fields manually */
-      }
-    }
-    init();
-  }, []);
+  // Set defaults once data loads
+  if (!from && summary.data?.activeAccount) {
+    const a = summary.data.activeAccount;
+    setFrom(`${a.account}@${a.authority}`);
+  }
+  if (!chainId && summary.data?.activeNetwork) {
+    setChainId(summary.data.activeNetwork.chainId);
+  }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!from || !to || !quantity || !chainId) return;
 
     const [account, authority] = from.split("@");
-    setSending(true);
-    try {
-      const res = await sendTransfer({
+    transfer.mutate(
+      {
         chainId,
         from: account,
         authority: authority ?? "active",
         to,
         quantity,
         memo: memo || undefined,
-      });
-      toast.success(`Transaction sent: ${res.transactionId.slice(0, 12)}…`);
-      navigate("/");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Transfer failed");
-    } finally {
-      setSending(false);
-    }
+      },
+      {
+        onSuccess: (res) => {
+          toast.success(`Transaction sent: ${res.transactionId.slice(0, 12)}…`);
+          navigate("/");
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : "Transfer failed");
+        },
+      },
+    );
+  }
+
+  if (!accounts.isLoading && (!accounts.data || accounts.data.length === 0)) {
+    return (
+      <div className="mx-auto max-w-lg space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Send Tokens</h1>
+          <p className="text-sm text-muted-foreground">
+            Transfer tokens to another account
+          </p>
+        </div>
+        <EmptyState
+          icon={Users}
+          title="No accounts imported"
+          description="Import an account first to send tokens"
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/import">Import Account</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
   }
 
   return (
@@ -108,7 +114,7 @@ export default function Send() {
                   <SelectValue placeholder="Select network" />
                 </SelectTrigger>
                 <SelectContent>
-                  {networks.map((n) => (
+                  {(networks.data ?? []).map((n) => (
                     <SelectItem key={n.chainId} value={n.chainId}>
                       {n.name} ({n.symbol})
                     </SelectItem>
@@ -125,7 +131,7 @@ export default function Send() {
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => (
+                  {(accounts.data ?? []).map((a) => (
                     <SelectItem
                       key={`${a.account}@${a.authority}`}
                       value={`${a.account}@${a.authority}`}
@@ -172,8 +178,8 @@ export default function Send() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={sending}>
-              {sending && <Loader2 className="size-4 animate-spin" />}
+            <Button type="submit" className="w-full" disabled={transfer.isPending}>
+              {transfer.isPending && <Loader2 className="size-4 animate-spin" />}
               Send
             </Button>
           </form>

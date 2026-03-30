@@ -28,14 +28,17 @@ public interface IWalletStateService
     /// <summary>Lock the wallet (clear decrypted keys from memory).</summary>
     void Lock();
 
-    /// <summary>Import an account by private key. Wallet must be unlocked.</summary>
-    AccountDto ImportAccount(string privateKeyWif, string account, string authority, string password);
+    /// <summary>Import accounts by private key. Wallet must be unlocked. Uses stored password.</summary>
+    IReadOnlyList<AccountDto> ImportAccounts(string privateKeyWif, IEnumerable<ImportAccountEntry> accounts);
 
-    /// <summary>Remove an imported account.</summary>
-    bool RemoveAccount(string account, string authority, string password);
+    /// <summary>Remove an imported account. Uses stored password.</summary>
+    bool RemoveAccount(string account, string authority, string chainId);
 
     /// <summary>
     /// Retrieve the WIF private key for signing. Returns null when unavailable.
     /// </summary>
     string? GetPrivateKeyWif(string account, string authority);
+
+    /// <summary>Get display name for a chain ID.</summary>
+    string GetChainName(string chainId);
 }

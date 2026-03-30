@@ -16,9 +16,14 @@ import type {
   EsrParseResponse,
   EsrApproveRequest,
   EsrRejectRequest,
+  LookupAccountsRequest,
+  LookupAccountsResponse,
+  AutoLockSettings,
+  AppSettings,
+  SignRawRequest,
 } from "./types";
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:5199";
+const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? "";
 
 function token(): string | null {
   return sessionStorage.getItem("backend_token");
@@ -65,8 +70,14 @@ export const lockWallet = () =>
 /* ---- Accounts ---- */
 export const getAccounts = () => request<AccountInfo[]>("/api/accounts");
 
+export const lookupAccounts = (body: LookupAccountsRequest) =>
+  request<LookupAccountsResponse>("/api/accounts/lookup", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
 export const importAccount = (body: ImportAccountRequest) =>
-  request<AccountInfo>("/api/accounts/import", {
+  request<AccountInfo[]>("/api/accounts/import", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -120,6 +131,31 @@ export const approveEsr = (body: EsrApproveRequest) =>
 
 export const rejectEsr = (body: EsrRejectRequest) =>
   request<void>("/api/esr/reject", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const signRawTransaction = (body: SignRawRequest) =>
+  request<TransferResponse>("/api/esr/sign-raw", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/* ---- Settings ---- */
+export const getAutoLockSettings = () =>
+  request<AutoLockSettings>("/api/settings/autolock");
+
+export const setAutoLockSettings = (body: AutoLockSettings) =>
+  request<AutoLockSettings>("/api/settings/autolock", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const getAppSettings = () =>
+  request<AppSettings>("/api/settings/app");
+
+export const setAppSettings = (body: AppSettings) =>
+  request<AppSettings>("/api/settings/app", {
     method: "POST",
     body: JSON.stringify(body),
   });

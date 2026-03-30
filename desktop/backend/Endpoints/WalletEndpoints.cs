@@ -14,18 +14,18 @@ public static class WalletEndpoints
                 ListenerStatus: "Disconnected"
             )));
 
-        app.MapPost("/api/wallet/create", (CreateWalletRequest req, IWalletStateService wallet) =>
+        app.MapPost("/api/wallet/create", (CreateWalletRequest req, IWalletStateService wallet, BackendTokenHolder tokenHolder) =>
         {
             if (wallet.WalletLoaded)
                 return Results.Problem("Wallet already exists.", statusCode: StatusCodes.Status409Conflict);
             var ok = wallet.CreateWallet(req.Password);
-            return ok ? Results.Ok(new UnlockResponse(true)) : Results.Problem("Failed to create wallet.");
+            return ok ? Results.Ok(new UnlockResponse(true, tokenHolder.Token)) : Results.Problem("Failed to create wallet.");
         });
 
-        app.MapPost("/api/wallet/unlock", (UnlockRequest req, IWalletStateService wallet) =>
+        app.MapPost("/api/wallet/unlock", (UnlockRequest req, IWalletStateService wallet, BackendTokenHolder tokenHolder) =>
         {
             var ok = wallet.Unlock(req.Password);
-            return Results.Ok(new UnlockResponse(ok));
+            return Results.Ok(new UnlockResponse(ok, ok ? tokenHolder.Token : null));
         });
 
         app.MapPost("/api/wallet/lock", (IWalletStateService wallet) =>

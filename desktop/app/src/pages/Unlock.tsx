@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Loader2, Wallet, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -6,48 +6,55 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getHealth, unlockWallet, createWallet } from "@/api/client";
+import {
+  useHealth,
+  useUnlockWallet,
+  useCreateWallet,
+} from "@/api/hooks";
 
 export default function Unlock() {
   const navigate = useNavigate();
+  const { data: health } = useHealth();
+  const unlock = useUnlockWallet();
+  const create = useCreateWallet();
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [walletExists, setWalletExists] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    getHealth()
-      .then((h) => {
-        if (h.walletUnlocked) {
-          navigate("/");
-          return;
-        }
-        setWalletExists(h.walletLoaded);
-      })
-      .catch(() => setWalletExists(false));
-  }, [navigate]);
+  // Redirect if already unlocked
+  if (health?.walletUnlocked) {
+    navigate("/", { replace: true });
+    return null;
+  }
 
-  async function handleUnlock(e: React.FormEvent) {
+  const walletExists = health?.walletLoaded ?? null;
+  if (walletExists === null) return null;
+
+  const submitting = unlock.isPending || create.isPending;
+
+  function handleUnlock(e: React.FormEvent) {
     e.preventDefault();
     if (!password) return;
 
-    setSubmitting(true);
-    try {
-      const res = await unlockWallet({ password });
-      if (res.unlocked) {
-        toast.success("Wallet unlocked");
-        navigate("/");
-      } else {
-        toast.error("Incorrect password");
-      }
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Unlock failed");
-    } finally {
-      setSubmitting(false);
-    }
+    unlock.mutate(
+      { password },
+      {
+        onSuccess: (res) => {
+          if (res.unlocked) {
+            if (res.token) sessionStorage.setItem("backend_token", res.token);
+            toast.success("Wallet unlocked");
+            navigate("/");
+          } else {
+            toast.error("Incorrect password");
+          }
+        },
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Unlock failed"),
+      },
+    );
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!password || password !== confirmPassword) {
       toast.error("Passwords do not match");
@@ -58,21 +65,21 @@ export default function Unlock() {
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const res = await createWallet({ password });
-      if (res.unlocked) {
-        toast.success("Wallet created");
-        navigate("/");
-      }
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Creation failed");
-    } finally {
-      setSubmitting(false);
-    }
+    create.mutate(
+      { password },
+      {
+        onSuccess: (res) => {
+          if (res.unlocked) {
+            if (res.token) sessionStorage.setItem("backend_token", res.token);
+            toast.success("Wallet created");
+            navigate("/");
+          }
+        },
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Creation failed"),
+      },
+    );
   }
-
-  if (walletExists === null) return null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

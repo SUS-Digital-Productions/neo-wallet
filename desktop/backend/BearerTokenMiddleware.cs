@@ -1,6 +1,23 @@
 using System.Security.Cryptography;
+using NeoWallet.Backend.Services;
 
 namespace NeoWallet.Backend;
+
+/// <summary>
+/// Holds the backend bearer token generated at startup.
+/// Registered as a singleton so endpoints can include the token in unlock responses.
+/// </summary>
+public sealed class BackendTokenHolder
+{
+    public string Token { get; }
+
+    public BackendTokenHolder(IConfiguration configuration)
+    {
+        Token = configuration["Auth:Token"]
+            ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        Console.WriteLine($"BACKEND_TOKEN={Token}");
+    }
+}
 
 /// <summary>
 /// Validates the startup-generated bearer token on every request.
@@ -12,18 +29,32 @@ public sealed class BearerTokenMiddleware
     private readonly RequestDelegate _next;
     private readonly string _token;
 
-    public BearerTokenMiddleware(RequestDelegate next, IConfiguration configuration)
+    public BearerTokenMiddleware(RequestDelegate next, BackendTokenHolder holder)
     {
         _next = next;
-        // Allow an explicit token for development; otherwise generate one.
-        _token = configuration["Auth:Token"]
-            ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        // Emit to stdout so the Tauri shell can read it.
-        Console.WriteLine($"BACKEND_TOKEN={_token}");
+        _token = holder.Token;
     }
 
-    public async Task InvokeAsync(HttpContext context)
+    // Endpoints that must work before the renderer has a token.
+    private static readonly string[] OpenPaths =
+    [
+        "/api/health",
+        "/api/wallet/create",
+        "/api/wallet/unlock",
+    ];
+
+    public async Task InvokeAsync(HttpContext context, AutoLockService autoLock)
     {
+        var path = context.Request.Path.Value ?? "";
+
+        // Skip auth for static files and open API paths.
+        if (!path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase)
+            || OpenPaths.Any(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)))
+        {
+            await _next(context);
+            return;
+        }
+
         var auth = context.Request.Headers.Authorization.ToString();
         if (string.IsNullOrEmpty(auth) || !auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
@@ -39,6 +70,9 @@ public sealed class BearerTokenMiddleware
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return;
         }
+
+        // Track activity for auto-lock
+        autoLock.Touch();
 
         await _next(context);
     }

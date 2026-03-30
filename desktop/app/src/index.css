@@ -39,31 +39,49 @@
 
 @layer base {
   :root {
-    --background: 222 70% 8%;
-    --foreground: 210 40% 98%;
-    --card: 222 60% 12%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 65% 10%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 85% 60%;
+    /* SUS UI — dark blue theme */
+    --background: 225 30% 6%;
+    --foreground: 210 40% 96%;
+    --card: 225 28% 10%;
+    --card-foreground: 210 40% 96%;
+    --popover: 225 30% 8%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 215 90% 58%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 217 35% 22%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 30% 20%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 50% 28%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 35% 24%;
-    --input: 217 35% 24%;
-    --ring: 217 85% 60%;
+    --secondary: 220 25% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 220 20% 16%;
+    --muted-foreground: 215 15% 58%;
+    --accent: 220 35% 22%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 96%;
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 215 90% 58%;
     --radius: 0.5rem;
-    --chart-1: 217 75% 60%;
-    --chart-2: 200 70% 55%;
-    --chart-3: 240 65% 60%;
-    --chart-4: 190 75% 55%;
-    --chart-5: 220 70% 65%;
+
+    /* SUS brand accents */
+    --sus-success: 160 84% 39%;
+    --sus-warning: 38 92% 50%;
+    --sus-info: 215 90% 58%;
+    --sus-wax: 25 95% 53%;
+    --sus-eos: 215 90% 58%;
+    --sus-telos: 270 60% 58%;
+
+    --chart-1: 215 80% 58%;
+    --chart-2: 195 70% 50%;
+    --chart-3: 270 60% 58%;
+    --chart-4: 160 84% 39%;
+    --chart-5: 38 92% 50%;
+
+    --sidebar: 225 30% 8%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-border: 220 20% 16%;
+    --sidebar-accent: 220 35% 18%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-primary: 215 90% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
   }
 }
 
@@ -92,6 +110,19 @@
   --color-chart-3: hsl(var(--chart-3));
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sus-success: hsl(var(--sus-success));
+  --color-sus-warning: hsl(var(--sus-warning));
+  --color-sus-info: hsl(var(--sus-info));
+  --color-sus-wax: hsl(var(--sus-wax));
+  --color-sus-eos: hsl(var(--sus-eos));
+  --color-sus-telos: hsl(var(--sus-telos));
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius));
   --radius-lg: calc(var(--radius) + 4px);

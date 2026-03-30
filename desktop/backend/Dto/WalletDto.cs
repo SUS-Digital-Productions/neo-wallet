@@ -28,20 +28,19 @@ public sealed record UnlockRequest(
 );
 
 public sealed record UnlockResponse(
-    [property: JsonPropertyName("unlocked")] bool Unlocked
+    [property: JsonPropertyName("unlocked")] bool Unlocked,
+    [property: JsonPropertyName("token")] string? Token = null
 );
 
-/// <summary>Import an account by private key.</summary>
+/// <summary>Import accounts by private key (wallet must be unlocked).</summary>
 public sealed record ImportAccountRequest(
     [property: JsonPropertyName("privateKey")] string PrivateKey,
-    [property: JsonPropertyName("account")] string Account,
-    [property: JsonPropertyName("authority")] string Authority,
-    [property: JsonPropertyName("password")] string Password
+    [property: JsonPropertyName("accounts")] ImportAccountEntry[] Accounts
 );
 
 /// <summary>Remove an account.</summary>
 public sealed record RemoveAccountRequest(
     [property: JsonPropertyName("account")] string Account,
     [property: JsonPropertyName("authority")] string Authority,
-    [property: JsonPropertyName("password")] string Password
+    [property: JsonPropertyName("chainId")] string ChainId
 );

@@ -21,6 +21,8 @@ export interface AccountInfo {
   account: string;
   authority: string;
   publicKey: string;
+  chainId: string;
+  chainName: string;
 }
 
 export interface SetActiveAccountRequest {
@@ -47,19 +49,59 @@ export interface UnlockRequest {
 
 export interface UnlockResponse {
   unlocked: boolean;
+  token?: string;
+}
+
+export interface ImportAccountEntry {
+  account: string;
+  authority: string;
+  chainId: string;
 }
 
 export interface ImportAccountRequest {
   privateKey: string;
-  account: string;
-  authority: string;
-  password: string;
+  accounts: ImportAccountEntry[];
 }
 
 export interface RemoveAccountRequest {
   account: string;
   authority: string;
-  password: string;
+  chainId: string;
+}
+
+/* ---- Lookup ---- */
+
+export interface LookupAccountsRequest {
+  privateKey: string;
+  chainIds?: string[];
+}
+
+export interface LookupAccountEntry {
+  account: string;
+  authority: string;
+}
+
+export interface LookupChainResult {
+  chainId: string;
+  name: string;
+  symbol: string;
+  accounts: LookupAccountEntry[];
+}
+
+export interface LookupAccountsResponse {
+  publicKey: string;
+  chains: LookupChainResult[];
+}
+
+/* ---- Settings ---- */
+
+export interface AutoLockSettings {
+  timeoutMinutes: number;
+}
+
+export interface AppSettings {
+  startAtLogin: boolean;
+  minimizeToTray: boolean;
 }
 
 /* ---- Balances ---- */
@@ -112,4 +154,18 @@ export interface EsrApproveRequest {
 export interface EsrRejectRequest {
   requestId: string;
   reason?: string;
+}
+
+/* ---- Sign Raw ---- */
+
+export interface SignRawAction {
+  account: string;
+  name: string;
+  data: Record<string, unknown>;
+}
+
+export interface SignRawRequest {
+  chainId: string;
+  actions: SignRawAction[];
+  broadcast?: boolean;
 }

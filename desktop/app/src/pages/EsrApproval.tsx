@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FileCheck, Loader2, ShieldAlert, X } from "lucide-react";
+import {
+  FileCheck,
+  Loader2,
+  ShieldAlert,
+  X,
+  Code,
+  Link as LinkIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,169 +16,320 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { EsrParseResponse } from "@/api/types";
-import { parseEsr, approveEsr, rejectEsr } from "@/api/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import type { EsrParseResponse, SignRawAction } from "@/api/types";
+import {
+  useParseEsr,
+  useApproveEsr,
+  useRejectEsr,
+  useSignRawTransaction,
+  useNetworks,
+  useWalletSummary,
+} from "@/api/hooks";
+
+const EXAMPLE_ACTIONS = `[
+  {
+    "account": "eosio.token",
+    "name": "transfer",
+    "data": {
+      "from": "myaccount",
+      "to": "receiver",
+      "quantity": "1.00000000 WAX",
+      "memo": "hello"
+    }
+  }
+]`;
 
 export default function EsrApproval() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // ESR URI tab
   const [uri, setUri] = useState(searchParams.get("uri") ?? "");
   const [parsed, setParsed] = useState<EsrParseResponse | null>(null);
-  const [parsing, setParsing] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const parseEsr = useParseEsr();
+  const approveEsr = useApproveEsr();
+  const rejectEsr = useRejectEsr();
 
-  async function handleParse(e: React.FormEvent) {
+  // Raw payload tab
+  const [actionsJson, setActionsJson] = useState("");
+  const [broadcast, setBroadcast] = useState(true);
+  const signRaw = useSignRawTransaction();
+  const { data: networks = [] } = useNetworks();
+  const { data: summary } = useWalletSummary();
+  const activeChainId = summary?.activeNetwork?.chainId ?? "";
+
+  function handleParse(e: React.FormEvent) {
     e.preventDefault();
     if (!uri.trim()) return;
 
-    setParsing(true);
     setParsed(null);
-    try {
-      const res = await parseEsr({ uri: uri.trim() });
-      setParsed(res);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to parse ESR");
-    } finally {
-      setParsing(false);
-    }
+    parseEsr.mutate(
+      { uri: uri.trim() },
+      {
+        onSuccess: (res) => setParsed(res),
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Failed to parse ESR"),
+      },
+    );
   }
 
-  async function handleApprove() {
+  function handleApprove() {
     if (!parsed) return;
-    setSubmitting(true);
-    try {
-      const res = await approveEsr({
-        requestId: parsed.requestId,
-        broadcast: true,
-      });
-      toast.success(`Approved – tx ${res.transactionId.slice(0, 12)}…`);
-      navigate("/");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Approval failed");
-    } finally {
-      setSubmitting(false);
-    }
+    approveEsr.mutate(
+      { requestId: parsed.requestId, broadcast: true },
+      {
+        onSuccess: (res) => {
+          toast.success(`Approved – tx ${res.transactionId.slice(0, 12)}…`);
+          navigate("/");
+        },
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Approval failed"),
+      },
+    );
   }
 
-  async function handleReject() {
+  function handleReject() {
     if (!parsed) return;
-    setSubmitting(true);
-    try {
-      await rejectEsr({
-        requestId: parsed.requestId,
-        reason: "User rejected",
-      });
-      toast.info("Request rejected");
-      navigate("/");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Rejection failed");
-    } finally {
-      setSubmitting(false);
-    }
+    rejectEsr.mutate(
+      { requestId: parsed.requestId, reason: "User rejected" },
+      {
+        onSuccess: () => {
+          toast.info("Request rejected");
+          navigate("/");
+        },
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Rejection failed"),
+      },
+    );
   }
+
+  function handleSignRaw(e: React.FormEvent) {
+    e.preventDefault();
+    if (!actionsJson.trim() || !activeChainId) return;
+
+    let actions: SignRawAction[];
+    try {
+      actions = JSON.parse(actionsJson);
+      if (!Array.isArray(actions)) throw new Error("Actions must be an array");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Invalid JSON – expected an array of actions",
+      );
+      return;
+    }
+
+    signRaw.mutate(
+      { chainId: activeChainId, actions, broadcast },
+      {
+        onSuccess: (res) => {
+          toast.success(`Signed – tx ${res.transactionId.slice(0, 12)}…`);
+          navigate("/");
+        },
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Sign failed"),
+      },
+    );
+  }
+
+  const activeNet = networks.find((n) => n.chainId === activeChainId);
+  const esrSubmitting = approveEsr.isPending || rejectEsr.isPending;
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Signing Request</h1>
         <p className="text-sm text-muted-foreground">
-          Parse and approve EOSIO Signing Requests
+          Sign an ESR URI or build a raw transaction payload
         </p>
       </div>
 
-      {/* Parse form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <FileCheck className="size-4 text-primary" />
+      <Tabs defaultValue="esr" className="w-full">
+        <TabsList className="w-full">
+          <TabsTrigger value="esr" className="flex-1 gap-1.5">
+            <LinkIcon className="size-3.5" />
             ESR URI
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleParse} className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="esr-uri">Signing Request URI</Label>
-              <Input
-                id="esr-uri"
-                placeholder="esr://..."
-                value={uri}
-                onChange={(e) => setUri(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" variant="outline" disabled={parsing}>
-              {parsing && <Loader2 className="size-4 animate-spin" />}
-              Parse
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </TabsTrigger>
+          <TabsTrigger value="raw" className="flex-1 gap-1.5">
+            <Code className="size-3.5" />
+            Raw Payload
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Parsed result */}
-      {parsing && (
-        <div className="space-y-2">
-          <Skeleton className="h-32 w-full rounded-lg" />
-        </div>
-      )}
-
-      {parsed && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldAlert className="size-4 text-destructive" />
-              Review Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Type</span>
-              <Badge variant="secondary">{parsed.type}</Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Chain</span>
-              <span className="font-mono text-xs">
-                {parsed.chainId.slice(0, 16)}…
-              </span>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Actions</p>
-              {parsed.actions.map((a, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg border px-3 py-2 text-sm font-mono"
-                >
-                  {a.account}::{a.name}
+        {/* ─── ESR URI Tab ─── */}
+        <TabsContent value="esr" className="space-y-4 pt-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileCheck className="size-4 text-primary" />
+                ESR URI
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleParse} className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="esr-uri">Signing Request URI</Label>
+                  <Input
+                    id="esr-uri"
+                    placeholder="esr://..."
+                    value={uri}
+                    onChange={(e) => setUri(e.target.value)}
+                    required
+                  />
                 </div>
-              ))}
-            </div>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={parseEsr.isPending}
+                >
+                  {parseEsr.isPending && (
+                    <Loader2 className="size-4 animate-spin" />
+                  )}
+                  Parse
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-            <Separator />
-
-            <div className="flex gap-3">
-              <Button
-                onClick={handleApprove}
-                className="flex-1"
-                disabled={submitting}
-              >
-                {submitting && <Loader2 className="size-4 animate-spin" />}
-                Approve & Broadcast
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleReject}
-                disabled={submitting}
-              >
-                <X className="size-4" />
-                Reject
-              </Button>
+          {parseEsr.isPending && (
+            <div className="space-y-2">
+              <Skeleton className="h-32 w-full rounded-lg" />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+
+          {parsed && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ShieldAlert className="size-4 text-destructive" />
+                  Review Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Type</span>
+                  <Badge variant="secondary">{parsed.type}</Badge>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Chain</span>
+                  <span className="font-mono text-xs">
+                    {parsed.chainId.slice(0, 16)}…
+                  </span>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Actions</p>
+                  {parsed.actions.map((a, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border px-3 py-2 text-sm font-mono"
+                    >
+                      {a.account}::{a.name}
+                    </div>
+                  ))}
+                </div>
+
+                <Separator />
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleApprove}
+                    className="flex-1"
+                    disabled={esrSubmitting}
+                  >
+                    {approveEsr.isPending && (
+                      <Loader2 className="size-4 animate-spin" />
+                    )}
+                    Approve & Broadcast
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleReject}
+                    disabled={esrSubmitting}
+                  >
+                    <X className="size-4" />
+                    Reject
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ─── Raw Payload Tab ─── */}
+        <TabsContent value="raw" className="space-y-4 pt-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Code className="size-4 text-primary" />
+                Raw Transaction
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSignRaw} className="space-y-4">
+                {/* Active chain info */}
+                {activeNet && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Signing on</span>
+                    <Badge variant="secondary">{activeNet.name}</Badge>
+                    <span className="font-mono text-xs">
+                      ({activeChainId.slice(0, 12)}…)
+                    </span>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="actions-json">Actions (JSON array)</Label>
+                  <Textarea
+                    id="actions-json"
+                    placeholder={EXAMPLE_ACTIONS}
+                    value={actionsJson}
+                    onChange={(e) => setActionsJson(e.target.value)}
+                    rows={12}
+                    className="font-mono text-xs"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Each action needs{" "}
+                    <code className="rounded bg-muted px-1">account</code>,{" "}
+                    <code className="rounded bg-muted px-1">name</code>, and{" "}
+                    <code className="rounded bg-muted px-1">data</code> fields
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="broadcast"
+                    checked={broadcast}
+                    onChange={(e) => setBroadcast(e.target.checked)}
+                    className="rounded border-muted-foreground"
+                  />
+                  <Label htmlFor="broadcast" className="text-sm">
+                    Broadcast transaction
+                  </Label>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={signRaw.isPending || !activeChainId}
+                >
+                  {signRaw.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <FileCheck className="size-4" />
+                  )}
+                  Sign {broadcast ? "& Broadcast" : "Transaction"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

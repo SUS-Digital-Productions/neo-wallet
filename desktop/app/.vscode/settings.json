@@ -1,0 +1,14 @@
+{
+  "css.customData": [],
+  "css.lint.unknownAtRules": "ignore",
+  "json.schemas": [
+    {
+      "fileMatch": ["src-tauri/tauri.conf.json"],
+      "url": "https://raw.githubusercontent.com/nicegui/tauri/v2/crates/tauri-utils/schema.json"
+    },
+    {
+      "fileMatch": ["components.json"],
+      "url": "https://ui.shadcn.com/schema.json"
+    }
+  ]
+}
