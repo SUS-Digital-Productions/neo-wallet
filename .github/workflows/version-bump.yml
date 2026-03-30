@@ -68,3 +68,17 @@ jobs:
           git commit -m "chore: bump version to ${{ steps.next.outputs.version }}"
           git tag "${{ steps.next.outputs.tag }}"
           git push origin HEAD --tags
+
+      # Tags pushed with GITHUB_TOKEN don't trigger other workflows,
+      # so we explicitly call the Publish workflow.
+      - name: Trigger Publish workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'publish.yml',
+              ref: '${{ steps.next.outputs.tag }}',
+              inputs: { platforms: 'all' }
+            });
