@@ -175,13 +175,31 @@ To run a published desktop app:
 
 ### CI/CD (GitHub Actions)
 
-The repository includes a `.github/workflows/publish.yml` workflow that:
+The repository has three workflows that form a pipeline:
 
-1. **Triggers** on version tags (`v*`) or manual dispatch
-2. Builds the React frontend once, shares it across all jobs
-3. Publishes desktop builds in parallel (Windows, Linux, macOS matrix)
-4. Builds Android APK and iOS archive via Capacitor
-5. Creates a GitHub Release with all artifacts on tag push
+#### 1. Libraries CI (`.github/workflows/libraries-ci.yml`)
+
+Runs automatically on every push to `main` and on pull requests:
+- Restores, builds, and tests all .NET projects
+- Gate-keeps code quality before merging
+
+#### 2. Version Bump (`.github/workflows/version-bump.yml`)
+
+Manual dispatch from the GitHub Actions tab. Choose a bump type:
+- **patch** — `1.0.4` → `1.0.5`
+- **minor** — `1.0.4` → `1.1.0`
+- **major** — `1.0.4` → `2.0.0`
+- Optional pre-release label: `1.1.0-beta`, `2.0.0-rc.1`
+
+This updates the `VERSION` file, commits, creates a `v{version}` tag, and pushes — which automatically triggers the Publish workflow.
+
+#### 3. Publish (`.github/workflows/publish.yml`)
+
+Triggers on version tags (`v*`) or manual dispatch:
+- Builds the React frontend once, shares it across all jobs
+- Publishes desktop builds in parallel (Windows, Linux, macOS matrix — 6 RIDs)
+- Builds Android APK and iOS archive via Capacitor
+- Creates a GitHub Release with all artifacts on tag push
 
 Manual dispatch lets you choose platforms:
 
@@ -190,6 +208,15 @@ platforms: "all"                    # Everything
 platforms: "windows,linux"          # Desktop subset
 platforms: "android,ios"            # Mobile only
 platforms: "windows,android"        # Mix
+```
+
+#### Typical release flow
+
+```
+1. Push code to main          → Libraries CI runs (build + test)
+2. Go to Actions → Version Bump → Run workflow (patch/minor/major)
+3. Version bump commits, tags v1.0.5, pushes
+4. Publish workflow triggers   → builds all platforms, creates GitHub Release
 ```
 
 ---
