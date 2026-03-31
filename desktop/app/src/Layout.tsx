@@ -9,6 +9,8 @@ import {
   FileCheck,
   Radio,
   KeyRound,
+  Globe,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -25,6 +27,8 @@ const navItems = [
   { to: "/send", icon: Send, label: "Send" },
   { to: "/receive", icon: QrCode, label: "Receive" },
   { to: "/keys", icon: KeyRound, label: "Keys" },
+  { to: "/networks", icon: Globe, label: "Networks" },
+  { to: "/accounts", icon: Users, label: "Accounts" },
   { to: "/esr", icon: FileCheck, label: "Sign" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];

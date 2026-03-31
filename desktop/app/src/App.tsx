@@ -9,6 +9,8 @@ import Unlock from "./pages/Unlock";
 import Settings from "./pages/Settings";
 import EsrApproval from "./pages/EsrApproval";
 import Keys from "./pages/Keys";
+import Networks from "./pages/Networks";
+import Accounts from "./pages/Accounts";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { data: health, isLoading } = useHealth({ refetchInterval: 5_000 });
@@ -42,6 +44,8 @@ function App() {
           <Route path="send" element={<Send />} />
           <Route path="receive" element={<Receive />} />
           <Route path="keys" element={<Keys />} />
+          <Route path="networks" element={<Networks />} />
+          <Route path="accounts" element={<Accounts />} />
           <Route path="settings" element={<Settings />} />
           <Route path="esr" element={<EsrApproval />} />
         </Route>

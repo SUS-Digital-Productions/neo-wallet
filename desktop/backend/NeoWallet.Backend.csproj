@@ -9,6 +9,7 @@
     <RootNamespace>NeoWallet.Backend</RootNamespace>
     <AssemblyName>NeoWallet.Backend</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>
