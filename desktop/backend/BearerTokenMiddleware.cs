@@ -16,6 +16,7 @@ public sealed class BackendTokenHolder
         Token = configuration["Auth:Token"]
             ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         Console.WriteLine($"BACKEND_TOKEN={Token}");
+        System.Diagnostics.Trace.WriteLine($"[AUTH] Token={Token}");
     }
 }
 
@@ -41,6 +42,7 @@ public sealed class BearerTokenMiddleware
         "/api/health",
         "/api/wallet/create",
         "/api/wallet/unlock",
+        "/api/esr/incoming",
     ];
 
     public async Task InvokeAsync(HttpContext context, AutoLockService autoLock)
@@ -55,14 +57,25 @@ public sealed class BearerTokenMiddleware
             return;
         }
 
+        // Accept token from Authorization header or query parameter (for WebSocket connections).
         var auth = context.Request.Headers.Authorization.ToString();
-        if (string.IsNullOrEmpty(auth) || !auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        string? provided = null;
+
+        if (!string.IsNullOrEmpty(auth) && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            provided = auth["Bearer ".Length..];
+        }
+        else if (context.Request.Query.TryGetValue("token", out var qToken) && !string.IsNullOrEmpty(qToken))
+        {
+            provided = qToken.ToString();
+        }
+
+        if (string.IsNullOrEmpty(provided))
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return;
         }
 
-        var provided = auth["Bearer ".Length..];
         if (!CryptographicOperations.FixedTimeEquals(
                 System.Text.Encoding.UTF8.GetBytes(provided),
                 System.Text.Encoding.UTF8.GetBytes(_token)))

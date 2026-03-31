@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using NeoWallet.Backend.Dto;
 using NeoWallet.Backend.Services;
@@ -10,16 +9,14 @@ namespace NeoWallet.Backend.Endpoints;
 
 public static class EsrEndpoints
 {
-    private static readonly ConcurrentDictionary<string, Esr> PendingRequests = new();
-
     public static void MapEsrEndpoints(this WebApplication app)
     {
-        app.MapPost("/api/esr/parse", async (EsrParseRequest req, IEsrService esrService, CancellationToken cancellationToken) =>
+        app.MapPost("/api/esr/parse", async (EsrParseRequest req, IEsrService esrService, EsrListenerService listener, CancellationToken cancellationToken) =>
         {
             _ = cancellationToken;
             var esr = await esrService.ParseRequestAsync(req.Uri);
             var requestId = Guid.NewGuid().ToString("N");
-            PendingRequests[requestId] = esr;
+            listener.PendingRequests[requestId] = (esr, null);
 
             var actions = ExtractActionSummaries(esr);
 
@@ -31,13 +28,15 @@ public static class EsrEndpoints
             ));
         });
 
-        app.MapPost("/api/esr/approve", async (EsrApproveRequest req, IWalletStateService wallet, IEsrService esrService, IChainClientFactory factory, CancellationToken cancellationToken) =>
+        app.MapPost("/api/esr/approve", async (EsrApproveRequest req, IWalletStateService wallet, IEsrService esrService, IChainClientFactory factory, EsrListenerService listener, CancellationToken cancellationToken) =>
         {
             if (!wallet.WalletUnlocked)
                 return Results.Problem("Wallet is locked.", statusCode: StatusCodes.Status403Forbidden);
 
-            if (!PendingRequests.TryRemove(req.RequestId, out var esr))
+            if (!listener.PendingRequests.TryRemove(req.RequestId, out var pending))
                 return Results.Problem("Request not found or already handled.", statusCode: StatusCodes.Status404NotFound);
+
+            var (esr, relayCallback) = pending;
 
             var account = wallet.ActiveAccount;
             if (account is null)
@@ -55,16 +54,42 @@ public static class EsrEndpoints
                 blockchainClient: rpc, broadcast: req.Broadcast,
                 cancellationToken: cancellationToken);
 
+            // Inject Anchor Link session metadata so dApps can establish persistent sessions
+            if (!string.IsNullOrEmpty(listener.LinkId) && !string.IsNullOrEmpty(listener.RequestPublicKey))
+            {
+                response.LinkChannel = $"https://cb.anchor.link/{listener.LinkId}";
+                response.LinkKey = listener.RequestPublicKey;
+                response.LinkName = "NeoWallet";
+            }
+
             System.Diagnostics.Trace.WriteLine($"[ESR] Approved request {req.RequestId}, txid={response.TransactionId}");
+
+            // Send callback to dApp so it knows the request was signed.
+            // Prefer the relay callback URL (from the envelope) over the ESR's own callback.
+            var callbackUrl = relayCallback ?? esr.Callback;
+            if (!string.IsNullOrEmpty(callbackUrl))
+            {
+                esr.Callback = callbackUrl;
+                try
+                {
+                    var callbackSent = await esrService.SendCallbackAsync(esr, response);
+                    System.Diagnostics.Trace.WriteLine($"[ESR] Callback to {callbackUrl}: {(callbackSent ? "success" : "failed")}");
+                }
+                catch (Exception cbEx)
+                {
+                    System.Diagnostics.Trace.WriteLine($"[ESR] Callback error: {cbEx.Message}");
+                }
+            }
+
             return Results.Ok(new TransferResponse(
                 TransactionId: response.TransactionId ?? "signed-not-broadcast",
                 Broadcast: req.Broadcast
             ));
         });
 
-        app.MapPost("/api/esr/reject", (EsrRejectRequest req) =>
+        app.MapPost("/api/esr/reject", (EsrRejectRequest req, EsrListenerService listener) =>
         {
-            PendingRequests.TryRemove(req.RequestId, out _);
+            listener.PendingRequests.TryRemove(req.RequestId, out _);
             System.Diagnostics.Trace.WriteLine($"[ESR] Reject: {req.RequestId}, reason={req.Reason}");
             return Results.Ok();
         });
@@ -136,6 +161,82 @@ public static class EsrEndpoints
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
             }
         });
+
+        // ── ESR Listener Management ─────────────────────────────────────
+
+        app.MapGet("/api/esr/listener/status", (EsrListenerService listener) =>
+            Results.Ok(new EsrListenerStatusResponse(
+                Status: listener.Status.ToString(),
+                LinkId: listener.LinkId,
+                RequestPublicKey: listener.RequestPublicKey,
+                SessionCount: listener.Sessions.Count
+            )));
+
+        app.MapPost("/api/esr/listener/connect", async (EsrListenerService listener, CancellationToken ct) =>
+        {
+            await listener.ConnectAsync(ct);
+            return Results.Ok(new { status = listener.Status.ToString() });
+        });
+
+        app.MapPost("/api/esr/listener/disconnect", async (EsrListenerService listener) =>
+        {
+            await listener.DisconnectAsync();
+            return Results.Ok(new { status = listener.Status.ToString() });
+        });
+
+        app.MapPost("/api/esr/listener/test", (EsrListenerService listener) =>
+        {
+            // Fire a synthetic signing_request event so the frontend can verify the end-to-end flow.
+            // Store a fake pending request so the frontend can navigate to the approval page.
+            var requestId = Guid.NewGuid().ToString("N");
+            var payload = JsonSerializer.Serialize(new
+            {
+                type = "signing_request",
+                requestId,
+                isIdentity = false,
+                chainId = "",
+                actions = new[] { new { account = "test", name = "diagnostic" } },
+                session = (object?)null,
+                callbackUrl = (string?)null,
+                rawPayload = (string?)null,
+            });
+            listener.BroadcastDiagnosticEvent("signing_request", payload);
+            return Results.Ok(new { sent = true, requestId });
+        });
+
+        // Fetch a pre-parsed pending request (created by relay listener or parse endpoint).
+        app.MapGet("/api/esr/pending/{requestId}", (string requestId, EsrListenerService listener) =>
+        {
+            if (!listener.PendingRequests.TryGetValue(requestId, out var pending))
+                return Results.NotFound();
+
+            var (esr, _) = pending;
+            var actions = ExtractActionSummaries(esr);
+
+            return Results.Ok(new EsrParseResponse(
+                RequestId: requestId,
+                ChainId: esr.ChainId ?? "",
+                Type: esr.Payload.IsTransaction ? "transaction" : (esr.Payload.IsAction ? "action" : "identity"),
+                Actions: actions
+            ));
+        });
+
+        // ── WebSocket push channel ──────────────────────────────────────
+        // The frontend connects to ws://localhost:5199/api/esr/ws?token=...
+        // and receives JSON messages pushed by the backend whenever an ESR
+        // event (signing_request, status_changed) occurs.
+
+        app.Map("/api/esr/ws", async (HttpContext ctx, EsrListenerService listener) =>
+        {
+            if (!ctx.WebSockets.IsWebSocketRequest)
+            {
+                ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
+            using var ws = await ctx.WebSockets.AcceptWebSocketAsync();
+            await listener.HandleWebSocketAsync(ws, ctx.RequestAborted);
+        });
     }
 
     private static List<EsrActionSummary> ExtractActionSummaries(Esr esr)
@@ -194,4 +295,5 @@ public static class EsrEndpoints
                    ?? "";
         return (account, name);
     }
+
 }

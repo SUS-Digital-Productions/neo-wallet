@@ -24,6 +24,12 @@ import type {
   SignRawRequest,
   CreateWalletRequest,
   UnlockRequest,
+  EsrListenerStatus,
+  GetPrivateKeyRequest,
+  ImportWalletRequest,
+  AddKeyRequest,
+  RemoveKeyRequest,
+  KeyInfo,
 } from "./types";
 
 // ── Query Keys ──────────────────────────────────────────
@@ -32,11 +38,13 @@ export const queryKeys = {
   health: ["health"] as const,
   walletSummary: ["wallet", "summary"] as const,
   accounts: ["accounts"] as const,
+  keys: ["keys"] as const,
   networks: ["networks"] as const,
   balances: (account: string, chainId: string) =>
     ["balances", account, chainId] as const,
   autoLockSettings: ["settings", "autolock"] as const,
   appSettings: ["settings", "app"] as const,
+  esrListenerStatus: ["esr", "listener", "status"] as const,
 };
 
 // ── Queries ─────────────────────────────────────────────
@@ -117,14 +125,24 @@ export function useAppSettings(
 // ── Mutations ───────────────────────────────────────────
 
 export function useCreateWallet() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateWalletRequest) => api.createWallet(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.health });
+      qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+    },
   });
 }
 
 export function useUnlockWallet() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: UnlockRequest) => api.unlockWallet(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.health });
+      qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+    },
   });
 }
 
@@ -234,6 +252,93 @@ export function useSetAppSettings() {
     mutationFn: (body: AppSettings) => api.setAppSettings(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.appSettings });
+    },
+  });
+}
+
+// ── ESR Listener ────────────────────────────────────────
+
+export function useEsrListenerStatus(
+  opts?: Partial<UseQueryOptions<EsrListenerStatus>>
+) {
+  return useQuery({
+    queryKey: queryKeys.esrListenerStatus,
+    queryFn: api.getEsrListenerStatus,
+    ...opts,
+  });
+}
+
+export function useConnectEsrListener() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.connectEsrListener(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.esrListenerStatus });
+      qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+    },
+  });
+}
+
+export function useDisconnectEsrListener() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.disconnectEsrListener(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.esrListenerStatus });
+      qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+    },
+  });
+}
+
+// ── Wallet Export / Import / Private Keys ───────────────
+
+export function useGetPrivateKey() {
+  return useMutation({
+    mutationFn: (body: GetPrivateKeyRequest) => api.getPrivateKey(body),
+  });
+}
+
+export function useImportWallet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ImportWalletRequest) => api.importWallet(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.health });
+      qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+      qc.invalidateQueries({ queryKey: queryKeys.accounts });
+      qc.invalidateQueries({ queryKey: queryKeys.keys });
+    },
+  });
+}
+
+// ── Keys ────────────────────────────────────────────────
+
+export function useKeys(opts?: Partial<UseQueryOptions<KeyInfo[]>>) {
+  return useQuery({
+    queryKey: queryKeys.keys,
+    queryFn: api.getKeys,
+    ...opts,
+  });
+}
+
+export function useAddKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AddKeyRequest) => api.addKey(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.keys });
+    },
+  });
+}
+
+export function useRemoveKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RemoveKeyRequest) => api.removeKey(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.keys });
+      qc.invalidateQueries({ queryKey: queryKeys.accounts });
+      qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
     },
   });
 }

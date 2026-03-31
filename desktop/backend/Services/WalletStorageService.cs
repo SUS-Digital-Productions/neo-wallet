@@ -30,6 +30,24 @@ public sealed class WalletData
 {
     [JsonPropertyName("accounts")]
     public List<WalletAccount> Accounts { get; set; } = [];
+
+    [JsonPropertyName("keys")]
+    public List<WalletKey> Keys { get; set; } = [];
+}
+
+/// <summary>
+/// A standalone private key stored in the wallet (not necessarily linked to an imported account).
+/// </summary>
+public sealed class WalletKey
+{
+    [JsonPropertyName("label")]
+    public string Label { get; set; } = "";
+
+    [JsonPropertyName("privateKeyWif")]
+    public string PrivateKeyWif { get; set; } = "";
+
+    [JsonPropertyName("publicKey")]
+    public string PublicKey { get; set; } = "";
 }
 
 /// <summary>
@@ -65,6 +83,8 @@ public interface IWalletStorageService
     void Lock();
     void Save(string password, WalletData data);
     WalletData? CurrentData { get; }
+    byte[]? ReadRawFile();
+    void WriteRawFile(byte[] data);
 }
 
 public sealed class WalletStorageService : IWalletStorageService
@@ -157,6 +177,19 @@ public sealed class WalletStorageService : IWalletStorageService
         File.WriteAllText(_walletPath, json);
         _current = data;
         System.Diagnostics.Trace.WriteLine("[WALLETSTORAGE] Wallet saved to disk");
+    }
+
+    public byte[]? ReadRawFile()
+    {
+        return File.Exists(_walletPath) ? File.ReadAllBytes(_walletPath) : null;
+    }
+
+    public void WriteRawFile(byte[] data)
+    {
+        // Lock the current wallet before overwriting
+        _current = null;
+        File.WriteAllBytes(_walletPath, data);
+        System.Diagnostics.Trace.WriteLine("[WALLETSTORAGE] Wallet file replaced via import");
     }
 
     private static byte[] DeriveKey(string password, byte[] salt)

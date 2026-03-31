@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Globe,
   Users,
@@ -8,6 +8,14 @@ import {
   Monitor,
   UserX,
   ServerOff,
+  Radio,
+  Copy,
+  Eye,
+  EyeOff,
+  Download,
+  Upload,
+  KeyRound,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +37,16 @@ import {
   useSetActiveAccount,
   useSetAutoLockSettings,
   useSetAppSettings,
+  useEsrListenerStatus,
+  useConnectEsrListener,
+  useDisconnectEsrListener,
+  useGetPrivateKey,
+  useImportWallet,
+  useRemoveAccount,
 } from "@/api/hooks";
+import { exportWallet } from "@/api/client";
+import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 const CHAIN_COLORS: Record<string, string> = {
   WAX: "bg-sus-wax/15 text-sus-wax border-sus-wax/30",
@@ -68,8 +85,24 @@ export default function Settings() {
   const setAccount = useSetActiveAccount();
   const setLock = useSetAutoLockSettings();
   const setApp = useSetAppSettings();
+  const { data: esrListener } = useEsrListenerStatus({ refetchInterval: 10_000 });
+  const connectListener = useConnectEsrListener();
+  const disconnectListener = useDisconnectEsrListener();
+
+  const getPrivateKey = useGetPrivateKey();
+  const importWalletMutation = useImportWallet();
+  const removeAccountMutation = useRemoveAccount();
 
   const [switching, setSwitching] = useState<string | null>(null);
+  const [revealedKey, setRevealedKey] = useState<{ id: string; wif: string } | null>(null);
+  const [importPassword, setImportPassword] = useState("");
+  const [removeTarget, setRemoveTarget] = useState<{
+    account: string;
+    authority: string;
+    chainId: string;
+    symbol: string;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeNet = summary?.activeNetwork?.chainId ?? null;
   const activeAcc = summary?.activeAccount
@@ -196,6 +229,108 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* ESR Listener */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Radio className="size-4 text-primary" />
+            Anchor Link Listener
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div
+                className={`size-2 rounded-full ${esrListener?.status === "Connected" ? "bg-green-500" : "bg-muted-foreground"}`}
+              />
+              <span className="text-sm font-medium">
+                {esrListener?.status ?? "Unknown"}
+              </span>
+              <Badge variant="secondary" className="text-[10px]">
+                {esrListener?.sessionCount ?? 0} sessions
+              </Badge>
+            </div>
+            {esrListener?.status === "Connected" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={disconnectListener.isPending}
+                onClick={() =>
+                  disconnectListener.mutate(undefined, {
+                    onSuccess: () => toast.success("Listener disconnected"),
+                    onError: () => toast.error("Failed to disconnect"),
+                  })
+                }
+              >
+                {disconnectListener.isPending && (
+                  <Loader2 className="mr-1 size-3 animate-spin" />
+                )}
+                Disconnect
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={connectListener.isPending}
+                onClick={() =>
+                  connectListener.mutate(undefined, {
+                    onSuccess: () => toast.success("Listener connected"),
+                    onError: () => toast.error("Failed to connect"),
+                  })
+                }
+              >
+                {connectListener.isPending && (
+                  <Loader2 className="mr-1 size-3 animate-spin" />
+                )}
+                Connect
+              </Button>
+            )}
+          </div>
+          {esrListener?.linkId && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Link ID
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-xs">
+                      {esrListener.linkId}
+                    </code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => {
+                        navigator.clipboard.writeText(esrListener.linkId);
+                        toast.success("Link ID copied");
+                      }}
+                    >
+                      <Copy className="size-3" />
+                    </Button>
+                  </div>
+                </div>
+                {esrListener.requestPublicKey && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Request Public Key
+                    </p>
+                    <code className="block truncate rounded bg-muted px-2 py-1 text-xs">
+                      {esrListener.requestPublicKey}
+                    </code>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  dApps learn these values when you approve an identity request.
+                  Future signing requests use this channel automatically.
+                </p>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Auto-lock */}
       <Card>
         <CardHeader>
@@ -319,10 +454,10 @@ export default function Settings() {
               const isSwitching = switching === `acc-${key}`;
               const net = networks.find((n) => n.chainId === a.chainId);
               return (
-                <div
-                  key={key}
-                  className="flex items-center justify-between rounded-lg border px-4 py-2"
-                >
+                <div key={key} className="space-y-0">
+                  <div
+                    className="flex items-center justify-between rounded-lg border px-4 py-2"
+                  >
                   <div className="flex items-center gap-3">
                     {net && chainBadge(net.symbol)}
                     <div>
@@ -343,19 +478,85 @@ export default function Settings() {
                       </Badge>
                     )}
                   </div>
-                  {!isActive && (
+                  <div className="flex items-center gap-2">
                     <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isSwitching}
-                      onClick={() => switchAccount(a)}
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      disabled={getPrivateKey.isPending}
+                      onClick={() => {
+                        const id = `${a.account}@${a.authority}`;
+                        if (revealedKey?.id === id) {
+                          setRevealedKey(null);
+                          return;
+                        }
+                        getPrivateKey.mutate(
+                          { account: a.account, authority: a.authority },
+                          {
+                            onSuccess: (res) =>
+                              setRevealedKey({ id, wif: res.privateKey }),
+                            onError: () =>
+                              toast.error("Failed to retrieve private key"),
+                          }
+                        );
+                      }}
                     >
-                      {isSwitching ? (
-                        <Loader2 className="size-3 animate-spin" />
+                      {revealedKey?.id === `${a.account}@${a.authority}` ? (
+                        <EyeOff className="size-3.5" />
                       ) : (
-                        "Use"
+                        <Eye className="size-3.5" />
                       )}
                     </Button>
+                    {!isActive && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isSwitching}
+                        onClick={() => switchAccount(a)}
+                      >
+                        {isSwitching ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : (
+                          "Use"
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 text-destructive hover:text-destructive"
+                      disabled={removeAccountMutation.isPending}
+                      onClick={() =>
+                        setRemoveTarget({
+                          account: a.account,
+                          authority: a.authority,
+                          chainId: a.chainId,
+                          symbol: net?.symbol ?? "",
+                        })
+                      }
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                  </div>
+                  {revealedKey?.id === `${a.account}@${a.authority}` && (
+                    <div className="mt-2 flex items-center gap-2 rounded-md bg-muted px-3 py-2">
+                      <KeyRound className="size-3.5 shrink-0 text-muted-foreground" />
+                      <code className="flex-1 break-all text-xs">
+                        {revealedKey.wif}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        onClick={() => {
+                          navigator.clipboard.writeText(revealedKey.wif);
+                          toast.success("Private key copied");
+                        }}
+                      >
+                        <Copy className="size-3" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               );
@@ -363,6 +564,146 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Wallet Backup ─────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Download className="size-4 text-primary" />
+            Wallet Backup
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Export */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Export Wallet</p>
+              <p className="text-xs text-muted-foreground">
+                Download your encrypted wallet file
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const blob = await exportWallet();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "wallet.json";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success("Wallet exported");
+                } catch {
+                  toast.error("Failed to export wallet");
+                }
+              }}
+            >
+              <Download className="mr-1 size-3.5" />
+              Export
+            </Button>
+          </div>
+
+          <Separator />
+
+          {/* Import */}
+          <div>
+            <p className="text-sm font-medium">Import Wallet</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Restore from an encrypted wallet backup file
+            </p>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="mr-1 size-3.5" />
+                Choose File
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  toast.info(`Selected: ${file.name}`);
+                }}
+              />
+              <Input
+                type="password"
+                placeholder="Wallet password"
+                value={importPassword}
+                onChange={(e) => setImportPassword(e.target.value)}
+              />
+              <Button
+                size="sm"
+                disabled={
+                  importWalletMutation.isPending ||
+                  !importPassword ||
+                  !fileInputRef.current?.files?.length
+                }
+                onClick={async () => {
+                  const file = fileInputRef.current?.files?.[0];
+                  if (!file) return;
+                  const buf = await file.arrayBuffer();
+                  const base64 = btoa(
+                    String.fromCharCode(...new Uint8Array(buf))
+                  );
+                  importWalletMutation.mutate(
+                    { password: importPassword, fileBase64: base64 },
+                    {
+                      onSuccess: () => {
+                        toast.success("Wallet imported successfully");
+                        setImportPassword("");
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      },
+                      onError: () => toast.error("Failed to import wallet"),
+                    }
+                  );
+                }}
+              >
+                {importWalletMutation.isPending ? (
+                  <Loader2 className="mr-1 size-3.5 animate-spin" />
+                ) : (
+                  <Upload className="mr-1 size-3.5" />
+                )}
+                Import
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null); }}
+        title="Remove Account"
+        description={
+          removeTarget
+            ? `Are you sure you want to remove ${removeTarget.account}@${removeTarget.authority}${removeTarget.symbol ? ` (${removeTarget.symbol})` : ""}? The private key will remain in your wallet.`
+            : ""
+        }
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (!removeTarget) return;
+          removeAccountMutation.mutate(
+            {
+              account: removeTarget.account,
+              authority: removeTarget.authority,
+              chainId: removeTarget.chainId,
+            },
+            {
+              onSuccess: () => toast.success("Account removed"),
+              onError: () => toast.error("Failed to remove account"),
+            },
+          );
+        }}
+        disabled={removeAccountMutation.isPending}
+      />
     </div>
   );
 }

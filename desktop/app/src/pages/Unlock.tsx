@@ -20,6 +20,7 @@ export default function Unlock() {
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   // Redirect if already unlocked
   if (health?.walletUnlocked) {
@@ -30,11 +31,10 @@ export default function Unlock() {
   const walletExists = health?.walletLoaded ?? null;
   if (walletExists === null) return null;
 
-  const submitting = unlock.isPending || create.isPending;
-
   function handleUnlock(e: React.FormEvent) {
     e.preventDefault();
     if (!password) return;
+    setSubmitting(true);
 
     unlock.mutate(
       { password },
@@ -45,11 +45,14 @@ export default function Unlock() {
             toast.success("Wallet unlocked");
             navigate("/");
           } else {
+            setSubmitting(false);
             toast.error("Incorrect password");
           }
         },
-        onError: (err) =>
-          toast.error(err instanceof Error ? err.message : "Unlock failed"),
+        onError: (err) => {
+          setSubmitting(false);
+          toast.error(err instanceof Error ? err.message : "Unlock failed");
+        },
       },
     );
   }
@@ -64,6 +67,7 @@ export default function Unlock() {
       toast.error("Password must be at least 8 characters");
       return;
     }
+    setSubmitting(true);
 
     create.mutate(
       { password },
@@ -73,17 +77,30 @@ export default function Unlock() {
             if (res.token) sessionStorage.setItem("backend_token", res.token);
             toast.success("Wallet created");
             navigate("/");
+          } else {
+            setSubmitting(false);
           }
         },
-        onError: (err) =>
-          toast.error(err instanceof Error ? err.message : "Creation failed"),
+        onError: (err) => {
+          setSubmitting(false);
+          toast.error(err instanceof Error ? err.message : "Creation failed");
+        },
       },
     );
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
+      <Card className="relative w-full max-w-sm overflow-hidden">
+        {/* Loading overlay */}
+        {submitting && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm">
+            <Loader2 className="size-8 animate-spin text-primary" />
+            <p className="text-sm font-medium text-muted-foreground">
+              {walletExists ? "Unlocking wallet…" : "Creating wallet…"}
+            </p>
+          </div>
+        )}
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10">
             <Wallet className="size-6 text-primary" />

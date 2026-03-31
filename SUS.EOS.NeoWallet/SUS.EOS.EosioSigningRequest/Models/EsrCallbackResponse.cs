@@ -20,4 +20,10 @@ public class EsrCallbackResponse
     public uint? RefBlockNum { get; set; }
     public uint? RefBlockPrefix { get; set; }
     public string? RefBlockId { get; set; }
+    public DateTime? Expiration { get; set; }
+
+    // Anchor Link session metadata (included in identity request callbacks)
+    public string? LinkChannel { get; set; }
+    public string? LinkKey { get; set; }
+    public string? LinkName { get; set; }
 }

@@ -38,9 +38,44 @@ public sealed record ImportAccountRequest(
     [property: JsonPropertyName("accounts")] ImportAccountEntry[] Accounts
 );
 
+/// <summary>Request to view a private key.</summary>
+public sealed record GetPrivateKeyRequest(
+    [property: JsonPropertyName("account")] string Account,
+    [property: JsonPropertyName("authority")] string Authority
+);
+
+/// <summary>Response with a private key.</summary>
+public sealed record GetPrivateKeyResponse(
+    [property: JsonPropertyName("privateKey")] string PrivateKey
+);
+
+/// <summary>Import a wallet file.</summary>
+public sealed record ImportWalletRequest(
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("fileBase64")] string FileBase64
+);
+
 /// <summary>Remove an account.</summary>
 public sealed record RemoveAccountRequest(
     [property: JsonPropertyName("account")] string Account,
     [property: JsonPropertyName("authority")] string Authority,
     [property: JsonPropertyName("chainId")] string ChainId
+);
+
+/// <summary>A stored key visible to the frontend.</summary>
+public sealed record KeyDto(
+    [property: JsonPropertyName("publicKey")] string PublicKey,
+    [property: JsonPropertyName("label")] string Label,
+    [property: JsonPropertyName("accountCount")] int AccountCount
+);
+
+/// <summary>Request to add a standalone key.</summary>
+public sealed record AddKeyRequest(
+    [property: JsonPropertyName("privateKey")] string PrivateKey,
+    [property: JsonPropertyName("label")] string Label
+);
+
+/// <summary>Request to remove a stored key.</summary>
+public sealed record RemoveKeyRequest(
+    [property: JsonPropertyName("publicKey")] string PublicKey
 );

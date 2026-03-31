@@ -21,6 +21,13 @@ import type {
   AutoLockSettings,
   AppSettings,
   SignRawRequest,
+  EsrListenerStatus,
+  GetPrivateKeyRequest,
+  GetPrivateKeyResponse,
+  ImportWalletRequest,
+  KeyInfo,
+  AddKeyRequest,
+  RemoveKeyRequest,
 } from "./types";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? "";
@@ -42,7 +49,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.text().catch(() => "");
     throw new Error(body || `${res.status} ${res.statusText}`);
   }
-  return res.json() as Promise<T>;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 /* ---- Health ---- */
@@ -66,6 +75,42 @@ export const unlockWallet = (body: UnlockRequest) =>
 
 export const lockWallet = () =>
   request<void>("/api/wallet/lock", { method: "POST" });
+
+export async function exportWallet(): Promise<Blob> {
+  const t = token();
+  const headers: Record<string, string> = {};
+  if (t) headers["Authorization"] = `Bearer ${t}`;
+  const res = await fetch(`${BASE_URL}/api/wallet/export`, { headers });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.blob();
+}
+
+export const importWallet = (body: ImportWalletRequest) =>
+  request<UnlockResponse>("/api/wallet/import", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const getPrivateKey = (body: GetPrivateKeyRequest) =>
+  request<GetPrivateKeyResponse>("/api/accounts/private-key", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/* ---- Keys ---- */
+export const getKeys = () => request<KeyInfo[]>("/api/keys");
+
+export const addKey = (body: AddKeyRequest) =>
+  request<KeyInfo>("/api/keys", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const removeKey = (body: RemoveKeyRequest) =>
+  request<void>("/api/keys/remove", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
 /* ---- Accounts ---- */
 export const getAccounts = () => request<AccountInfo[]>("/api/accounts");
@@ -123,6 +168,9 @@ export const parseEsr = (body: EsrParseRequest) =>
     body: JSON.stringify(body),
   });
 
+export const getPendingEsr = (requestId: string) =>
+  request<EsrParseResponse>(`/api/esr/pending/${encodeURIComponent(requestId)}`);
+
 export const approveEsr = (body: EsrApproveRequest) =>
   request<TransferResponse>("/api/esr/approve", {
     method: "POST",
@@ -159,3 +207,13 @@ export const setAppSettings = (body: AppSettings) =>
     method: "POST",
     body: JSON.stringify(body),
   });
+
+/* ---- ESR Listener ---- */
+export const getEsrListenerStatus = () =>
+  request<EsrListenerStatus>("/api/esr/listener/status");
+
+export const connectEsrListener = () =>
+  request<{ status: string }>("/api/esr/listener/connect", { method: "POST" });
+
+export const disconnectEsrListener = () =>
+  request<{ status: string }>("/api/esr/listener/disconnect", { method: "POST" });

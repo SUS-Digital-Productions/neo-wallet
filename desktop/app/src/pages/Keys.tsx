@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   KeyRound,
   Loader2,
-  Import as ImportIcon,
+  Plus,
   Search,
   Check,
   Globe,
   SearchX,
+  Trash2,
+  Import as ImportIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,12 +16,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type {
   LookupAccountsResponse,
   ImportAccountEntry,
+  KeyInfo,
 } from "@/api/types";
-import { useLookupAccounts, useImportAccounts, useAccounts } from "@/api/hooks";
+import {
+  useKeys,
+  useAddKey,
+  useRemoveKey,
+  useLookupAccounts,
+  useImportAccounts,
+  useAccounts,
+} from "@/api/hooks";
 
 const CHAIN_COLORS: Record<string, string> = {
   WAX: "bg-sus-wax/15 text-sus-wax border-sus-wax/30",
@@ -39,24 +50,32 @@ function chainBadge(symbol: string) {
   );
 }
 
-export default function ImportAccount() {
-  const navigate = useNavigate();
+export default function Keys() {
+  const { data: keys = [], isLoading: keysLoading } = useKeys();
+  const { data: existingAccounts = [] } = useAccounts();
+  const addKeyMutation = useAddKey();
+  const removeKeyMutation = useRemoveKey();
   const lookup = useLookupAccounts();
   const importMutation = useImportAccounts();
 
+  // Add key form
   const [privateKey, setPrivateKey] = useState("");
+  const [label, setLabel] = useState("");
+  const [removeTarget, setRemoveTarget] = useState<KeyInfo | null>(null);
+
+  // Lookup state
+  const [lookupKey, setLookupKey] = useState("");
   const [lookupResult, setLookupResult] = useState<LookupAccountsResponse | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const { data: existingAccounts = [] } = useAccounts();
+
+  function entryKey(chainId: string, account: string, authority: string) {
+    return `${chainId}::${account}::${authority}`;
+  }
 
   function isAlreadyImported(chainId: string, account: string, authority: string) {
     return existingAccounts.some(
       (a) => a.account === account && a.authority === authority && a.chainId === chainId,
     );
-  }
-
-  function entryKey(chainId: string, account: string, authority: string) {
-    return `${chainId}::${account}::${authority}`;
   }
 
   function toggleSelection(key: string) {
@@ -68,28 +87,31 @@ export default function ImportAccount() {
     });
   }
 
-  function selectAll() {
-    if (!lookupResult) return;
-    const all = new Set<string>();
-    for (const chain of lookupResult.chains) {
-      for (const acct of chain.accounts) {
-        if (!isAlreadyImported(chain.chainId, acct.account, acct.authority)) {
-          all.add(entryKey(chain.chainId, acct.account, acct.authority));
-        }
-      }
-    }
-    setSelected(all);
-  }
-
-  function handleLookup(e: React.FormEvent) {
+  function handleAddKey(e: React.FormEvent) {
     e.preventDefault();
     if (!privateKey.trim()) return;
 
+    addKeyMutation.mutate(
+      { privateKey: privateKey.trim(), label: label.trim() },
+      {
+        onSuccess: () => {
+          toast.success("Key added");
+          setPrivateKey("");
+          setLabel("");
+        },
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Failed to add key"),
+      },
+    );
+  }
+
+  function handleLookup(wif: string) {
+    setLookupKey(wif);
     setLookupResult(null);
     setSelected(new Set());
 
     lookup.mutate(
-      { privateKey },
+      { privateKey: wif },
       {
         onSuccess: (result) => {
           setLookupResult(result);
@@ -121,7 +143,7 @@ export default function ImportAccount() {
   }
 
   function handleImport() {
-    if (!lookupResult || selected.size === 0) return;
+    if (!lookupResult || selected.size === 0 || !lookupKey) return;
 
     const accounts: ImportAccountEntry[] = [];
     for (const key of selected) {
@@ -130,15 +152,16 @@ export default function ImportAccount() {
     }
 
     importMutation.mutate(
-      { privateKey, accounts },
+      { privateKey: lookupKey, accounts },
       {
         onSuccess: (imported) => {
           toast.success(`Imported ${imported.length} account(s)`);
-          navigate("/");
+          setLookupResult(null);
+          setSelected(new Set());
+          setLookupKey("");
         },
-        onError: (err) => {
-          toast.error(err instanceof Error ? err.message : "Import failed");
-        },
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Import failed"),
       },
     );
   }
@@ -149,22 +172,22 @@ export default function ImportAccount() {
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Import Account</h1>
+        <h1 className="text-2xl font-semibold">Key Management</h1>
         <p className="text-sm text-muted-foreground">
-          Enter your private key to find and import linked accounts
+          Store private keys and link them to blockchain accounts
         </p>
       </div>
 
-      {/* Step 1: Enter key and search */}
+      {/* Add Key */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <KeyRound className="size-4 text-primary" />
-            Private Key
+            <Plus className="size-4 text-primary" />
+            Add Private Key
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLookup} className="space-y-4">
+          <form onSubmit={handleAddKey} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="pk">Private Key (WIF)</Label>
               <div className="relative">
@@ -180,11 +203,122 @@ export default function ImportAccount() {
                 />
               </div>
             </div>
-
+            <div className="space-y-2">
+              <Label htmlFor="label">Label (optional)</Label>
+              <Input
+                id="label"
+                placeholder="e.g. Main key, Trading key"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+              />
+            </div>
             <Button
               type="submit"
               className="w-full"
-              disabled={lookup.isPending || !privateKey.trim()}
+              disabled={addKeyMutation.isPending || !privateKey.trim()}
+            >
+              {addKeyMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Plus className="size-4" />
+              )}
+              Add Key
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Stored Keys */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <KeyRound className="size-4 text-primary" />
+            Stored Keys
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {keysLoading ? (
+            <div className="space-y-2">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : keys.length === 0 ? (
+            <EmptyState
+              icon={KeyRound}
+              title="No keys stored"
+              description="Add a private key above to get started"
+            />
+          ) : (
+            keys.map((k) => (
+              <div
+                key={k.publicKey}
+                className="flex items-center justify-between rounded-lg border px-4 py-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">
+                    {k.label || "Unlabeled"}
+                  </p>
+                  <p className="truncate font-mono text-xs text-muted-foreground">
+                    {k.publicKey}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {k.accountCount} linked account{k.accountCount !== 1 && "s"}
+                  </p>
+                </div>
+                <div className="ml-2 flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-destructive hover:text-destructive"
+                    disabled={removeKeyMutation.isPending}
+                    onClick={() => setRemoveTarget(k)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Account Lookup / Import */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Globe className="size-4 text-primary" />
+            Find & Import Accounts
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const wif = (e.currentTarget.elements.namedItem("lookup-pk") as HTMLInputElement)?.value;
+              if (wif?.trim()) handleLookup(wif.trim());
+            }}
+            className="space-y-3"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="lookup-pk">Private Key to Search</Label>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="lookup-pk"
+                  name="lookup-pk"
+                  type="password"
+                  placeholder="5K… or PVT_K1_…"
+                  className="pl-9"
+                  required
+                />
+              </div>
+            </div>
+            <Button
+              type="submit"
+              variant="outline"
+              className="w-full"
+              disabled={lookup.isPending}
             >
               {lookup.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -197,33 +331,22 @@ export default function ImportAccount() {
         </CardContent>
       </Card>
 
-      {/* Step 2: Results */}
+      {/* Lookup Results */}
       {lookupResult && (
         <>
-          {/* Public key */}
           <Card>
             <CardContent className="py-3">
               <p className="text-xs text-muted-foreground">Derived Public Key</p>
-              <p className="font-mono text-xs break-all">
-                {lookupResult.publicKey}
-              </p>
+              <p className="break-all font-mono text-xs">{lookupResult.publicKey}</p>
             </CardContent>
           </Card>
 
-          {/* Chain results */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Globe className="size-4 text-primary" />
-                  Found Accounts
-                </CardTitle>
-                {totalFound > 0 && (
-                  <Button variant="ghost" size="sm" onClick={selectAll}>
-                    Select All
-                  </Button>
-                )}
-              </div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Globe className="size-4 text-primary" />
+                Found Accounts
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {totalFound === 0 ? (
@@ -298,10 +421,10 @@ export default function ImportAccount() {
                 ))
               )}
 
-              {totalFound > 0 && (
+              {totalFound > 0 && selected.size > 0 && (
                 <Button
                   className="w-full"
-                  disabled={importMutation.isPending || selected.size === 0}
+                  disabled={importMutation.isPending}
                   onClick={handleImport}
                 >
                   {importMutation.isPending ? (
@@ -316,6 +439,29 @@ export default function ImportAccount() {
           </Card>
         </>
       )}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null); }}
+        title="Remove Key"
+        description={
+          removeTarget
+            ? `Remove this key and its ${removeTarget.accountCount} linked account(s)? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (!removeTarget) return;
+          removeKeyMutation.mutate(
+            { publicKey: removeTarget.publicKey },
+            {
+              onSuccess: () => toast.success("Key removed"),
+              onError: () => toast.error("Failed to remove key"),
+            },
+          );
+        }}
+        disabled={removeKeyMutation.isPending}
+      />
     </div>
   );
 }

@@ -39,6 +39,15 @@ public interface IWalletStateService
     /// </summary>
     string? GetPrivateKeyWif(string account, string authority);
 
+    /// <summary>Get all stored standalone keys.</summary>
+    IReadOnlyList<KeyDto> GetKeys();
+
+    /// <summary>Add a standalone private key to the wallet.</summary>
+    KeyDto AddKey(string privateKeyWif, string label);
+
+    /// <summary>Remove a stored key by public key. Also removes all accounts linked to that key.</summary>
+    bool RemoveKey(string publicKey);
+
     /// <summary>Get display name for a chain ID.</summary>
     string GetChainName(string chainId);
 }

@@ -65,7 +65,19 @@ public sealed class WalletStateService : IWalletStateService
         if (match is null)
             throw new InvalidOperationException($"Network {chainId} not found.");
         _activeNetwork = match;
-        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Active network set to {match.Name}");
+
+        // Auto-switch to an account on the new chain if the current one doesn't match
+        if (_activeAccount is null || _activeAccount.ChainId != chainId)
+        {
+            var data = _storage.CurrentData;
+            var fallback = data?.Accounts.Find(a => a.ChainId == chainId);
+            _activeAccount = fallback is not null
+                ? new AccountDto(fallback.Account, fallback.Authority, fallback.PublicKey,
+                    fallback.ChainId, GetChainName(fallback.ChainId))
+                : null;
+        }
+
+        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Active network set to {match.Name}, account: {_activeAccount?.Account ?? "(none)"}");
     }
 
     public bool CreateWallet(string password)
@@ -111,6 +123,17 @@ public sealed class WalletStateService : IWalletStateService
         var key = EosioKey.FromPrivateKey(privateKeyWif);
         var publicKey = key.PublicKey;
         var imported = new List<AccountDto>();
+
+        // Auto-add key to the key store if not already present
+        if (!data.Keys.Any(k => k.PublicKey == publicKey))
+        {
+            data.Keys.Add(new WalletKey
+            {
+                Label = "",
+                PrivateKeyWif = key.PrivateKeyWif,
+                PublicKey = publicKey,
+            });
+        }
 
         foreach (var entry in accounts)
         {
@@ -182,5 +205,67 @@ public sealed class WalletStateService : IWalletStateService
         if (data is null) return null;
         var match = data.Accounts.Find(a => a.Account == account && a.Authority == authority);
         return match?.PrivateKeyWif;
+    }
+
+    public IReadOnlyList<KeyDto> GetKeys()
+    {
+        var data = _storage.CurrentData;
+        if (data is null) return [];
+        return data.Keys
+            .Select(k => new KeyDto(
+                k.PublicKey,
+                k.Label,
+                data.Accounts.Count(a => a.PublicKey == k.PublicKey)))
+            .ToList();
+    }
+
+    public KeyDto AddKey(string privateKeyWif, string label)
+    {
+        var data = _storage.CurrentData ?? throw new InvalidOperationException("Wallet is locked.");
+        var password = _password ?? throw new InvalidOperationException("Wallet is locked.");
+
+        var key = EosioKey.FromPrivateKey(privateKeyWif);
+
+        // Prevent duplicate keys
+        if (data.Keys.Any(k => k.PublicKey == key.PublicKey))
+            throw new InvalidOperationException("This key is already stored.");
+
+        data.Keys.Add(new WalletKey
+        {
+            Label = label,
+            PrivateKeyWif = key.PrivateKeyWif,
+            PublicKey = key.PublicKey,
+        });
+
+        _storage.Save(password, data);
+        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Added key {key.PublicKey[..24]}… label=\"{label}\"");
+        return new KeyDto(key.PublicKey, label, data.Accounts.Count(a => a.PublicKey == key.PublicKey));
+    }
+
+    public bool RemoveKey(string publicKey)
+    {
+        var data = _storage.CurrentData ?? throw new InvalidOperationException("Wallet is locked.");
+        var password = _password ?? throw new InvalidOperationException("Wallet is locked.");
+
+        var removed = data.Keys.RemoveAll(k => k.PublicKey == publicKey);
+        if (removed == 0) return false;
+
+        // Also remove all accounts linked to this key
+        var accountsRemoved = data.Accounts.RemoveAll(a => a.PublicKey == publicKey);
+        _storage.Save(password, data);
+
+        // Clear active account if it was linked to the removed key
+        if (_activeAccount is not null &&
+            data.Accounts.All(a => a.Account != _activeAccount.Account || a.Authority != _activeAccount.Authority || a.ChainId != _activeAccount.ChainId))
+        {
+            _activeAccount = data.Accounts.Count > 0
+                ? new AccountDto(data.Accounts[0].Account, data.Accounts[0].Authority,
+                    data.Accounts[0].PublicKey, data.Accounts[0].ChainId,
+                    GetChainName(data.Accounts[0].ChainId))
+                : null;
+        }
+
+        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Removed key {publicKey[..24]}… and {accountsRemoved} linked accounts");
+        return true;
     }
 }

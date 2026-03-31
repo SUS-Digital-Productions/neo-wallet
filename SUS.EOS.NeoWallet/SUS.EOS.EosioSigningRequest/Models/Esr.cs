@@ -195,10 +195,11 @@ public class Esr
                 {
                     Signatures = new List<string> { identitySignature },
                     ChainId = chainInfo.ChainId,
-                    Signer = string.Empty, // Will be filled by caller
-                    SignerPermission = string.Empty, // Will be filled by caller
+                    Signer = signer,
+                    SignerPermission = signerPermission,
                     RefBlockNum = 0,
                     RefBlockId = "0",
+                    Expiration = expiration,
                 };
             }
 
@@ -285,6 +286,7 @@ public class Esr
                 RefBlockId = chainInfo.LastIrreversibleBlockId,
                 Signer = signer,
                 SignerPermission = signerPermission,
+                Expiration = DateTime.Parse(transaction.Expiration, null, System.Globalization.DateTimeStyles.AssumeUniversal),
             };
         }
         catch (Exception ex)
@@ -309,27 +311,38 @@ public class Esr
         try
         {
             // ESR callback format per Anchor/greymass spec
-            // Only include required fields - extra fields can cause parsing issues
-            var callbackData = new
+            var callbackDict = new Dictionary<string, object?>
             {
-                sig = response.Signatures.First(),              // Signature
-                tx = response.PackedTransaction,                // Packed transaction hex
-                sa = response.Signer,                           // Signer actor
-                sp = response.SignerPermission,                 // Signer permission
-                rbn = response.RefBlockNum?.ToString(),         // Ref block num as string
-                rid = response.RefBlockNum?.ToString(),         // Ref block ID (use block num, not full ID)
-                ex = DateTime.UtcNow.AddMinutes(5).ToString("yyyy-MM-ddTHH:mm:ss"), // Expiration
-                req = ToUri(),                                  // Original request
-                cid = response.ChainId,                         // Chain ID
+                ["sig"] = response.Signatures.First(),
+                ["tx"] = response.PackedTransaction,
+                ["sa"] = response.Signer,
+                ["sp"] = response.SignerPermission,
+                ["rbn"] = response.RefBlockNum?.ToString(),
+                ["rid"] = response.RefBlockId,
+                ["ex"] = (response.Expiration ?? DateTime.UtcNow.AddMinutes(5)).ToString("yyyy-MM-ddTHH:mm:ss"),
+                ["req"] = ToUri(),
+                ["cid"] = response.ChainId,
             };
 
+            // Include Anchor Link session metadata for identity request callbacks
+            // This allows the dApp to establish a persistent session with this wallet
+            if (!string.IsNullOrEmpty(response.LinkChannel))
+                callbackDict["link_ch"] = response.LinkChannel;
+            if (!string.IsNullOrEmpty(response.LinkKey))
+                callbackDict["link_key"] = response.LinkKey;
+            if (!string.IsNullOrEmpty(response.LinkName))
+                callbackDict["link_name"] = response.LinkName;
+
             var content = new StringContent(
-                JsonSerializer.Serialize(callbackData),
+                JsonSerializer.Serialize(callbackDict),
                 Encoding.UTF8,
                 "application/json"
             );
 
-            return await client.PostAsync(Callback, content);
+            System.Diagnostics.Trace.WriteLine($"[ESR] Sending callback to {Callback}");
+            var httpResponse = await client.PostAsync(Callback, content);
+            System.Diagnostics.Trace.WriteLine($"[ESR] Callback response: {httpResponse.StatusCode}");
+            return httpResponse;
         }
         finally
         {

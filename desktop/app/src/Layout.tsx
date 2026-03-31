@@ -5,20 +5,26 @@ import {
   QrCode,
   Settings,
   Wallet,
-  Import,
   LogOut,
   FileCheck,
+  Radio,
+  KeyRound,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { useLockWallet } from "@/api/hooks";
+import { Badge } from "@/components/ui/badge";
+import { useLockWallet, useWalletSummary } from "@/api/hooks";
+import { useEsrEvents } from "@/api/useEsrEvents";
+import { useEsrDeepLink } from "@/api/useEsrDeepLink";
+import type { EsrSseEvent } from "@/api/types";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/send", icon: Send, label: "Send" },
   { to: "/receive", icon: QrCode, label: "Receive" },
-  { to: "/import", icon: Import, label: "Import" },
+  { to: "/keys", icon: KeyRound, label: "Keys" },
   { to: "/esr", icon: FileCheck, label: "Sign" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
@@ -26,6 +32,29 @@ const navItems = [
 export default function Layout() {
   const navigate = useNavigate();
   const lock = useLockWallet();
+  const { data: summary } = useWalletSummary({ refetchInterval: 10_000 });
+
+  const listenerConnected = summary?.listenerStatus === "Connected";
+
+  // Listen for ESR deep links from Tauri (esr:// protocol handler)
+  useEsrDeepLink();
+
+  // Listen for ESR signing requests from the background listener
+  useEsrEvents((evt: EsrSseEvent) => {
+    if (evt.type === "signing_request") {
+      const sigEvt = evt as import("@/api/types").EsrSigningRequestEvent;
+
+      // Auto-navigate to the approval page
+      if (sigEvt.requestId) {
+        toast.info("Signing request received from dApp");
+        navigate(`/esr?requestId=${sigEvt.requestId}`);
+      } else if ("rawPayload" in sigEvt && sigEvt.rawPayload) {
+        const esrUri = encodeURIComponent(sigEvt.rawPayload);
+        toast.info("Signing request received from dApp");
+        navigate(`/esr?uri=${esrUri}`);
+      }
+    }
+  });
 
   function handleLock() {
     lock.mutate(undefined, {
@@ -65,6 +94,16 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+        <Separator className="bg-sidebar-border" />
+        <div className="px-3 py-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Radio className={cn("size-3", listenerConnected ? "text-green-500" : "text-muted-foreground")} />
+            <span>Listener</span>
+            <Badge variant={listenerConnected ? "default" : "secondary"} className="ml-auto text-[10px] px-1.5 py-0">
+              {summary?.listenerStatus ?? "—"}
+            </Badge>
+          </div>
+        </div>
         <Separator className="bg-sidebar-border" />
         <div className="p-2">
           <Button

@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { useAccounts, useNetworks, useWalletSummary, useSendTransfer } from "@/api/hooks";
 
@@ -30,7 +31,6 @@ export default function Send() {
   const [quantity, setQuantity] = useState("");
   const [memo, setMemo] = useState("");
 
-  // Set defaults once data loads
   if (!from && summary.data?.activeAccount) {
     const a = summary.data.activeAccount;
     setFrom(`${a.account}@${a.authority}`);
@@ -38,6 +38,8 @@ export default function Send() {
   if (!chainId && summary.data?.activeNetwork) {
     setChainId(summary.data.activeNetwork.chainId);
   }
+
+  const loading = accounts.isLoading || networks.isLoading || summary.isLoading;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,6 +64,26 @@ export default function Send() {
           toast.error(err instanceof Error ? err.message : "Transfer failed");
         },
       },
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-lg space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Send Tokens</h1>
+          <p className="text-sm text-muted-foreground">
+            Transfer tokens to another account
+          </p>
+        </div>
+        <Card>
+          <CardContent className="space-y-4 pt-6">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 

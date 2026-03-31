@@ -12,8 +12,15 @@ public static class NetworkEndpoints
 
         app.MapPost("/api/networks/active", (SetActiveNetworkRequest req, IWalletStateService wallet) =>
         {
-            wallet.SetActiveNetwork(req.ChainId);
-            return Results.Ok();
+            try
+            {
+                wallet.SetActiveNetwork(req.ChainId);
+                return Results.Ok();
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
+            }
         });
     }
 }

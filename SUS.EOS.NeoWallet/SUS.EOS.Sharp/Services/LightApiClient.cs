@@ -12,6 +12,7 @@ public class LightApiClient : IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly string? _chainName;
     private bool _disposed;
 
     /// <summary>
@@ -39,11 +40,15 @@ public class LightApiClient : IDisposable
     /// Create a new Light API client
     /// </summary>
     /// <param name="baseEndpoint">Base endpoint URL (e.g., "https://wax.light-api.net")</param>
-    public LightApiClient(string baseEndpoint)
+    /// <param name="chainName">Optional chain short name (e.g., "wax"). Derived from endpoint host if omitted.</param>
+    public LightApiClient(string baseEndpoint, string? chainName = null)
     {
+        var uri = new Uri(baseEndpoint.TrimEnd('/'));
+        _chainName = chainName ?? uri.Host.Split('.')[0];
+
         _httpClient = new HttpClient
         {
-            BaseAddress = new Uri(baseEndpoint.TrimEnd('/')),
+            BaseAddress = uri,
             Timeout = TimeSpan.FromSeconds(30)
         };
 
@@ -269,7 +274,10 @@ public class LightApiClient : IDisposable
     /// </summary>
     public async Task<List<LightApiBalance>> GetAccountBalancesAsync(string accountName, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync($"/api/balances/{accountName}", cancellationToken);
+        var path = _chainName is not null
+            ? $"/api/balances/{_chainName}/{accountName}"
+            : $"/api/balances/{accountName}";
+        var response = await _httpClient.GetAsync(path, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -305,7 +313,10 @@ public class LightApiClient : IDisposable
     {
         try
         {
-            var response = await _httpClient.GetAsync($"/api/account/{accountName}", cancellationToken);
+            var path = _chainName is not null
+                ? $"/api/account/{_chainName}/{accountName}"
+                : $"/api/account/{accountName}";
+            var response = await _httpClient.GetAsync(path, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);

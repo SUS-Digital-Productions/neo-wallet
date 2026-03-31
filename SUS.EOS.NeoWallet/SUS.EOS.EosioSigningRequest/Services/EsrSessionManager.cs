@@ -197,8 +197,9 @@ public class EsrSessionManager : IEsrSessionManager, IDisposable
             );
             UpdateStatus(EsrSessionStatus.Connected);
 
-            // Send identify message to register this wallet with the relay
-            await SendIdentifyMessageAsync(_connectionCts.Token);
+            // The Buoy relay (cb.anchor.link) is a simple message forwarder —
+            // no identify handshake is needed. The wallet's identity (linkId + requestPublicKey)
+            // is communicated to dApps via ESR callback responses, not via the relay.
 
             // Start background listener thread
             System.Diagnostics.Trace.WriteLine("[ESR] Starting background listener thread...");
@@ -366,6 +367,13 @@ public class EsrSessionManager : IEsrSessionManager, IDisposable
                             
                             binaryMessageBuffer.Clear();
                             
+                            // Ignore empty binary frames (e.g., heartbeat keepalive echoes)
+                            if (binaryData.Length == 0)
+                            {
+                                System.Diagnostics.Trace.WriteLine("[ESR] Ignoring empty binary frame");
+                                continue;
+                            }
+
                             // Binary WebSocket messages from Anchor Link are sealed messages
                             // Handle directly as encrypted payload
                             _ = Task.Run(() => ProcessBinaryMessageAsync(binaryData), cancellationToken);
@@ -412,7 +420,8 @@ public class EsrSessionManager : IEsrSessionManager, IDisposable
     }
 
     /// <summary>
-    /// Heartbeat to keep WebSocket connection alive
+    /// Heartbeat to keep WebSocket connection alive.
+    /// Uses empty binary frames instead of text messages to avoid polluting the Buoy relay channel.
     /// </summary>
     private async Task HeartbeatAsync(CancellationToken cancellationToken)
     {
@@ -428,16 +437,16 @@ public class EsrSessionManager : IEsrSessionManager, IDisposable
                 {
                     try
                     {
-                        System.Diagnostics.Trace.WriteLine("[ESR] Sending heartbeat ping...");
-                        var ping = JsonSerializer.Serialize(new { type = "ping" });
-                        var bytes = Encoding.UTF8.GetBytes(ping);
+                        // Send an empty binary frame as keepalive — the Buoy relay
+                        // forwards text/binary messages to other clients on the channel,
+                        // so we use a zero-length frame that won't be forwarded or cause issues.
                         await _webSocket.SendAsync(
-                            new ArraySegment<byte>(bytes),
-                            WebSocketMessageType.Text,
+                            ArraySegment<byte>.Empty,
+                            WebSocketMessageType.Binary,
                             true,
                             cancellationToken
                         );
-                        System.Diagnostics.Trace.WriteLine($"[ESR] Heartbeat ping sent. Connection state: {_webSocket.State}");
+                        System.Diagnostics.Trace.WriteLine($"[ESR] Heartbeat sent. State: {_webSocket.State}");
                     }
                     catch (Exception ex)
                     {
@@ -652,12 +661,17 @@ public class EsrSessionManager : IEsrSessionManager, IDisposable
     {
         try
         {
-            System.Diagnostics.Trace.WriteLine($"[ESR] ========================================");
-            System.Diagnostics.Trace.WriteLine($"[ESR] Processing message: {message}");
-            System.Diagnostics.Trace.WriteLine($"[ESR] Message length: {message.Length}");
-            System.Diagnostics.Trace.WriteLine($"[ESR] ========================================");
+            // Ignore empty or non-JSON messages (relay acks, echoes, etc.)
+            var trimmed = message.Trim();
+            if (string.IsNullOrEmpty(trimmed) || !trimmed.StartsWith('{'))
+            {
+                System.Diagnostics.Trace.WriteLine($"[ESR] Ignoring non-JSON text message: {trimmed[..Math.Min(100, trimmed.Length)]}");
+                return;
+            }
 
-            var envelope = JsonSerializer.Deserialize<EsrMessageEnvelope>(message);
+            System.Diagnostics.Trace.WriteLine($"[ESR] Processing JSON message ({trimmed.Length} chars)");
+
+            var envelope = JsonSerializer.Deserialize<EsrMessageEnvelope>(trimmed);
             if (envelope == null)
             {
                 System.Diagnostics.Trace.WriteLine("[ESR] Failed to deserialize envelope");
@@ -665,10 +679,6 @@ public class EsrSessionManager : IEsrSessionManager, IDisposable
             }
 
             System.Diagnostics.Trace.WriteLine($"[ESR] Envelope type: {envelope.Type}");
-            System.Diagnostics.Trace.WriteLine($"[ESR] Has Payload: {!string.IsNullOrEmpty(envelope.Payload)}");
-            System.Diagnostics.Trace.WriteLine($"[ESR] Has Ciphertext: {!string.IsNullOrEmpty(envelope.Ciphertext)}");
-            System.Diagnostics.Trace.WriteLine($"[ESR] Has From: {!string.IsNullOrEmpty(envelope.From)}");
-            System.Diagnostics.Trace.WriteLine($"[ESR] Has Callback: {!string.IsNullOrEmpty(envelope.Callback)}");
 
             switch (envelope.Type)
             {
@@ -703,81 +713,6 @@ public class EsrSessionManager : IEsrSessionManager, IDisposable
         {
             System.Diagnostics.Trace.WriteLine($"[ESR] Message processing error: {ex.Message}");
             System.Diagnostics.Trace.WriteLine($"[ESR] Stack trace: {ex.StackTrace}");
-        }
-    }
-
-    /// <summary>
-    /// Send identify message to register wallet with Anchor Link relay
-    /// </summary>
-    private async Task SendIdentifyMessageAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            System.Diagnostics.Trace.WriteLine("[ESR] Sending identify message...");
-
-            // Anchor Link identify message format
-            var identifyMessage = new
-            {
-                type = "identify",
-                payload = new
-                {
-                    link_url = $"wss://{DefaultLinkUrl}/{_linkId}",
-                    link_id = _linkId,
-                    link_name = "NeoWallet",
-                    link_key = _requestPublicKey,
-                    device_id = _linkId,
-                    device_key = _requestPublicKey,
-                    chains = new[]
-                    {
-                        new
-                        {
-                            chain_id = "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4", // WAX mainnet
-                            chain_name = "WAX"
-                        },
-                        new
-                        {
-                            chain_id = "8fc6dce7942189f842170de953932b1f66693ad3788f766e777b6f9d22335c02", // WAX testnet
-                            chain_name = "WAX Testnet"
-                        },
-                        new
-                        {
-                            chain_id = "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906", // EOS mainnet
-                            chain_name = "EOS"
-                        },
-                        new
-                        {
-                            chain_id = "4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11", // Telos mainnet
-                            chain_name = "Telos"
-                        }
-                    }
-                }
-            };
-
-            var json = JsonSerializer.Serialize(identifyMessage);
-            var bytes = Encoding.UTF8.GetBytes(json);
-
-            System.Diagnostics.Trace.WriteLine($"[ESR] Identify message: {json}");
-
-            if (_webSocket?.State == WebSocketState.Open)
-            {
-                await _webSocket.SendAsync(
-                    new ArraySegment<byte>(bytes),
-                    WebSocketMessageType.Text,
-                    true,
-                    cancellationToken
-                );
-
-                System.Diagnostics.Trace.WriteLine("[ESR] Identify message sent successfully");
-            }
-            else
-            {
-                System.Diagnostics.Trace.WriteLine($"[ESR] Cannot send identify - WebSocket state: {_webSocket?.State}");
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Trace.WriteLine($"[ESR] Failed to send identify message: {ex.Message}");
-            throw;
         }
     }
 

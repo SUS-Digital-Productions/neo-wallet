@@ -32,7 +32,7 @@ jobs:
 
           # Desktop matrix
           if [[ "$INPUT" == "all" ]]; then
-            echo 'desktop=[{"rid":"win-x64","os":"windows-latest"},{"rid":"win-arm64","os":"windows-latest"},{"rid":"linux-x64","os":"ubuntu-latest"},{"rid":"linux-arm64","os":"ubuntu-latest"},{"rid":"osx-x64","os":"macos-13"},{"rid":"osx-arm64","os":"macos-latest"}]' >> "$GITHUB_OUTPUT"
+            echo 'desktop=[{"rid":"win-x64","os":"windows-latest"},{"rid":"win-arm64","os":"windows-latest"},{"rid":"linux-x64","os":"ubuntu-latest"},{"rid":"linux-arm64","os":"ubuntu-latest"},{"rid":"osx-x64","os":"macos-14"},{"rid":"osx-arm64","os":"macos-latest"}]' >> "$GITHUB_OUTPUT"
             echo "android=true"  >> "$GITHUB_OUTPUT"
             echo "ios=true"      >> "$GITHUB_OUTPUT"
           else
@@ -47,7 +47,7 @@ jobs:
               SEP=","
             fi
             if echo "$INPUT" | grep -qi "mac"; then
-              MATRIX="${MATRIX}${SEP}{\"rid\":\"osx-x64\",\"os\":\"macos-13\"},{\"rid\":\"osx-arm64\",\"os\":\"macos-latest\"}"
+              MATRIX="${MATRIX}${SEP}{\"rid\":\"osx-x64\",\"os\":\"macos-14\"},{\"rid\":\"osx-arm64\",\"os\":\"macos-latest\"}"
               SEP=","
             fi
             MATRIX="${MATRIX}]"
@@ -223,18 +223,43 @@ jobs:
 
           npx cap sync ios
 
+          # Install CocoaPods dependencies if Podfile exists
+          if [ -f "ios/App/Podfile" ]; then
+            cd ios/App
+            pod install --repo-update
+            cd ../..
+          fi
+
+          echo "--- iOS project contents ---"
+          ls -la ios/App/
+
       - name: Build iOS (unsigned archive)
         working-directory: desktop/app/ios/App
         run: |
           set -o pipefail
-          xcodebuild archive \
-            -workspace App.xcworkspace \
-            -scheme App \
-            -configuration Release \
-            -archivePath $RUNNER_TEMP/NeoWallet.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
-            -destination "generic/platform=iOS" \
-            2>&1 | tail -50
+
+          # Use workspace if it exists (CocoaPods/SPM), otherwise fall back to xcodeproj
+          if [ -d "App.xcworkspace" ]; then
+            echo "Building with App.xcworkspace"
+            xcodebuild archive \
+              -workspace App.xcworkspace \
+              -scheme App \
+              -configuration Release \
+              -archivePath $RUNNER_TEMP/NeoWallet.xcarchive \
+              CODE_SIGNING_ALLOWED=NO \
+              -destination "generic/platform=iOS" \
+              2>&1 | tail -50
+          else
+            echo "Building with App.xcodeproj"
+            xcodebuild archive \
+              -project App.xcodeproj \
+              -scheme App \
+              -configuration Release \
+              -archivePath $RUNNER_TEMP/NeoWallet.xcarchive \
+              CODE_SIGNING_ALLOWED=NO \
+              -destination "generic/platform=iOS" \
+              2>&1 | tail -50
+          fi
 
       - name: Collect archive
         run: |

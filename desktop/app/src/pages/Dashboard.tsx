@@ -7,20 +7,35 @@ import {
   Globe,
   Shield,
   Coins,
+  ChevronDown,
+  Check,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "@/components/EmptyState";
-import { useWalletSummary, useBalances } from "@/api/hooks";
+import {
+  useWalletSummary,
+  useBalances,
+  useAccounts,
+  useSetActiveAccount,
+} from "@/api/hooks";
+import { useState } from "react";
 
 export default function Dashboard() {
   const summary = useWalletSummary();
+  const { data: accounts = [] } = useAccounts();
+  const setAccount = useSetActiveAccount();
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
+
+  const activeChainId = summary.data?.activeNetwork?.chainId;
+  const networkAccounts = accounts.filter((a) => a.chainId === activeChainId);
   const balances = useBalances(
     summary.data?.activeAccount?.account,
-    summary.data?.activeNetwork?.chainId,
+    summary.data?.activeAccount?.chainId,
   );
 
   const loading = summary.isLoading;
@@ -53,8 +68,8 @@ export default function Dashboard() {
             Wallet overview and quick actions
           </p>
         </div>
-        <Button variant="outline" size="icon" onClick={refetch}>
-          <RefreshCw className="size-4" />
+        <Button variant="outline" size="icon" onClick={refetch} disabled={summary.isFetching || balances.isFetching}>
+          <RefreshCw className={`size-4 ${summary.isFetching || balances.isFetching ? "animate-spin" : ""}`} />
         </Button>
       </div>
 
@@ -71,20 +86,76 @@ export default function Dashboard() {
             {loading ? (
               <Skeleton className="h-5 w-32" />
             ) : (
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-lg font-semibold">
-                    {summary.data?.activeAccount?.account ?? "No account"}
-                  </p>
-                  {summary.data?.activeAccount?.chainName && (
-                    <span className="text-xs text-muted-foreground">
-                      ({summary.data.activeAccount.chainName})
-                    </span>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAccountPicker((v) => !v)}
+                  className="flex w-full items-center justify-between rounded-md text-left"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-lg font-semibold">
+                        {summary.data?.activeAccount?.account ?? "No account"}
+                      </p>
+                      {summary.data?.activeAccount?.chainName && (
+                        <span className="text-xs text-muted-foreground">
+                          ({summary.data.activeAccount.chainName})
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {summary.data?.activeAccount?.authority ?? "—"}
+                    </p>
+                  </div>
+                  {networkAccounts.length > 1 && (
+                    <ChevronDown
+                      className={`size-4 text-muted-foreground transition-transform ${
+                        showAccountPicker ? "rotate-180" : ""
+                      }`}
+                    />
                   )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {summary.data?.activeAccount?.authority ?? "—"}
-                </p>
+                </button>
+
+                {showAccountPicker && networkAccounts.length > 1 && (
+                  <div className="space-y-1 rounded-md border p-1">
+                    {networkAccounts.map((a) => {
+                      const isActive =
+                        summary.data?.activeAccount?.account === a.account &&
+                        summary.data?.activeAccount?.authority === a.authority &&
+                        summary.data?.activeAccount?.chainId === a.chainId;
+                      return (
+                        <button
+                          key={`${a.account}@${a.authority}@${a.chainId}`}
+                          type="button"
+                          disabled={isActive || setAccount.isPending}
+                          onClick={() => {
+                            setAccount.mutate(
+                              { account: a.account, authority: a.authority, chainId: a.chainId },
+                              {
+                                onSuccess: () => {
+                                  toast.success(`Switched to ${a.account}`);
+                                  setShowAccountPicker(false);
+                                },
+                                onError: () => toast.error("Failed to switch account"),
+                              },
+                            );
+                          }}
+                          className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm transition-colors ${
+                            isActive
+                              ? "bg-primary/10 text-primary"
+                              : "hover:bg-accent"
+                          }`}
+                        >
+                          <div>
+                            <span className="font-medium">{a.account}</span>
+                            <span className="ml-1 text-muted-foreground">@{a.authority}</span>
+                          </div>
+                          {isActive && <Check className="size-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -175,7 +246,7 @@ export default function Dashboard() {
             action={
               !summary.data?.activeAccount ? (
                 <Button variant="outline" size="sm" asChild>
-                  <Link to="/import">Import Account</Link>
+                  <Link to="/keys">Import Account</Link>
                 </Button>
               ) : undefined
             }

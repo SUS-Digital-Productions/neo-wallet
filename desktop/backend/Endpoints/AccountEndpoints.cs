@@ -27,6 +27,7 @@ public static class AccountEndpoints
             {
                 var key = EosioKey.FromPrivateKey(req.PrivateKey);
                 var publicKey = key.PublicKey;
+                var pubKeyK1 = key.PublicKeyK1;
 
                 var networks = wallet.GetNetworks();
                 var chainIds = req.ChainIds ?? networks.Select(n => n.ChainId).ToArray();
@@ -44,9 +45,12 @@ public static class AccountEndpoints
                         if (lightApi is not null)
                         {
                             var keyResult = await lightApi.GetAccountsByKeyAsync(publicKey);
-                            foreach (var chain in keyResult.Chains.Values)
+                            foreach (var chain in keyResult.Chains.Values.Where(c =>
+                                         string.Equals(c.ChainId, chainId, StringComparison.OrdinalIgnoreCase)))
                             {
-                                foreach (var acct in chain.Accounts.Where(a => a.IsKeyControlled))
+                                foreach (var acct in chain.Accounts.Where(a =>
+                                             a.IsKeyControlled &&
+                                             a.PublicKeys.Any(pk => MatchesKey(pk, publicKey, pubKeyK1))))
                                 {
                                     entries.Add(new LookupAccountEntry(acct.AccountName, acct.Permission));
                                 }
@@ -93,5 +97,15 @@ public static class AccountEndpoints
             var ok = wallet.RemoveAccount(req.Account, req.Authority, req.ChainId);
             return ok ? Results.Ok() : Results.Problem("Account not found.", statusCode: StatusCodes.Status404NotFound);
         });
+    }
+
+    /// <summary>
+    /// Check if a public key from the Light API response matches the queried key
+    /// by comparing against both legacy EOS and modern PUB_K1_ formats.
+    /// </summary>
+    private static bool MatchesKey(string responseKey, string legacyKey, string k1Key)
+    {
+        return string.Equals(responseKey, legacyKey, StringComparison.Ordinal)
+            || string.Equals(responseKey, k1Key, StringComparison.Ordinal);
     }
 }

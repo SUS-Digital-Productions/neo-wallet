@@ -1,5 +1,6 @@
 using NeoWallet.Backend.Services;
 using SUS.EOS.EosioSigningRequest;
+using SUS.EOS.EosioSigningRequest.Services;
 using SUS.EOS.Sharp.Services;
 
 namespace NeoWallet.Backend;
@@ -16,7 +17,11 @@ public static class ServiceRegistration
         services.AddSingleton<AppSettingsService>();
         services.AddSingleton<AutoLockService>();
         services.AddHostedService(sp => sp.GetRequiredService<AutoLockService>());
-        services.AddEsrServices();
+        // Register file-backed ESR state store so link ID and sessions persist across restarts
+        services.AddSingleton<IEsrStateStore, FileEsrStateStore>();
+        services.AddEsrServices(useMemoryStore: false);
+        services.AddSingleton<EsrListenerService>();
+        services.AddHostedService(sp => sp.GetRequiredService<EsrListenerService>());
         return services;
     }
 }

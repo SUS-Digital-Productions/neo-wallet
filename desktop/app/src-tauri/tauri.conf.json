@@ -35,5 +35,17 @@
     ],
     "externalBin": ["sidecar/NeoWallet.Backend"]
   },
-  "plugins": {}
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["esr"]
+      },
+      "mobile": [
+        {
+          "scheme": ["esr"],
+          "appLink": false
+        }
+      ]
+    }
+  }
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileCheck,
@@ -8,6 +8,7 @@ import {
   Code,
   Link as LinkIcon,
 } from "lucide-react";
+import { QrScanner } from "@/components/QrScanner";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
   useNetworks,
   useWalletSummary,
 } from "@/api/hooks";
+import { getPendingEsr } from "@/api/client";
 
 const EXAMPLE_ACTIONS = `[
   {
@@ -60,13 +62,11 @@ export default function EsrApproval() {
   const { data: summary } = useWalletSummary();
   const activeChainId = summary?.activeNetwork?.chainId ?? "";
 
-  function handleParse(e: React.FormEvent) {
-    e.preventDefault();
-    if (!uri.trim()) return;
-
+  function doParse(esrUri: string) {
+    if (!esrUri.trim()) return;
     setParsed(null);
     parseEsr.mutate(
-      { uri: uri.trim() },
+      { uri: esrUri.trim() },
       {
         onSuccess: (res) => setParsed(res),
         onError: (err) =>
@@ -74,6 +74,20 @@ export default function EsrApproval() {
       },
     );
   }
+
+  function handleParse(e: React.FormEvent) {
+    e.preventDefault();
+    doParse(uri);
+  }
+
+  const handleQrScan = useCallback(
+    (data: string) => {
+      setUri(data);
+      doParse(data);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   function handleApprove() {
     if (!parsed) return;
@@ -133,6 +147,34 @@ export default function EsrApproval() {
     );
   }
 
+  // Auto-load when navigated with ?requestId= (from relay) or ?uri= (from deep link / manual)
+  useEffect(() => {
+    const paramRequestId = searchParams.get("requestId");
+    const paramUri = searchParams.get("uri");
+
+    if (paramRequestId && !parsed) {
+      // Fetch pre-parsed request from backend (relay-originated)
+      getPendingEsr(paramRequestId)
+        .then((res) => setParsed(res))
+        .catch((err) =>
+          toast.error(err instanceof Error ? err.message : "Failed to load request"),
+        );
+    } else if (paramUri && !parsed && !parseEsr.isPending) {
+      const decoded = decodeURIComponent(paramUri);
+      setUri(decoded);
+      parseEsr.mutate(
+        { uri: decoded },
+        {
+          onSuccess: (res) => setParsed(res),
+          onError: (err) =>
+            toast.error(err instanceof Error ? err.message : "Failed to parse ESR"),
+        },
+      );
+    }
+    // Only run on mount / when searchParams change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const activeNet = networks.find((n) => n.chainId === activeChainId);
   const esrSubmitting = approveEsr.isPending || rejectEsr.isPending;
 
@@ -170,13 +212,17 @@ export default function EsrApproval() {
               <form onSubmit={handleParse} className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="esr-uri">Signing Request URI</Label>
-                  <Input
-                    id="esr-uri"
-                    placeholder="esr://..."
-                    value={uri}
-                    onChange={(e) => setUri(e.target.value)}
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="esr-uri"
+                      placeholder="esr://..."
+                      value={uri}
+                      onChange={(e) => setUri(e.target.value)}
+                      required
+                      className="flex-1"
+                    />
+                    <QrScanner onScan={handleQrScan} />
+                  </div>
                 </div>
                 <Button
                   type="submit"

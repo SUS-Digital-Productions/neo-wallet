@@ -69,6 +69,37 @@ export interface RemoveAccountRequest {
   chainId: string;
 }
 
+export interface GetPrivateKeyRequest {
+  account: string;
+  authority: string;
+}
+
+export interface GetPrivateKeyResponse {
+  privateKey: string;
+}
+
+export interface ImportWalletRequest {
+  password: string;
+  fileBase64: string;
+}
+
+/* ---- Keys ---- */
+
+export interface KeyInfo {
+  publicKey: string;
+  label: string;
+  accountCount: number;
+}
+
+export interface AddKeyRequest {
+  privateKey: string;
+  label: string;
+}
+
+export interface RemoveKeyRequest {
+  publicKey: string;
+}
+
 /* ---- Lookup ---- */
 
 export interface LookupAccountsRequest {
@@ -169,3 +200,35 @@ export interface SignRawRequest {
   actions: SignRawAction[];
   broadcast?: boolean;
 }
+
+/* ---- ESR Listener ---- */
+
+export interface EsrListenerStatus {
+  status: string;
+  linkId: string;
+  requestPublicKey: string | null;
+  sessionCount: number;
+}
+
+export interface EsrSigningRequestEvent {
+  type: "signing_request";
+  requestId?: string;
+  isIdentity: boolean;
+  chainId?: string;
+  actions?: EsrActionSummary[];
+  session: {
+    actor: string;
+    permission: string;
+    chainId: string;
+    name: string;
+  } | null;
+  callbackUrl: string | null;
+  rawPayload: string | null;
+}
+
+export interface EsrStatusChangedEvent {
+  type: "status_changed";
+  status: string;
+}
+
+export type EsrSseEvent = EsrSigningRequestEvent | EsrStatusChangedEvent;

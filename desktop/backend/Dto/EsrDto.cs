@@ -35,3 +35,11 @@ public sealed record SignRawRequest(
     [property: JsonPropertyName("actions")] JsonElement Actions,
     [property: JsonPropertyName("broadcast")] bool Broadcast = true
 );
+
+/// <summary>ESR listener connection status.</summary>
+public sealed record EsrListenerStatusResponse(
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("linkId")] string LinkId,
+    [property: JsonPropertyName("requestPublicKey")] string? RequestPublicKey,
+    [property: JsonPropertyName("sessionCount")] int SessionCount
+);

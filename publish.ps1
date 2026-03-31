@@ -117,6 +117,13 @@ foreach ($rid in $desktopTargets) {
     Write-Host "[$step/$totalTargets] Publishing $rid..." -ForegroundColor Yellow
 
     $publishDir = "$root\publish\$rid"
+
+    # Clean stale frontend assets so old hashed bundles don't linger
+    $wwwrootAssets = "$publishDir\wwwroot\assets"
+    if (Test-Path $wwwrootAssets) {
+        Remove-Item $wwwrootAssets -Recurse -Force
+    }
+
     dotnet publish "$root\desktop\backend\NeoWallet.Backend.csproj" `
         --configuration Release `
         --runtime $rid `
