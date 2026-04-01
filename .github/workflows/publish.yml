@@ -165,7 +165,6 @@ jobs:
         working-directory: desktop/app
         run: |
           npm ci
-          npm install @capacitor/core @capacitor/cli @capacitor/android --save
 
           # Add the Android platform if not present
           if [ ! -d "android" ]; then
@@ -178,12 +177,12 @@ jobs:
         working-directory: desktop/app/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleDebug
 
       - name: Collect APK
         run: |
           mkdir -p publish/android
-          find desktop/app/android -name "*.apk" -path "*/release/*" -exec cp {} publish/android/NeoWallet.apk \;
+          find desktop/app/android -name "*.apk" -path "*/debug/*" -exec cp {} publish/android/NeoWallet.apk \;
 
       - uses: actions/upload-artifact@v5
         with:
@@ -214,7 +213,6 @@ jobs:
         working-directory: desktop/app
         run: |
           npm ci
-          npm install @capacitor/core @capacitor/cli @capacitor/ios --save
 
           # Add the iOS platform if not present
           if [ ! -d "ios" ]; then

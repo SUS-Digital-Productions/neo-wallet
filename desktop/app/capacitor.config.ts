@@ -11,10 +11,7 @@ const config: CapacitorConfig = {
     // cleartext: true,
   },
   android: {
-    buildOptions: {
-      keystorePath: undefined,
-      keystoreAlias: undefined,
-    },
+    minWebViewVersion: "60.0.0",
   },
   ios: {
     scheme: "NeoWallet",
