@@ -1,0 +1,26 @@
+[package]
+name = "eosio-signer"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "EOSIO/WAX transaction signing: private key management, transaction serialization, and chain API client"
+repository = "https://github.com/SUS-Digital-Productions/neo-wallet"
+keywords = ["eosio", "wax", "signing", "antelope", "blockchain"]
+categories = ["cryptography::cryptocurrencies"]
+
+[dependencies]
+eosio-abi = { path = "../eosio-abi", version = "0.1.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+ripemd = "0.1"
+k256 = { version = "0.13", features = ["ecdsa-core", "ecdsa", "sha256"] }
+ecdsa = { version = "0.16", features = ["signing", "hazmat", "rfc6979"] }
+bs58 = "0.5"
+reqwest = { version = "0.12", features = ["json", "blocking"], optional = true }
+hex = "0.4"
+rand = "0.8"
+
+[features]
+default = ["api"]
+api = ["reqwest"]

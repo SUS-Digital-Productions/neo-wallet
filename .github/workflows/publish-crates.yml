@@ -1,0 +1,135 @@
+name: Publish Rust Crates
+
+# Publish eosio-abi and eosio-signer to crates.io so they can be used
+# as regular dependencies in other Rust projects.
+#
+# Trigger manually, or automatically when a crate-v* tag is pushed.
+# The workflow publishes eosio-abi first (dependency), then eosio-signer.
+
+on:
+  push:
+    tags: ["crate-v*"]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Dry run (validate but don't publish)"
+        type: boolean
+        default: true
+      version:
+        description: "Override version (e.g. 0.2.0). Leave empty to use Cargo.toml version."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  CRATE_DIR: desktop/app/src-tauri/crates
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.CRATE_DIR }}
+
+      # Optional: bump version in both Cargo.tomls before publish
+      - name: Set version override
+        if: inputs.version != ''
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "Overriding crate versions to $VERSION"
+
+          # Update eosio-abi version
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" $CRATE_DIR/eosio-abi/Cargo.toml
+
+          # Update eosio-signer version + its eosio-abi dependency version
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" $CRATE_DIR/eosio-signer/Cargo.toml
+          sed -i "s/eosio-abi = { path = \"..\/eosio-abi\", version = \"[^\"]*\"/eosio-abi = { path = \"..\/eosio-abi\", version = \"$VERSION\"/" $CRATE_DIR/eosio-signer/Cargo.toml
+
+          echo "--- eosio-abi/Cargo.toml ---"
+          head -10 $CRATE_DIR/eosio-abi/Cargo.toml
+          echo "--- eosio-signer/Cargo.toml ---"
+          head -15 $CRATE_DIR/eosio-signer/Cargo.toml
+
+      # Verify both crates compile
+      - name: Check eosio-abi
+        working-directory: ${{ env.CRATE_DIR }}/eosio-abi
+        run: cargo check
+
+      - name: Check eosio-signer
+        working-directory: ${{ env.CRATE_DIR }}/eosio-signer
+        run: cargo check
+
+      # Run tests
+      - name: Test eosio-abi
+        working-directory: ${{ env.CRATE_DIR }}/eosio-abi
+        run: cargo test
+
+      - name: Test eosio-signer
+        working-directory: ${{ env.CRATE_DIR }}/eosio-signer
+        run: cargo test
+
+      # Dry run — validate packaging without uploading
+      - name: Package eosio-abi (dry run)
+        working-directory: ${{ env.CRATE_DIR }}/eosio-abi
+        run: cargo package --allow-dirty
+
+      - name: Package eosio-signer (dry run)
+        working-directory: ${{ env.CRATE_DIR }}/eosio-signer
+        run: cargo package --allow-dirty
+
+      # Publish eosio-abi first (eosio-signer depends on it)
+      - name: Publish eosio-abi
+        if: >-
+          (inputs.dry-run != true && inputs.dry-run != 'true') ||
+          startsWith(github.ref, 'refs/tags/crate-v')
+        working-directory: ${{ env.CRATE_DIR }}/eosio-abi
+        run: cargo publish --allow-dirty
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # Wait for crates.io to index eosio-abi before publishing eosio-signer
+      - name: Wait for crates.io index
+        if: >-
+          (inputs.dry-run != true && inputs.dry-run != 'true') ||
+          startsWith(github.ref, 'refs/tags/crate-v')
+        run: sleep 30
+
+      - name: Publish eosio-signer
+        if: >-
+          (inputs.dry-run != true && inputs.dry-run != 'true') ||
+          startsWith(github.ref, 'refs/tags/crate-v')
+        working-directory: ${{ env.CRATE_DIR }}/eosio-signer
+        run: cargo publish --allow-dirty
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Summary
+        run: |
+          ABI_VER=$(grep '^version' $CRATE_DIR/eosio-abi/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          SIGNER_VER=$(grep '^version' $CRATE_DIR/eosio-signer/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "## Crate Publish Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Crate | Version |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| eosio-abi | $ABI_VER |" >> $GITHUB_STEP_SUMMARY
+          echo "| eosio-signer | $SIGNER_VER |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ inputs.dry-run }}" == "true" ]] && ! [[ "${{ github.ref }}" == refs/tags/crate-v* ]]; then
+            echo "> **Dry run** — crates were validated but not published." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Usage" >> $GITHUB_STEP_SUMMARY
+            echo '```toml' >> $GITHUB_STEP_SUMMARY
+            echo "[dependencies]" >> $GITHUB_STEP_SUMMARY
+            echo "eosio-abi = \"$ABI_VER\"" >> $GITHUB_STEP_SUMMARY
+            echo "eosio-signer = \"$SIGNER_VER\"" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi

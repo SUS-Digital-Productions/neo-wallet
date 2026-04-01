@@ -1,0 +1,13 @@
+[package]
+name = "eosio-abi"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Dynamic ABI serialization and deserialization for EOSIO/WAX"
+repository = "https://github.com/SUS-Digital-Productions/neo-wallet"
+keywords = ["eosio", "wax", "abi", "antelope", "blockchain"]
+categories = ["encoding", "cryptography::cryptocurrencies"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

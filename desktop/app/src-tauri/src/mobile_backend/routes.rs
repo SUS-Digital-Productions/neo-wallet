@@ -9,7 +9,9 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::chain::AsyncChainApi;
 use super::state::AppState;
+use eosio_signer::PrivateKey as EosioPrivateKey;
 
 // ---------------------------------------------------------------------------
 // Router
@@ -104,6 +106,8 @@ struct NetworkDef {
     name: &'static str,
     symbol: &'static str,
     rpc: &'static str,
+    /// Token contract for the native token.
+    token_contract: &'static str,
 }
 
 const NETWORKS: &[NetworkDef] = &[
@@ -112,20 +116,49 @@ const NETWORKS: &[NetworkDef] = &[
         name: "WAX",
         symbol: "WAX",
         rpc: "https://wax.greymass.com",
+        token_contract: "eosio.token",
     },
     NetworkDef {
         chain_id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
         name: "EOS",
         symbol: "EOS",
         rpc: "https://eos.greymass.com",
+        token_contract: "eosio.token",
     },
     NetworkDef {
         chain_id: "4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11",
         name: "Telos",
         symbol: "TLOS",
         rpc: "https://telos.greymass.com",
+        token_contract: "eosio.token",
     },
 ];
+
+/// Embedded eosio.token ABI for transfer action encoding.
+const TOKEN_ABI: &str = r#"{
+    "version": "eosio::abi/1.2",
+    "structs": [{
+        "name": "transfer",
+        "base": "",
+        "fields": [
+            {"name": "from", "type": "name"},
+            {"name": "to", "type": "name"},
+            {"name": "quantity", "type": "asset"},
+            {"name": "memo", "type": "string"}
+        ]
+    }],
+    "actions": [{"name": "transfer", "type": "transfer", "ricardian_contract": ""}],
+    "tables": [],
+    "types": [],
+    "variants": []
+}"#;
+
+/// Derive the legacy EOS public key string from a WIF private key.
+fn derive_public_key(wif: &str) -> Result<String, String> {
+    let key = EosioPrivateKey::from_wif(wif)
+        .map_err(|e| format!("{e}"))?;
+    Ok(key.public_key().to_legacy_string())
+}
 
 fn find_network(chain_id: &str) -> Option<&'static NetworkDef> {
     NETWORKS.iter().find(|n| n.chain_id == chain_id)
@@ -556,8 +589,11 @@ async fn accounts_import(
 ) -> Result<StatusCode, StatusCode> {
     require_auth!(state, headers, "/api/accounts/import");
 
-    // For now we store the private key as-is (WIF validation happens in the
-    // .NET library on desktop — on mobile we trust the key format).
+    let public_key = derive_public_key(&body.private_key)
+        .map_err(|e| {
+            eprintln!("[mobile-backend] invalid WIF key: {e}");
+            StatusCode::BAD_REQUEST
+        })?;
     {
         let mut inner = state.inner.lock().unwrap();
         let data = inner.wallet_data.as_mut().ok_or(StatusCode::FORBIDDEN)?;
@@ -573,7 +609,7 @@ async fn accounts_import(
                     account: entry.account.clone(),
                     authority: entry.authority.clone(),
                     private_key_wif: body.private_key.clone(),
-                    public_key: String::new(), // Will be populated when we add secp256k1
+                    public_key: public_key.clone(),
                     chain_id: entry.chain_id.clone(),
                 });
             }
@@ -627,34 +663,46 @@ async fn accounts_private_key(
 }
 
 async fn accounts_lookup(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     headers: HeaderMap,
     Json(body): Json<LookupAccountsBody>,
 ) -> Result<Json<LookupAccountsResponse>, StatusCode> {
-    require_auth!(_state, headers, "/api/accounts/lookup");
+    require_auth!(state, headers, "/api/accounts/lookup");
 
-    // Lookup accounts on each chain via the Light API.
-    // For now, return empty chains — full lookup requires secp256k1 key derivation
-    // and HTTP calls to the Light API which will be added later.
+    let public_key = derive_public_key(&body.private_key)
+        .map_err(|e| {
+            eprintln!("[mobile-backend] lookup: invalid WIF: {e}");
+            StatusCode::BAD_REQUEST
+        })?;
+
     let chain_ids: Vec<&str> = match &body.chain_ids {
         Some(ids) => ids.iter().map(|s| s.as_str()).collect(),
         None => NETWORKS.iter().map(|n| n.chain_id).collect(),
     };
 
-    let chains = chain_ids
-        .iter()
-        .filter_map(|cid| {
-            find_network(cid).map(|n| LookupChainResult {
-                chain_id: n.chain_id.to_string(),
-                name: n.name.to_string(),
-                symbol: n.symbol.to_string(),
-                accounts: vec![],
-            })
-        })
-        .collect();
+    let mut chains = Vec::new();
+    for cid in &chain_ids {
+        if let Some(net) = find_network(cid) {
+            let api = AsyncChainApi::new(net.rpc);
+            let account_names = api.get_key_accounts(&public_key).await.unwrap_or_default();
+            let accounts = account_names
+                .into_iter()
+                .map(|name| LookupAccountEntry {
+                    account: name,
+                    authority: "active".to_string(),
+                })
+                .collect();
+            chains.push(LookupChainResult {
+                chain_id: net.chain_id.to_string(),
+                name: net.name.to_string(),
+                symbol: net.symbol.to_string(),
+                accounts,
+            });
+        }
+    }
 
     Ok(Json(LookupAccountsResponse {
-        public_key: String::new(), // TODO: derive from private key
+        public_key,
         chains,
     }))
 }
@@ -693,13 +741,18 @@ async fn keys_add(
     Json(body): Json<AddKeyBody>,
 ) -> Result<StatusCode, StatusCode> {
     require_auth!(state, headers, "/api/keys");
+    let public_key = derive_public_key(&body.private_key)
+        .map_err(|e| {
+            eprintln!("[mobile-backend] keys_add: invalid WIF: {e}");
+            StatusCode::BAD_REQUEST
+        })?;
     {
         let mut inner = state.inner.lock().unwrap();
         let data = inner.wallet_data.as_mut().ok_or(StatusCode::FORBIDDEN)?;
         data.keys.push(super::crypto::WalletKey {
             label: body.label,
             private_key_wif: body.private_key,
-            public_key: String::new(), // TODO: derive from private key
+            public_key,
         });
     }
     state.save().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -755,12 +808,48 @@ async fn networks_set_active(
 async fn balances(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Query(_params): Query<BalanceQuery>,
+    Query(params): Query<BalanceQuery>,
 ) -> Result<Json<Vec<BalanceEntry>>, StatusCode> {
     require_auth!(state, headers, "/api/balances");
-    // TODO: implement on-chain balance lookups via reqwest to the RPC endpoint.
-    // For now return an empty list so the UI renders without errors.
-    Ok(Json(vec![]))
+
+    let (account, chain_id) = {
+        let inner = state.inner.lock().unwrap();
+        let acct = params
+            .account
+            .or_else(|| inner.active_account.clone())
+            .ok_or(StatusCode::BAD_REQUEST)?;
+        let cid = params
+            .chain_id
+            .unwrap_or_else(|| inner.active_chain_id.clone());
+        (acct, cid)
+    };
+
+    let net = find_network(&chain_id).ok_or(StatusCode::BAD_REQUEST)?;
+    let api = AsyncChainApi::new(net.rpc);
+
+    let balances_raw = api
+        .get_currency_balance(net.token_contract, &account, net.symbol)
+        .await
+        .unwrap_or_default();
+
+    let entries: Vec<BalanceEntry> = balances_raw
+        .iter()
+        .filter_map(|s| {
+            // Format: "123.45678900 WAX"
+            let parts: Vec<&str> = s.trim().splitn(2, ' ').collect();
+            if parts.len() != 2 {
+                return None;
+            }
+            let numeric: f64 = parts[0].parse().unwrap_or(0.0);
+            Some(BalanceEntry {
+                symbol: parts[1].to_string(),
+                amount: s.clone(),
+                numeric_amount: numeric,
+            })
+        })
+        .collect();
+
+    Ok(Json(entries))
 }
 
 // -- Transfers --
@@ -768,11 +857,104 @@ async fn balances(
 async fn transfers(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(_body): Json<TransferBody>,
+    Json(body): Json<TransferBody>,
 ) -> Result<Json<TransferResponse>, StatusCode> {
     require_auth!(state, headers, "/api/transfers");
-    // TODO: implement transaction signing and broadcast.
-    Err(StatusCode::NOT_IMPLEMENTED)
+
+    let net = find_network(&body.chain_id).ok_or(StatusCode::BAD_REQUEST)?;
+
+    // Get the private key for the sender account
+    let private_key_wif = {
+        let inner = state.inner.lock().unwrap();
+        let data = inner.wallet_data.as_ref().ok_or(StatusCode::FORBIDDEN)?;
+        let acct = data
+            .accounts
+            .iter()
+            .find(|a| a.account == body.from && a.authority == body.authority && a.chain_id == body.chain_id)
+            .ok_or(StatusCode::NOT_FOUND)?;
+        acct.private_key_wif.clone()
+    };
+
+    let key = EosioPrivateKey::from_wif(&private_key_wif).map_err(|e| {
+        eprintln!("[mobile-backend] transfer: invalid key: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // Encode action data using the embedded eosio.token ABI
+    let codec = eosio_abi::AbiCodec::from_json(TOKEN_ABI).map_err(|e| {
+        eprintln!("[mobile-backend] transfer: ABI parse: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let action_json = serde_json::json!({
+        "from": body.from,
+        "to": body.to,
+        "quantity": body.quantity,
+        "memo": body.memo.as_deref().unwrap_or("")
+    });
+    let encoded_data = codec.encode_action("transfer", &action_json).map_err(|e| {
+        eprintln!("[mobile-backend] transfer: ABI encode: {e}");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    // Build action
+    let mut action = eosio_signer::Action::new(
+        net.token_contract,
+        "transfer",
+        vec![eosio_signer::PermissionLevel::new(&body.from, &body.authority)],
+    );
+    action.set_data_bytes(encoded_data);
+
+    // Get chain info and build transaction
+    let api = AsyncChainApi::new(net.rpc);
+    let info = api.get_info().await.map_err(|e| {
+        eprintln!("[mobile-backend] transfer: get_info: {e}");
+        StatusCode::BAD_GATEWAY
+    })?;
+    let block = api.get_block_info(info.last_irreversible_block_num).await.map_err(|e| {
+        eprintln!("[mobile-backend] transfer: get_block_info: {e}");
+        StatusCode::BAD_GATEWAY
+    })?;
+
+    let head_time = super::chain::parse_eosio_time(&info.head_block_time).map_err(|e| {
+        eprintln!("[mobile-backend] transfer: parse time: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let expiration = head_time + 120;
+
+    let id_bytes = hex::decode(&block.id).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let ref_block_num = (block.block_num & 0xFFFF) as u16;
+    let ref_block_prefix = if id_bytes.len() >= 12 {
+        u32::from_le_bytes([id_bytes[8], id_bytes[9], id_bytes[10], id_bytes[11]])
+    } else {
+        0
+    };
+
+    let header = eosio_signer::transaction::TransactionHeader {
+        expiration,
+        ref_block_num,
+        ref_block_prefix,
+        max_net_usage_words: 0,
+        max_cpu_usage_ms: 0,
+        delay_sec: 0,
+    };
+    let tx = eosio_signer::transaction::Transaction::new(header, vec![action]);
+
+    // Sign
+    let packed = eosio_signer::sign_transaction(&tx, &info.chain_id, &key).map_err(|e| {
+        eprintln!("[mobile-backend] transfer: sign: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // Broadcast
+    let result = api.push_transaction(&packed).await.map_err(|e| {
+        eprintln!("[mobile-backend] transfer: push: {e}");
+        StatusCode::BAD_GATEWAY
+    })?;
+
+    Ok(Json(TransferResponse {
+        transaction_id: result.transaction_id,
+        broadcast: true,
+    }))
 }
 
 // -- Settings --

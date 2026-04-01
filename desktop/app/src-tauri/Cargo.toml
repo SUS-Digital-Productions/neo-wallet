@@ -34,3 +34,5 @@ pbkdf2 = { version = "0.12", features = ["simple"] }
 sha2 = "0.10"
 hex = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+eosio-signer = { path = "crates/eosio-signer", default-features = false }
+eosio-abi = { path = "crates/eosio-abi" }
