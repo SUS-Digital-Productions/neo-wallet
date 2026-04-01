@@ -1,0 +1,11 @@
+{
+  "app": {
+    "trayIcon": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": true
+    }
+  },
+  "bundle": {
+    "externalBin": ["sidecar/NeoWallet.Backend"]
+  }
+}
