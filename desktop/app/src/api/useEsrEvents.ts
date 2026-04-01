@@ -7,7 +7,7 @@ function resolveBaseUrl(): string {
   const env = import.meta.env.VITE_BACKEND_URL;
   if (env) return env as string;
   if (
-    (window as Record<string, unknown>).__TAURI_INTERNALS__ &&
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ &&
     !window.location.origin.includes("localhost:5199")
   ) {
     return "http://127.0.0.1:5199";

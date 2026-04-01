@@ -43,7 +43,7 @@ function resolveBaseUrl(): string {
   // Tauri mobile: webview is loaded from tauri:// or https://tauri.localhost,
   // not from the backend, so we must use the explicit embedded-server address.
   if (
-    (window as Record<string, unknown>).__TAURI_INTERNALS__ &&
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ &&
     !window.location.origin.includes("localhost:5199")
   ) {
     return "http://127.0.0.1:5199";
