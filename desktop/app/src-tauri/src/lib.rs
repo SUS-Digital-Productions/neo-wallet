@@ -114,6 +114,7 @@ fn emit_deep_links(app: &tauri::AppHandle, urls: Vec<url::Url>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[allow(unused_mut)]
     let mut builder = tauri::Builder::default();
 
     // Single-instance plugin — desktop only.

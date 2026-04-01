@@ -2,11 +2,12 @@
 // The format is byte-compatible with the .NET desktop backend so wallet files
 // can be transferred between desktop and mobile.
 
-use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
+use aes::cipher::{block_padding::Pkcs7, BlockEncryptMut, BlockDecryptMut, KeyIvInit};
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use pbkdf2::pbkdf2_hmac;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::convert::TryInto;
 
 const SALT_SIZE: usize = 16;
 const KEY_SIZE: usize = 32; // AES-256
@@ -90,7 +91,10 @@ impl WalletFile {
             .map_err(|e| format!("decode ciphertext: {e}"))?;
 
         let key = derive_key(password, &salt);
-        let plaintext = decrypt_aes256_cbc(&key, &iv, &ciphertext)?;
+        let iv_arr: [u8; IV_SIZE] = iv
+            .try_into()
+            .map_err(|_| "invalid IV length".to_string())?;
+        let plaintext = decrypt_aes256_cbc(&key, &iv_arr, &ciphertext)?;
 
         serde_json::from_slice(&plaintext)
             .map_err(|e| format!("deserialize wallet data: {e}"))
@@ -105,7 +109,13 @@ fn derive_key(password: &str, salt: &[u8]) -> [u8; KEY_SIZE] {
 
 fn encrypt_aes256_cbc(key: &[u8; KEY_SIZE], iv: &[u8; IV_SIZE], plaintext: &[u8]) -> Vec<u8> {
     let enc = Aes256CbcEnc::new(key.into(), iv.into());
-    enc.encrypt_padded_vec_mut::<Pkcs7>(plaintext)
+    // Allocate buffer: plaintext + up to one full block of PKCS7 padding
+    let mut buf = vec![0u8; plaintext.len() + 16];
+    buf[..plaintext.len()].copy_from_slice(plaintext);
+    let ct = enc
+        .encrypt_padded_mut::<Pkcs7>(&mut buf, plaintext.len())
+        .expect("encrypt buffer too small");
+    ct.to_vec()
 }
 
 fn decrypt_aes256_cbc(
@@ -114,6 +124,9 @@ fn decrypt_aes256_cbc(
     ciphertext: &[u8],
 ) -> Result<Vec<u8>, String> {
     let dec = Aes256CbcDec::new(key.into(), iv.into());
-    dec.decrypt_padded_vec_mut::<Pkcs7>(ciphertext)
-        .map_err(|_| "decryption failed (wrong password?)".to_string())
+    let mut buf = ciphertext.to_vec();
+    let pt = dec
+        .decrypt_padded_mut::<Pkcs7>(&mut buf)
+        .map_err(|_| "decryption failed (wrong password?)".to_string())?;
+    Ok(pt.to_vec())
 }
