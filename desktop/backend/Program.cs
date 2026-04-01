@@ -4,19 +4,28 @@ using Microsoft.Win32;
 using NeoWallet.Backend;
 using NeoWallet.Backend.Endpoints;
 
-// ── Protocol handler: forward ESR URI to running instance ──────────
-// When launched via esr:// protocol, the OS passes the URI as an arg.
-// If another instance is already running, POST the URI there and exit.
+// ── Single-instance guard ──────────────────────────────────────────
+// Probe the default port. If a healthy instance is already running,
+// forward any ESR URI and exit instead of crashing on port conflict.
 var esrArg = args.FirstOrDefault(a => a.StartsWith("esr:", StringComparison.OrdinalIgnoreCase));
-if (esrArg is not null)
 {
     using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
     try
     {
-        var resp = await probe.PostAsync(
-            $"http://localhost:5199/api/esr/incoming?uri={Uri.EscapeDataString(esrArg)}",
-            null);
-        if (resp.IsSuccessStatusCode) return; // Running instance accepted it
+        var healthResp = await probe.GetAsync("http://localhost:5199/api/health");
+        if (healthResp.IsSuccessStatusCode)
+        {
+            // Another instance is already running.
+            if (esrArg is not null)
+            {
+                await probe.PostAsync(
+                    $"http://localhost:5199/api/esr/incoming?uri={Uri.EscapeDataString(esrArg)}",
+                    null);
+            }
+
+            Console.WriteLine("Another instance is already running. Exiting.");
+            return;
+        }
     }
     catch { /* No running instance — continue booting normally */ }
 }

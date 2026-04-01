@@ -13,11 +13,17 @@ import Networks from "./pages/Networks";
 import Accounts from "./pages/Accounts";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { data: health, isLoading } = useHealth({ refetchInterval: 5_000 });
+  const { data: health, isLoading, isError } = useHealth({ refetchInterval: 5_000 });
   const location = useLocation();
 
   // Don't gate the unlock page itself
   if (location.pathname === "/unlock") return <>{children}</>;
+
+  // If the backend is unreachable (mobile / no sidecar), go to unlock
+  // so the user isn't stuck on a spinner forever.
+  if (isError) {
+    return <Navigate to="/unlock" replace />;
+  }
 
   if (isLoading) {
     return (
