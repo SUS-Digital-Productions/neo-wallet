@@ -5,7 +5,7 @@
 | Tool | Version | Purpose |
 |------|---------|---------|
 | **.NET SDK** | 10.0+ | Backend + static file server |
-| **Node.js** | 20+ | Build the React frontend |
+| **Node.js** | 24+ | Build the React frontend |
 | **npm** | 10+ | Package management |
 
 ---

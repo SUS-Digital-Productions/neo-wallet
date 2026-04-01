@@ -3,7 +3,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./hooks";
 import type { EsrSseEvent } from "./types";
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? "";
+function resolveBaseUrl(): string {
+  const env = import.meta.env.VITE_BACKEND_URL;
+  if (env) return env as string;
+  if (
+    (window as Record<string, unknown>).__TAURI_INTERNALS__ &&
+    !window.location.origin.includes("localhost:5199")
+  ) {
+    return "http://127.0.0.1:5199";
+  }
+  return "";
+}
+
+const BASE_URL = resolveBaseUrl();
 
 /**
  * Hook that establishes a WebSocket connection to the backend ESR event stream.

@@ -28,8 +28,7 @@ export default function Unlock() {
     return null;
   }
 
-  const walletExists = health?.walletLoaded ?? null;
-  if (walletExists === null) return null;
+  const walletExists = health?.walletLoaded ?? false;
 
   function handleUnlock(e: React.FormEvent) {
     e.preventDefault();

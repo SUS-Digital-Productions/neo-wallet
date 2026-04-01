@@ -1,32 +1,51 @@
 # SUS.EOS.NeoWallet - AI Coding Instructions
 
 ## Project Overview
-This repository no longer contains the MAUI wallet application. The UI layer was removed in favor of a planned desktop architecture built around Tauri, React, and a local .NET backend.
+This repository contains the Neo Wallet application — a cross-platform wallet for Antelope (EOSIO) blockchains built with Tauri 2, React, and a backend layer that differs by platform:
+- **Desktop**: .NET 10 sidecar process spawned by Tauri
+- **Mobile**: Embedded Rust HTTP backend (axum) running inside the Tauri app
 
 ## Current Repository Scope
 - **SUS.EOS.Sharp** - Antelope blockchain client, cryptography, serialization, and transaction helpers
 - **SUS.EOS.EosioSigningRequest** - ESR protocol models and services
 - **SUS.EOS.Sharp.Tests / TestAction** - test and example projects
+- **desktop/app** - Tauri 2 + React frontend (desktop & mobile)
+- **desktop/backend** - .NET 10 local backend (desktop sidecar)
 
-## Intended Desktop Architecture
+## Architecture
+
+### Desktop
 ```
 React + Vite renderer
     ↓
-Tauri desktop shell
+Tauri desktop shell (tray icon, single-instance, deep links)
     ↓
-Local .NET backend / sidecar
+Local .NET backend / sidecar (port 5199)
     ↓
 SUS.EOS.EosioSigningRequest
     ↓
 SUS.EOS.Sharp
 ```
 
+### Mobile (Android / iOS)
+```
+React (bundled in Tauri Mobile webview)
+    ↓
+Tauri mobile shell (deep links)
+    ↓
+Embedded Rust HTTP backend (axum, port 5199)
+    ↓
+AES-256-CBC wallet crypto (byte-compatible with .NET)
+```
+
 ## Coding Guidance
 
 ### Primary Direction
 - Prefer changes that strengthen the reusable backend surface.
-- Keep wallet secrets, signing, protocol handling, and chain access in .NET.
-- Treat React/Tauri as the future UI shell, not the future signing layer.
+- Keep wallet secrets, signing, protocol handling, and chain access in .NET (desktop) or Rust (mobile).
+- Treat React/Tauri as the UI shell, not the signing layer.
+- The mobile Rust backend must maintain API compatibility with the .NET desktop backend.
+- Wallet file encryption format (AES-256-CBC + PBKDF2-SHA256) must stay byte-compatible across platforms.
 
 ### Modern C# Features
 - Use file-scoped namespaces.

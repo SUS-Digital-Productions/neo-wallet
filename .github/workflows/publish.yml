@@ -134,9 +134,9 @@ jobs:
           path: NeoWallet-${{ matrix.rid }}.*
           retention-days: 30
 
-  # ── Android build (Capacitor) ──────────────────────────
+  # ── Android build (Tauri Mobile) ────────────────────────
   android:
-    needs: [matrix-setup, build-frontend]
+    needs: [matrix-setup]
     if: needs.matrix-setup.outputs.build-android == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -156,33 +156,36 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - uses: actions/download-artifact@v5
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
         with:
-          name: frontend-dist
-          path: desktop/app/dist/
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
 
-      - name: Install dependencies & init Capacitor
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/app/src-tauri
+
+      - name: Install frontend deps
         working-directory: desktop/app
-        run: |
-          npm ci
+        run: npm ci
 
-          # Add the Android platform if not present
-          if [ ! -d "android" ]; then
-            npx cap add android
-          fi
+      - name: Init Tauri Android
+        working-directory: desktop/app
+        run: npx tauri android init
 
-          npx cap sync android
-
-      - name: Build Android APK
-        working-directory: desktop/app/android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
+      - name: Build Android APK (debug)
+        working-directory: desktop/app
+        run: npx tauri android build --debug
 
       - name: Collect APK
         run: |
           mkdir -p publish/android
-          find desktop/app/android -name "*.apk" -path "*/debug/*" -exec cp {} publish/android/NeoWallet.apk \;
+          find desktop/app/src-tauri/gen/android -name "*.apk" -path "*/debug/*" -exec cp {} publish/android/NeoWallet.apk \; 2>/dev/null || true
+          # Fallback: look in the target directory
+          if [ ! -f publish/android/NeoWallet.apk ]; then
+            find desktop/app/src-tauri -name "*.apk" -exec cp {} publish/android/NeoWallet.apk \; 2>/dev/null || true
+          fi
 
       - uses: actions/upload-artifact@v5
         with:
@@ -190,9 +193,9 @@ jobs:
           path: publish/android/NeoWallet.apk
           retention-days: 30
 
-  # ── iOS build (Capacitor + Xcode) ──────────────────────
+  # ── iOS build (Tauri Mobile + Xcode) ───────────────────
   ios:
-    needs: [matrix-setup, build-frontend]
+    needs: [matrix-setup]
     if: needs.matrix-setup.outputs.build-ios == 'true'
     runs-on: macos-latest
     steps:
@@ -204,67 +207,38 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/app/package-lock.json
 
-      - uses: actions/download-artifact@v5
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
         with:
-          name: frontend-dist
-          path: desktop/app/dist/
+          targets: aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-ios-sim
 
-      - name: Install dependencies & init Capacitor
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/app/src-tauri
+
+      - name: Install frontend deps
         working-directory: desktop/app
-        run: |
-          npm ci
+        run: npm ci
 
-          # Add the iOS platform if not present
-          if [ ! -d "ios" ]; then
-            npx cap add ios
-          fi
+      - name: Init Tauri iOS
+        working-directory: desktop/app
+        run: npx tauri ios init
 
-          npx cap sync ios
+      - name: Build iOS (unsigned)
+        working-directory: desktop/app
+        run: npx tauri ios build -- --allow-provisioning-updates CODE_SIGNING_ALLOWED=NO
+        continue-on-error: true
 
-          # Install CocoaPods dependencies if Podfile exists
-          if [ -f "ios/App/Podfile" ]; then
-            cd ios/App
-            pod install --repo-update
-            cd ../..
-          fi
-
-          echo "--- iOS project contents ---"
-          ls -la ios/App/
-
-      - name: Build iOS (unsigned archive)
-        working-directory: desktop/app/ios/App
-        run: |
-          set -o pipefail
-
-          # Use workspace if it exists (CocoaPods/SPM), otherwise fall back to xcodeproj
-          if [ -d "App.xcworkspace" ]; then
-            echo "Building with App.xcworkspace"
-            xcodebuild archive \
-              -workspace App.xcworkspace \
-              -scheme App \
-              -configuration Release \
-              -archivePath $RUNNER_TEMP/NeoWallet.xcarchive \
-              CODE_SIGNING_ALLOWED=NO \
-              -destination "generic/platform=iOS" \
-              2>&1 | tail -50
-          else
-            echo "Building with App.xcodeproj"
-            xcodebuild archive \
-              -project App.xcodeproj \
-              -scheme App \
-              -configuration Release \
-              -archivePath $RUNNER_TEMP/NeoWallet.xcarchive \
-              CODE_SIGNING_ALLOWED=NO \
-              -destination "generic/platform=iOS" \
-              2>&1 | tail -50
-          fi
-
-      - name: Collect archive
+      - name: Collect build output
         run: |
           mkdir -p publish/ios
-          cp -R "$RUNNER_TEMP/NeoWallet.xcarchive" publish/ios/
+          find desktop/app/src-tauri -name "*.app" -o -name "*.xcarchive" | head -5
+          # Copy whatever Tauri produced
+          find desktop/app/src-tauri/gen/apple -name "*.xcarchive" -exec cp -R {} publish/ios/ \; 2>/dev/null || true
 
       - uses: actions/upload-artifact@v5
+        if: always()
         with:
           name: NeoWallet-ios
           path: publish/ios/

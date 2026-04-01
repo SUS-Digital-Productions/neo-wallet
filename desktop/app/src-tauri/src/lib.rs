@@ -1,12 +1,25 @@
-use tauri::Manager;
 use tauri::Emitter;
 use tauri::Listener;
+use tauri::Manager;
+#[cfg(desktop)]
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
+#[cfg(desktop)]
 use tauri::tray::TrayIconBuilder;
+#[cfg(desktop)]
 use tauri_plugin_shell::ShellExt;
 
-/// Start the .NET sidecar backend and return the process handle.
-fn start_backend(app: &tauri::AppHandle) -> Result<tauri_plugin_shell::process::CommandChild, String> {
+#[cfg(not(desktop))]
+mod mobile_backend;
+
+// ---------------------------------------------------------------------------
+// Desktop helpers
+// ---------------------------------------------------------------------------
+
+/// Start the .NET sidecar backend and return the process handle (desktop only).
+#[cfg(desktop)]
+fn start_backend(
+    app: &tauri::AppHandle,
+) -> Result<tauri_plugin_shell::process::CommandChild, String> {
     let shell = app.shell();
     let (mut rx, child) = shell
         .sidecar("NeoWallet.Backend")
@@ -14,7 +27,6 @@ fn start_backend(app: &tauri::AppHandle) -> Result<tauri_plugin_shell::process::
         .spawn()
         .map_err(|e| format!("failed to spawn sidecar: {e}"))?;
 
-    // Log sidecar stdout/stderr in background
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
@@ -32,6 +44,59 @@ fn start_backend(app: &tauri::AppHandle) -> Result<tauri_plugin_shell::process::
     Ok(child)
 }
 
+/// Set up desktop-specific features: tray icon, .NET sidecar.
+#[cfg(desktop)]
+fn setup_desktop(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let open_item = MenuItemBuilder::with_id("open", "Open Neo Wallet").build(app)?;
+    let quit_item = MenuItemBuilder::with_id("quit", "Exit").build(app)?;
+    let tray_menu = MenuBuilder::new(app)
+        .item(&open_item)
+        .separator()
+        .item(&quit_item)
+        .build()?;
+
+    let _tray = TrayIconBuilder::new()
+        .menu(&tray_menu)
+        .tooltip("Neo Wallet")
+        .on_menu_event(move |app, event| match event.id().as_ref() {
+            "open" => {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+            "quit" => {
+                println!("[tauri] Exit requested from tray — shutting down.");
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                let app = tray.app_handle();
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        })
+        .build(app)?;
+
+    println!("[tauri] System tray icon started");
+
+    let handle = app.handle().clone();
+    match start_backend(&handle) {
+        Ok(_child) => println!("[tauri] .NET backend sidecar started"),
+        Err(e) => eprintln!("[tauri] Failed to start backend: {e}"),
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
 /// Emit any `esr://` URIs to the React frontend.
 fn emit_deep_links(app: &tauri::AppHandle, urls: Vec<url::Url>) {
     for u in urls {
@@ -43,32 +108,32 @@ fn emit_deep_links(app: &tauri::AppHandle, urls: Vec<url::Url>) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
 
-    // On desktop, use single-instance plugin so subsequent deep-link clicks
-    // reuse the already-running window instead of spawning a new process.
+    // Single-instance plugin — desktop only.
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {
-            // Deep-link args are forwarded automatically when the "deep-link"
-            // feature is enabled on the single-instance plugin.
-        }));
+        builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}));
     }
 
     builder
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
-            // Register esr:// scheme at runtime for dev/non-installed builds
+            // Register esr:// scheme at runtime (desktop Linux/Windows)
             #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 let _ = app.deep_link().register_all();
             }
 
-            // Check if app was launched via a deep link
+            // Check if app was launched via a deep link (desktop only)
             #[cfg(desktop)]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -77,7 +142,7 @@ pub fn run() {
                 }
             }
 
-            // Listen for deep-link events while running
+            // Listen for deep-link events while running (all platforms)
             let handle = app.handle().clone();
             app.listen("deep-link://new-url", move |event: tauri::Event| {
                 if let Ok(urls) = serde_json::from_str::<Vec<url::Url>>(event.payload()) {
@@ -85,54 +150,21 @@ pub fn run() {
                 }
             });
 
-            // Build system tray icon with context menu
-            let open_item = MenuItemBuilder::with_id("open", "Open Neo Wallet").build(app)?;
-            let quit_item = MenuItemBuilder::with_id("quit", "Exit").build(app)?;
-            let tray_menu = MenuBuilder::new(app)
-                .item(&open_item)
-                .separator()
-                .item(&quit_item)
-                .build()?;
+            // --- Desktop: tray icon + .NET sidecar ---
+            #[cfg(desktop)]
+            setup_desktop(app)?;
 
-            let _tray = TrayIconBuilder::new()
-                .menu(&tray_menu)
-                .tooltip("Neo Wallet")
-                .on_menu_event(move |app, event| match event.id().as_ref() {
-                    "open" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                    "quit" => {
-                        println!("[tauri] Exit requested from tray — shutting down.");
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                })
-                .build(app)?;
-
-            println!("[tauri] System tray icon started");
-
-            // Start .NET backend sidecar
-            let handle2 = app.handle().clone();
-            match start_backend(&handle2) {
-                Ok(_child) => {
-                    println!("[tauri] .NET backend sidecar started");
-                }
-                Err(e) => {
-                    eprintln!("[tauri] Failed to start backend: {e}");
-                }
+            // --- Mobile: embedded Rust HTTP backend ---
+            #[cfg(not(desktop))]
+            {
+                let data_dir = app
+                    .path()
+                    .app_data_dir()
+                    .expect("failed to resolve app data directory");
+                mobile_backend::start(data_dir);
+                println!("[tauri] Mobile embedded backend started");
             }
+
             Ok(())
         })
         .run(tauri::generate_context!())
