@@ -5,6 +5,7 @@
   "permissions": [
     "core:default",
     "core:event:default",
+    "core:tray:default",
     "shell:allow-open",
     "shell:allow-execute",
     "deep-link:default"

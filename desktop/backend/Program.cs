@@ -260,34 +260,11 @@ else
             "NeoWallet", "browser-profile")
         : null;
 
-    // ── System tray (Windows) ──────────────────────────────────────
-    NeoWallet.Backend.Services.TrayIconService? tray = null;
-
-    if (OperatingSystem.IsWindows())
-    {
-        tray = new NeoWallet.Backend.Services.TrayIconService();
-
-        tray.OpenRequested += () =>
-        {
-            LaunchBrowserWindow(browserExe, listenUrl, profileDir);
-        };
-
-        tray.ExitRequested += () =>
-        {
-            Trace.WriteLine("[BACKEND] Exit requested from tray — shutting down.");
-            _ = app.StopAsync();
-        };
-
-        tray.Start();
-    }
-
     // Open the initial browser window.
     LaunchBrowserWindow(browserExe, listenUrl, profileDir);
 
-    // Block on the ASP.NET host — exits when tray Exit is clicked or app is stopped.
+    // Block on the ASP.NET host.
     app.WaitForShutdown();
-
-    tray?.Dispose();
 }
 
 // ── Helper methods ─────────────────────────────────────────────────

@@ -1,5 +1,9 @@
 use tauri::Manager;
 use tauri::Emitter;
+use tauri::Listener;
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::tray::TrayIconBuilder;
+use tauri_plugin_shell::ShellExt;
 
 /// Start the .NET sidecar backend and return the process handle.
 fn start_backend(app: &tauri::AppHandle) -> Result<tauri_plugin_shell::process::CommandChild, String> {
@@ -75,11 +79,49 @@ pub fn run() {
 
             // Listen for deep-link events while running
             let handle = app.handle().clone();
-            app.listen("deep-link://new-url", move |event| {
+            app.listen("deep-link://new-url", move |event: tauri::Event| {
                 if let Ok(urls) = serde_json::from_str::<Vec<url::Url>>(event.payload()) {
                     emit_deep_links(&handle, urls);
                 }
             });
+
+            // Build system tray icon with context menu
+            let open_item = MenuItemBuilder::with_id("open", "Open Neo Wallet").build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "Exit").build(app)?;
+            let tray_menu = MenuBuilder::new(app)
+                .item(&open_item)
+                .separator()
+                .item(&quit_item)
+                .build()?;
+
+            let _tray = TrayIconBuilder::new()
+                .menu(&tray_menu)
+                .tooltip("Neo Wallet")
+                .on_menu_event(move |app, event| match event.id().as_ref() {
+                    "open" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        println!("[tauri] Exit requested from tray — shutting down.");
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            println!("[tauri] System tray icon started");
 
             // Start .NET backend sidecar
             let handle2 = app.handle().clone();
