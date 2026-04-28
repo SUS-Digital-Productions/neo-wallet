@@ -22,6 +22,12 @@ public sealed class AutoLockService : BackgroundService
     /// <summary>Update the activity timestamp. Called by middleware on each authenticated request.</summary>
     public void Touch() => _lastActivity = DateTime.UtcNow;
 
+    /// <summary>UTC timestamp of the last user activity that reset the auto-lock timer.</summary>
+    public DateTime LastActivity => _lastActivity;
+
+    /// <summary>Configured timeout in minutes (0 = disabled).</summary>
+    public int TimeoutMinutes => _settings.AutoLockMinutes;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Trace.WriteLine($"[AUTOLOCK] Started, timeout = {_settings.AutoLockMinutes} min");

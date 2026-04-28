@@ -37,6 +37,11 @@ export interface WalletSummary {
   activeNetwork: NetworkInfo | null;
   activeAccount: AccountInfo | null;
   listenerStatus: string;
+  /** Configured auto-lock timeout in minutes (0 = disabled). */
+  autoLockMinutes: number;
+  /** ISO-8601 UTC timestamp of when the wallet will auto-lock, or null if unlocked-but-disabled / locked. */
+  lockExpiresAt: string | null;
+  walletUnlocked: boolean;
 }
 
 export interface CreateWalletRequest {
@@ -81,6 +86,17 @@ export interface GetPrivateKeyResponse {
 export interface ImportWalletRequest {
   password: string;
   fileBase64: string;
+}
+
+export interface ImportAnchorWalletRequest {
+  password: string;
+  fileBase64: string;
+}
+
+export interface ImportAnchorWalletResponse {
+  importedKeys: number;
+  publicKeys: string[];
+  format: string;
 }
 
 /* ---- Keys ---- */
@@ -232,3 +248,101 @@ export interface EsrStatusChangedEvent {
 }
 
 export type EsrSseEvent = EsrSigningRequestEvent | EsrStatusChangedEvent;
+
+/* ---- Generic action signing (used by Sign Action page + dedicated forms) ---- */
+
+export interface SignAction {
+  account: string;
+  name: string;
+  data: Record<string, unknown>;
+  authorization?: { actor: string; permission: string }[];
+}
+
+export interface SignActionsRequest {
+  chainId?: string;
+  actions: SignAction[];
+  broadcast?: boolean;
+}
+
+export interface SignActionsResponse {
+  transactionId: string;
+  broadcast: boolean;
+}
+
+/* ---- Chain (Account Viewer) ----
+ * The /api/chain/account endpoint returns the raw nodeos /v1/chain/get_account
+ * response, which is large and chain-specific. We type only the bits we render.
+ */
+
+export interface ChainResourceLimit {
+  used: number;
+  available: number;
+  max: number;
+}
+
+export interface ChainKeyWeight {
+  key: string;
+  weight: number;
+}
+
+export interface ChainPermissionLevel {
+  actor: string;
+  permission: string;
+}
+
+export interface ChainAccountInfo {
+  account_name: string;
+  created: string;
+  ram_quota: number;
+  ram_usage: number;
+  net_weight: number | string;
+  cpu_weight: number | string;
+  net_limit: ChainResourceLimit;
+  cpu_limit: ChainResourceLimit;
+  core_liquid_balance?: string;
+  permissions: {
+    perm_name: string;
+    parent: string;
+    required_auth: {
+      threshold: number;
+      keys: ChainKeyWeight[];
+      accounts: { permission: ChainPermissionLevel; weight: number }[];
+      waits: { wait_sec: number; weight: number }[];
+    };
+  }[];
+  total_resources?: {
+    owner: string;
+    net_weight: string;
+    cpu_weight: string;
+    ram_bytes: number;
+  } | null;
+  self_delegated_bandwidth?: {
+    from: string;
+    to: string;
+    net_weight: string;
+    cpu_weight: string;
+  } | null;
+  refund_request?: {
+    owner: string;
+    request_time: string;
+    net_amount: string;
+    cpu_amount: string;
+  } | null;
+  voter_info?: {
+    owner: string;
+    proxy: string;
+    producers: string[];
+    staked: number | string;
+    last_vote_weight: string;
+    proxied_vote_weight: string;
+    is_proxy: number;
+  } | null;
+  rex_info?: {
+    owner: string;
+    vote_stake: string;
+    rex_balance: string;
+    matured_rex: number;
+  } | null;
+  // Allow forward-compatibility for unknown fields.
+  [extraField: string]: unknown;
+}

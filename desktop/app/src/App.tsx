@@ -11,6 +11,15 @@ import EsrApproval from "./pages/EsrApproval";
 import Keys from "./pages/Keys";
 import Networks from "./pages/Networks";
 import Accounts from "./pages/Accounts";
+import Account from "./pages/Account";
+import Utilities from "./pages/Utilities";
+import Resources from "./pages/Resources";
+import Ram from "./pages/Ram";
+import PowerUp from "./pages/PowerUp";
+import Vote from "./pages/Vote";
+import Permissions from "./pages/Permissions";
+import CreateAccount from "./pages/CreateAccount";
+import Msig from "./pages/Msig";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { data: health, isLoading, isError } = useHealth({ refetchInterval: 5_000 });
@@ -52,6 +61,15 @@ function App() {
           <Route path="keys" element={<Keys />} />
           <Route path="networks" element={<Networks />} />
           <Route path="accounts" element={<Accounts />} />
+          <Route path="account" element={<Account />} />
+          <Route path="utilities" element={<Utilities />} />
+          <Route path="resources" element={<Resources />} />
+          <Route path="ram" element={<Ram />} />
+          <Route path="powerup" element={<PowerUp />} />
+          <Route path="vote" element={<Vote />} />
+          <Route path="permissions" element={<Permissions />} />
+          <Route path="create-account" element={<CreateAccount />} />
+          <Route path="msig" element={<Msig />} />
           <Route path="settings" element={<Settings />} />
           <Route path="esr" element={<EsrApproval />} />
         </Route>

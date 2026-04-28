@@ -85,6 +85,14 @@ public interface IWalletStorageService
     WalletData? CurrentData { get; }
     byte[]? ReadRawFile();
     void WriteRawFile(byte[] data);
+
+    /// <summary>
+    /// Validate that the supplied bytes form a wallet file decryptable with the
+    /// given password, and only then atomically replace the existing wallet.
+    /// Returns the decrypted WalletData on success, null if the password is wrong
+    /// or the file is not a NeoWallet-format file.
+    /// </summary>
+    WalletData? ValidateAndReplace(byte[] candidateBytes, string password);
 }
 
 public sealed class WalletStorageService : IWalletStorageService
@@ -190,6 +198,67 @@ public sealed class WalletStorageService : IWalletStorageService
         _current = null;
         File.WriteAllBytes(_walletPath, data);
         System.Diagnostics.Trace.WriteLine("[WALLETSTORAGE] Wallet file replaced via import");
+    }
+
+    public WalletData? ValidateAndReplace(byte[] candidateBytes, string password)
+    {
+        // Try to decode as our wallet file format and decrypt with given password
+        // BEFORE touching the existing wallet.json on disk.
+        WalletFile? file;
+        try
+        {
+            var json = Encoding.UTF8.GetString(candidateBytes);
+            file = JsonSerializer.Deserialize<WalletFile>(json);
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (file is null
+            || string.IsNullOrEmpty(file.Salt)
+            || string.IsNullOrEmpty(file.Iv)
+            || string.IsNullOrEmpty(file.Ciphertext))
+        {
+            return null;
+        }
+
+        WalletData? decoded;
+        try
+        {
+            var salt = Convert.FromBase64String(file.Salt);
+            var iv = Convert.FromBase64String(file.Iv);
+            var ciphertext = Convert.FromBase64String(file.Ciphertext);
+            var key = DeriveKey(password, salt);
+            var plaintext = Decrypt(ciphertext, key, iv);
+            decoded = JsonSerializer.Deserialize<WalletData>(plaintext);
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (decoded is null) return null;
+
+        // Validation succeeded — back up existing wallet, then atomically replace.
+        if (File.Exists(_walletPath))
+        {
+            var backup = _walletPath + $".bak.{DateTime.UtcNow:yyyyMMddHHmmss}";
+            try
+            {
+                File.Copy(_walletPath, backup, overwrite: false);
+                System.Diagnostics.Trace.WriteLine($"[WALLETSTORAGE] Backed up existing wallet to {Path.GetFileName(backup)}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"[WALLETSTORAGE] Backup failed: {ex.Message}");
+            }
+        }
+
+        File.WriteAllBytes(_walletPath, candidateBytes);
+        _current = decoded;
+        System.Diagnostics.Trace.WriteLine("[WALLETSTORAGE] Wallet imported and unlocked");
+        return decoded;
     }
 
     private static byte[] DeriveKey(string password, byte[] salt)

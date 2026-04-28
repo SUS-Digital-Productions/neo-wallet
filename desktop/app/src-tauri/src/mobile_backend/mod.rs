@@ -5,6 +5,7 @@
 // the React frontend expects.  The wallet file format (AES-256-CBC with
 // PBKDF2 key derivation) is byte-compatible with the .NET desktop backend.
 
+mod anchor;
 mod chain;
 mod crypto;
 mod routes;

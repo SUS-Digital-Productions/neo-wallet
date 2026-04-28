@@ -7,12 +7,24 @@ public static class WalletEndpoints
 {
     public static void MapWalletEndpoints(this WebApplication app)
     {
-        app.MapGet("/api/wallet/summary", (IWalletStateService wallet, EsrListenerService listener) =>
-            Results.Ok(new WalletSummaryDto(
+        app.MapGet("/api/wallet/summary", (IWalletStateService wallet, EsrListenerService listener, AutoLockService autoLock) =>
+        {
+            string? lockExpiresAt = null;
+            if (wallet.WalletUnlocked && autoLock.TimeoutMinutes > 0)
+            {
+                var expires = autoLock.LastActivity.AddMinutes(autoLock.TimeoutMinutes);
+                lockExpiresAt = expires.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            return Results.Ok(new WalletSummaryDto(
                 ActiveNetwork: wallet.ActiveNetwork,
                 ActiveAccount: wallet.ActiveAccount,
-                ListenerStatus: listener.Status.ToString()
-            )));
+                ListenerStatus: listener.Status.ToString(),
+                AutoLockMinutes: autoLock.TimeoutMinutes,
+                LockExpiresAt: lockExpiresAt,
+                WalletUnlocked: wallet.WalletUnlocked
+            ));
+        });
 
         app.MapPost("/api/wallet/create", (CreateWalletRequest req, IWalletStateService wallet, BackendTokenHolder tokenHolder) =>
         {
@@ -54,17 +66,61 @@ public static class WalletEndpoints
             try { fileBytes = Convert.FromBase64String(req.FileBase64); }
             catch { return Results.Problem("Invalid file data.", statusCode: StatusCodes.Status400BadRequest); }
 
-            // Write the file, then try to unlock with the given password
-            storage.WriteRawFile(fileBytes);
-            var data = storage.Unlock(req.Password);
+            // Validate the candidate file BEFORE overwriting the existing wallet.
+            // ValidateAndReplace decrypts in-memory, then atomically swaps with backup.
+            var data = storage.ValidateAndReplace(fileBytes, req.Password);
             if (data is null)
             {
-                return Results.Problem("Wrong password or corrupted wallet file.", statusCode: StatusCodes.Status400BadRequest);
+                return Results.Problem(
+                    "Wrong password, or file is not a NeoWallet-format wallet. " +
+                    "If this is an Anchor / scatter backup, use the dedicated Anchor import.",
+                    statusCode: StatusCodes.Status400BadRequest);
             }
 
-            // Wallet is now unlocked with the imported data
+            // Wallet replaced — re-prime the in-memory state with the new password
             wallet.Unlock(req.Password);
             return Results.Ok(new UnlockResponse(true, tokenHolder.Token));
+        });
+
+        app.MapPost("/api/wallet/import-anchor", (ImportAnchorWalletRequest req, IWalletStateService wallet) =>
+        {
+            if (!wallet.WalletUnlocked)
+                return Results.Problem(
+                    "Wallet must be unlocked to import keys from an Anchor backup. " +
+                    "Create or unlock your NeoWallet first, then import.",
+                    statusCode: StatusCodes.Status403Forbidden);
+
+            byte[] fileBytes;
+            try { fileBytes = Convert.FromBase64String(req.FileBase64); }
+            catch { return Results.Problem("Invalid file data.", statusCode: StatusCodes.Status400BadRequest); }
+
+            var result = AnchorWalletImporter.TryImport(fileBytes, req.Password);
+            if (result is null || result.PrivateKeysWif.Count == 0)
+            {
+                return Results.Problem(
+                    "Could not decrypt the Anchor wallet file with the given password. " +
+                    "If you are sure the password is correct, the file format may not be supported yet.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var publicKeys = new List<string>();
+            foreach (var wif in result.PrivateKeysWif)
+            {
+                try
+                {
+                    var added = wallet.AddKey(wif, label: $"Imported from Anchor ({result.Format})");
+                    publicKeys.Add(added.PublicKey);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"[ANCHOR-IMPORT] Failed to add key: {ex.Message}");
+                }
+            }
+
+            return Results.Ok(new ImportAnchorWalletResponse(
+                ImportedKeys: publicKeys.Count,
+                PublicKeys: publicKeys.ToArray(),
+                Format: result.Format));
         });
 
         app.MapPost("/api/accounts/private-key", (GetPrivateKeyRequest req, IWalletStateService wallet) =>

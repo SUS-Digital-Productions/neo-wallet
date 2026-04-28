@@ -106,6 +106,8 @@ app.MapBalanceEndpoints();
 app.MapTransferEndpoints();
 app.MapEsrEndpoints();
 app.MapSettingsEndpoints();
+app.MapChainEndpoints();
+app.MapActionsEndpoints();
 
 // Unauthenticated endpoint for esr:// protocol handler invocations.
 // Accepts an ESR URI, parses it, stores it, and pushes a WebSocket event.

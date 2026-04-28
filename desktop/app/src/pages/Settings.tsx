@@ -8,6 +8,7 @@ import {
   Copy,
   Download,
   Upload,
+  KeyRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import {
   useConnectEsrListener,
   useDisconnectEsrListener,
   useImportWallet,
+  useImportAnchorWallet,
 } from "@/api/hooks";
 import { exportWallet } from "@/api/client";
 import { Input } from "@/components/ui/input";
@@ -49,9 +51,15 @@ export default function Settings() {
   const disconnectListener = useDisconnectEsrListener();
 
   const importWalletMutation = useImportWallet();
+  const importAnchorMutation = useImportAnchorWallet();
 
   const [importPassword, setImportPassword] = useState("");
+  const [importFileName, setImportFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [anchorPassword, setAnchorPassword] = useState("");
+  const [anchorFileName, setAnchorFileName] = useState<string | null>(null);
+  const anchorFileInputRef = useRef<HTMLInputElement>(null);
 
   const lockMinutes = lockSettings?.timeoutMinutes ?? 180;
 
@@ -328,26 +336,33 @@ export default function Settings() {
           <div>
             <p className="text-sm font-medium">Import Wallet</p>
             <p className="mb-3 text-xs text-muted-foreground">
-              Restore from an encrypted wallet backup file
+              Restore from a NeoWallet-format encrypted backup. Your existing wallet
+              will be backed up before being replaced.
             </p>
             <div className="space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload className="mr-1 size-3.5" />
-                Choose File
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="mr-1 size-3.5" />
+                  {importFileName ? "Change file" : "Choose file"}
+                </Button>
+                {importFileName && (
+                  <span className="truncate text-xs text-muted-foreground">
+                    {importFileName}
+                  </span>
+                )}
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".json"
+                accept=".json,application/json"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (!file) return;
-                  toast.info(`Selected: ${file.name}`);
+                  setImportFileName(file?.name ?? null);
                 }}
               />
               <Input
@@ -361,14 +376,14 @@ export default function Settings() {
                 disabled={
                   importWalletMutation.isPending ||
                   !importPassword ||
-                  !fileInputRef.current?.files?.length
+                  !importFileName
                 }
                 onClick={async () => {
                   const file = fileInputRef.current?.files?.[0];
                   if (!file) return;
                   const buf = await file.arrayBuffer();
                   const base64 = btoa(
-                    String.fromCharCode(...new Uint8Array(buf))
+                    String.fromCharCode(...new Uint8Array(buf)),
                   );
                   importWalletMutation.mutate(
                     { password: importPassword, fileBase64: base64 },
@@ -376,10 +391,16 @@ export default function Settings() {
                       onSuccess: () => {
                         toast.success("Wallet imported successfully");
                         setImportPassword("");
+                        setImportFileName(null);
                         if (fileInputRef.current) fileInputRef.current.value = "";
                       },
-                      onError: () => toast.error("Failed to import wallet"),
-                    }
+                      onError: (err) =>
+                        toast.error(
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to import wallet",
+                        ),
+                    },
                   );
                 }}
               >
@@ -392,6 +413,101 @@ export default function Settings() {
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Import from Anchor / Scatter ─────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <KeyRound className="size-4 text-primary" />
+            Import from Anchor wallet
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Decrypt an Anchor / Scatter-style encrypted wallet backup with its
+            password and add the recovered keys to your NeoWallet. Your wallet
+            must be unlocked first.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => anchorFileInputRef.current?.click()}
+            >
+              <Upload className="mr-1 size-3.5" />
+              {anchorFileName ? "Change file" : "Choose wallet.json"}
+            </Button>
+            {anchorFileName && (
+              <span className="truncate text-xs text-muted-foreground">
+                {anchorFileName}
+              </span>
+            )}
+          </div>
+          <input
+            ref={anchorFileInputRef}
+            type="file"
+            accept=".json,application/json,text/plain"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              setAnchorFileName(file?.name ?? null);
+            }}
+          />
+          <Input
+            type="password"
+            placeholder="Anchor wallet password"
+            value={anchorPassword}
+            onChange={(e) => setAnchorPassword(e.target.value)}
+          />
+          <Button
+            size="sm"
+            disabled={
+              importAnchorMutation.isPending ||
+              !anchorPassword ||
+              !anchorFileName
+            }
+            onClick={async () => {
+              const file = anchorFileInputRef.current?.files?.[0];
+              if (!file) return;
+              const buf = await file.arrayBuffer();
+              const base64 = btoa(
+                String.fromCharCode(...new Uint8Array(buf)),
+              );
+              importAnchorMutation.mutate(
+                { password: anchorPassword, fileBase64: base64 },
+                {
+                  onSuccess: (res) => {
+                    toast.success(
+                      `Imported ${res.importedKeys} key${res.importedKeys === 1 ? "" : "s"} (${res.format})`,
+                    );
+                    setAnchorPassword("");
+                    setAnchorFileName(null);
+                    if (anchorFileInputRef.current)
+                      anchorFileInputRef.current.value = "";
+                  },
+                  onError: (err) =>
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to decrypt Anchor wallet",
+                    ),
+                },
+              );
+            }}
+          >
+            {importAnchorMutation.isPending ? (
+              <Loader2 className="mr-1 size-3.5 animate-spin" />
+            ) : (
+              <Upload className="mr-1 size-3.5" />
+            )}
+            Import keys
+          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            After import, go to <strong>Keys</strong> to look up which on-chain
+            accounts each key controls and import them.
+          </p>
         </CardContent>
       </Card>
     </div>

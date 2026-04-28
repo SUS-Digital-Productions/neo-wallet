@@ -28,6 +28,11 @@ import type {
   KeyInfo,
   AddKeyRequest,
   RemoveKeyRequest,
+  SignActionsRequest,
+  SignActionsResponse,
+  ChainAccountInfo,
+  ImportAnchorWalletRequest,
+  ImportAnchorWalletResponse,
 } from "./types";
 
 /**
@@ -109,6 +114,12 @@ export async function exportWallet(): Promise<Blob> {
 
 export const importWallet = (body: ImportWalletRequest) =>
   request<UnlockResponse>("/api/wallet/import", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const importAnchorWallet = (body: ImportAnchorWalletRequest) =>
+  request<ImportAnchorWalletResponse>("/api/wallet/import-anchor", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -239,3 +250,34 @@ export const connectEsrListener = () =>
 
 export const disconnectEsrListener = () =>
   request<{ status: string }>("/api/esr/listener/disconnect", { method: "POST" });
+
+/* ---- Generic Action Signing ---- */
+export const signActions = (body: SignActionsRequest) =>
+  request<SignActionsResponse>("/api/actions/sign", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/* ---- Chain (Account Viewer + utility queries) ---- */
+export const getChainAccount = (account: string, chainId: string) =>
+  request<ChainAccountInfo>(
+    `/api/chain/account?account=${encodeURIComponent(account)}&chainId=${encodeURIComponent(chainId)}`,
+  );
+
+export const getCurrencyBalance = (
+  account: string,
+  chainId: string,
+  contract?: string,
+  symbol?: string,
+) => {
+  const qs = new URLSearchParams({ account, chainId });
+  if (contract) qs.set("contract", contract);
+  if (symbol) qs.set("symbol", symbol);
+  return request<string[]>(`/api/chain/currency-balance?${qs.toString()}`);
+};
+
+export const getTableRows = (body: Record<string, unknown> & { chainId: string }) =>
+  request<{ rows: unknown[]; more: boolean; next_key?: string }>(
+    "/api/chain/table-rows",
+    { method: "POST", body: JSON.stringify(body) },
+  );

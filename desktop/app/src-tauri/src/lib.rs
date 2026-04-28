@@ -109,6 +109,29 @@ fn emit_deep_links(app: &tauri::AppHandle, urls: Vec<url::Url>) {
 }
 
 // ---------------------------------------------------------------------------
+// JS-callable commands
+// ---------------------------------------------------------------------------
+
+/// Bring the main window to the foreground. Called from the renderer when an
+/// ESR signing request arrives so the user immediately sees the approval prompt.
+#[tauri::command]
+fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        // On Windows / macOS focus can race with the OS — request user attention.
+        #[cfg(any(windows, target_os = "macos"))]
+        {
+            let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
+        }
+        Ok(())
+    } else {
+        Err("main window not found".into())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -126,6 +149,7 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
+        .invoke_handler(tauri::generate_handler![show_main_window])
         .setup(|app| {
             // Register esr:// scheme at runtime (desktop Linux/Windows)
             #[cfg(any(windows, target_os = "linux"))]

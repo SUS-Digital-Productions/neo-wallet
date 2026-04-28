@@ -24,15 +24,18 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 
 # --- Mobile-only: embedded HTTP backend ---
 [target."cfg(any(target_os = \"android\", target_os = \"ios\"))".dependencies]
-axum = "0.8"
-tokio = { version = "1", features = ["rt", "net", "macros"] }
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["rt", "net", "macros", "sync"] }
 rand = "0.9"
 base64 = "0.22"
 aes = "0.8"
 cbc = "0.1"
 pbkdf2 = { version = "0.12", features = ["simple"] }
+scrypt = { version = "0.11", default-features = false, features = ["std"] }
 sha2 = "0.10"
 hex = "0.4"
+regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tower-http = { version = "0.6", features = ["cors"] }
 eosio-signer = { path = "crates/eosio-signer", default-features = false }
 eosio-abi = { path = "crates/eosio-abi" }

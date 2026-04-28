@@ -27,11 +27,13 @@ import type {
   EsrListenerStatus,
   GetPrivateKeyRequest,
   ImportWalletRequest,
+  ImportAnchorWalletRequest,
   AddKeyRequest,
   RemoveKeyRequest,
   KeyInfo,
+  SignActionsRequest,
+  ChainAccountInfo,
 } from "./types";
-
 // ── Query Keys ──────────────────────────────────────────
 
 export const queryKeys = {
@@ -311,6 +313,18 @@ export function useImportWallet() {
   });
 }
 
+export function useImportAnchorWallet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ImportAnchorWalletRequest) => api.importAnchorWallet(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.keys });
+      qc.invalidateQueries({ queryKey: queryKeys.accounts });
+      qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+    },
+  });
+}
+
 // ── Keys ────────────────────────────────────────────────
 
 export function useKeys(opts?: Partial<UseQueryOptions<KeyInfo[]>>) {
@@ -340,5 +354,33 @@ export function useRemoveKey() {
       qc.invalidateQueries({ queryKey: queryKeys.accounts });
       qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
     },
+  });
+}
+
+// ── Generic Action Signing ─────────────────────────────
+
+export function useSignActions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SignActionsRequest) => api.signActions(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["balances"] });
+      qc.invalidateQueries({ queryKey: ["chainAccount"] });
+    },
+  });
+}
+
+// ── Chain account viewer ───────────────────────────────
+
+export function useChainAccount(
+  account: string | undefined,
+  chainId: string | undefined,
+  opts?: Partial<UseQueryOptions<ChainAccountInfo>>,
+) {
+  return useQuery({
+    queryKey: ["chainAccount", account, chainId] as const,
+    queryFn: () => api.getChainAccount(account!, chainId!),
+    enabled: !!account && !!chainId,
+    ...opts,
   });
 }

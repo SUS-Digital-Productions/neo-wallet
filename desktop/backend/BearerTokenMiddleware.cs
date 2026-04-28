@@ -45,6 +45,16 @@ public sealed class BearerTokenMiddleware
         "/api/esr/incoming",
     ];
 
+    // Authenticated endpoints that should NOT reset the auto-lock timer
+    // (background polls / passive reads). Anything not in this list, when
+    // authenticated, counts as "user activity".
+    private static readonly string[] NoTouchPaths =
+    [
+        "/api/health",
+        "/api/wallet/summary",
+        "/api/esr/listener-status",
+    ];
+
     public async Task InvokeAsync(HttpContext context, AutoLockService autoLock)
     {
         var path = context.Request.Path.Value ?? "";
@@ -84,8 +94,12 @@ public sealed class BearerTokenMiddleware
             return;
         }
 
-        // Track activity for auto-lock
-        autoLock.Touch();
+        // Track activity for auto-lock - but only on user-initiated calls,
+        // not background polling so the timer actually counts down.
+        if (!NoTouchPaths.Any(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)))
+        {
+            autoLock.Touch();
+        }
 
         await _next(context);
     }

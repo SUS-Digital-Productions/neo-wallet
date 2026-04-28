@@ -186,6 +186,66 @@ impl AsyncChainApi {
             .await
             .map_err(|e| format!("get_abi parse: {e}"))
     }
+
+    /// POST /v1/chain/get_account — full nodeos account JSON (resources, perms…).
+    pub async fn get_account(&self, account: &str) -> Result<serde_json::Value, String> {
+        let url = format!("{}/v1/chain/get_account", self.base_url);
+        let resp = self
+            .client
+            .post(&url)
+            .json(&serde_json::json!({ "account_name": account }))
+            .send()
+            .await
+            .map_err(|e| format!("get_account request: {e}"))?;
+        resp.json()
+            .await
+            .map_err(|e| format!("get_account parse: {e}"))
+    }
+
+    /// POST /v1/chain/get_table_rows — generic table query passthrough.
+    pub async fn get_table_rows(
+        &self,
+        body: &serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let url = format!("{}/v1/chain/get_table_rows", self.base_url);
+        let resp = self
+            .client
+            .post(&url)
+            .json(body)
+            .send()
+            .await
+            .map_err(|e| format!("get_table_rows request: {e}"))?;
+        resp.json()
+            .await
+            .map_err(|e| format!("get_table_rows parse: {e}"))
+    }
+
+    /// POST /v1/chain/get_currency_balance with optional symbol.
+    pub async fn get_currency_balance_raw(
+        &self,
+        contract: &str,
+        account: &str,
+        symbol: Option<&str>,
+    ) -> Result<serde_json::Value, String> {
+        let url = format!("{}/v1/chain/get_currency_balance", self.base_url);
+        let mut body = serde_json::json!({
+            "code": contract,
+            "account": account,
+        });
+        if let Some(s) = symbol {
+            body["symbol"] = serde_json::Value::String(s.to_string());
+        }
+        let resp = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("get_currency_balance request: {e}"))?;
+        resp.json()
+            .await
+            .map_err(|e| format!("get_currency_balance parse: {e}"))
+    }
 }
 
 /// Parse EOSIO timestamp `"2024-01-01T00:00:00"` → Unix seconds (u32).

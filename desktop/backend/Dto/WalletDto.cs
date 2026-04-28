@@ -14,7 +14,10 @@ public sealed record HealthDto(
 public sealed record WalletSummaryDto(
     [property: JsonPropertyName("activeNetwork")] NetworkDto? ActiveNetwork,
     [property: JsonPropertyName("activeAccount")] AccountDto? ActiveAccount,
-    [property: JsonPropertyName("listenerStatus")] string ListenerStatus
+    [property: JsonPropertyName("listenerStatus")] string ListenerStatus,
+    [property: JsonPropertyName("autoLockMinutes")] int AutoLockMinutes,
+    [property: JsonPropertyName("lockExpiresAt")] string? LockExpiresAt,
+    [property: JsonPropertyName("walletUnlocked")] bool WalletUnlocked
 );
 
 /// <summary>Create a new wallet.</summary>
@@ -53,6 +56,19 @@ public sealed record GetPrivateKeyResponse(
 public sealed record ImportWalletRequest(
     [property: JsonPropertyName("password")] string Password,
     [property: JsonPropertyName("fileBase64")] string FileBase64
+);
+
+/// <summary>Import a foreign (Anchor / Scatter / similar) wallet file.</summary>
+public sealed record ImportAnchorWalletRequest(
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("fileBase64")] string FileBase64
+);
+
+/// <summary>Result of an Anchor-style wallet import.</summary>
+public sealed record ImportAnchorWalletResponse(
+    [property: JsonPropertyName("importedKeys")] int ImportedKeys,
+    [property: JsonPropertyName("publicKeys")] string[] PublicKeys,
+    [property: JsonPropertyName("format")] string Format
 );
 
 /// <summary>Remove an account.</summary>
