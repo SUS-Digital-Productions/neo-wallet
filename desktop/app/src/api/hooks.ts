@@ -33,6 +33,7 @@ import type {
   KeyInfo,
   SignActionsRequest,
   ChainAccountInfo,
+  SetNetworkNodeRequest,
 } from "./types";
 // ── Query Keys ──────────────────────────────────────────
 
@@ -200,6 +201,16 @@ export function useSetActiveNetwork() {
     mutationFn: (chainId: string) => api.setActiveNetwork(chainId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+    },
+  });
+}
+
+export function useSetNetworkNode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SetNetworkNodeRequest) => api.setNetworkNode(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.networks });
     },
   });
 }

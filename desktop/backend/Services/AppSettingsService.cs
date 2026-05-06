@@ -17,6 +17,7 @@ public sealed class AppSettingsService
     private int _autoLockMinutes = 180;
     private bool _startAtLogin;
     private bool _minimizeToTray;
+    private Dictionary<string, string> _nodeOverrides = [];
 
     public int AutoLockMinutes
     {
@@ -41,6 +42,16 @@ public sealed class AppSettingsService
         set { _minimizeToTray = value; Save(); }
     }
 
+    public string? GetNodeOverride(string chainId) =>
+        _nodeOverrides.TryGetValue(chainId, out var v) ? v : null;
+
+    public void SetNodeOverride(string chainId, string nodeUrl)
+    {
+        _nodeOverrides[chainId] = nodeUrl;
+        Save();
+        Trace.WriteLine($"[SETTINGS] Node override for {chainId[..16]}… set to {nodeUrl}");
+    }
+
     public AppSettingsService()
     {
         Load();
@@ -61,6 +72,12 @@ public sealed class AppSettingsService
                 _startAtLogin = startVal.GetBoolean();
             if (root.TryGetProperty("minimizeToTray", out var trayVal))
                 _minimizeToTray = trayVal.GetBoolean();
+            if (root.TryGetProperty("nodeOverrides", out var nodesEl) &&
+                nodesEl.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in nodesEl.EnumerateObject())
+                    _nodeOverrides[prop.Name] = prop.Value.GetString() ?? "";
+            }
         }
         catch (Exception ex)
         {
@@ -79,6 +96,7 @@ public sealed class AppSettingsService
                 autoLockMinutes = _autoLockMinutes,
                 startAtLogin = _startAtLogin,
                 minimizeToTray = _minimizeToTray,
+                nodeOverrides = _nodeOverrides,
             }, JsonOptions);
             File.WriteAllText(SettingsPath, json);
         }

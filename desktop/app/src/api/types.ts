@@ -13,6 +13,12 @@ export interface NetworkInfo {
   chainId: string;
   name: string;
   symbol: string;
+  node: string;
+}
+
+export interface SetNetworkNodeRequest {
+  chainId: string;
+  node: string;
 }
 
 /* ---- Account ---- */

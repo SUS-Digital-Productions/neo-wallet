@@ -54,8 +54,8 @@ public static class AnchorWalletImporter
 
         var (saltBytes, ivBytes, cipherBytes, format) = envelope.Value;
 
-        // Try several KDFs in order of likelihood.
-        string[] kdfs = ["pbkdf2-sha512-100k", "pbkdf2-sha256-100k", "pbkdf2-sha512-10k", "pbkdf2-sha256-10k", "scrypt-16384-8-1"];
+        // Try several KDFs in order of likelihood (Anchor v2 typically uses pbkdf2-sha512-10k or pbkdf2-sha256-100k).
+        string[] kdfs = ["pbkdf2-sha512-10k", "pbkdf2-sha256-100k", "pbkdf2-sha512-100k", "pbkdf2-sha256-10k", "scrypt-16384-8-1", "pbkdf2-sha1-10k", "pbkdf2-sha256-50k"];
 
         foreach (var kdf in kdfs)
         {
@@ -93,9 +93,25 @@ public static class AnchorWalletImporter
             using var doc = JsonDocument.Parse(text);
             var root = doc.RootElement;
 
-            // Walk into "wallet" / "data" sub-objects that some tools wrap with.
             if (root.ValueKind == JsonValueKind.Object)
             {
+                // Anchor v2 backup: root.storage.data.data
+                if (root.TryGetProperty("storage", out var storageEl) &&
+                    storageEl.ValueKind == JsonValueKind.Object &&
+                    storageEl.TryGetProperty("data", out var storageDataEl) &&
+                    storageDataEl.ValueKind == JsonValueKind.Object &&
+                    storageDataEl.TryGetProperty("data", out var dataEl) &&
+                    dataEl.ValueKind == JsonValueKind.String)
+                {
+                    var blobStr = dataEl.GetString();
+                    if (!string.IsNullOrEmpty(blobStr))
+                    {
+                        var env = TryParseAnchorV2Blob(blobStr);
+                        if (env is not null) return env;
+                    }
+                }
+
+                // Walk into "wallet" / "data" / "encrypted" sub-objects.
                 foreach (var inner in new[] { "wallet", "data", "encrypted" })
                 {
                     if (root.TryGetProperty(inner, out var sub) && sub.ValueKind == JsonValueKind.Object)
@@ -125,6 +141,80 @@ public static class AnchorWalletImporter
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Parses the Anchor v2 storage.data.data blob.
+    ///
+    /// The format is: {saltHex}{base64(IV + ciphertext)}
+    /// where salt is stored as hex (either 32 or 64 hex chars = 16 or 32 bytes).
+    /// The IV is the first 16 bytes of the decoded base64 remainder.
+    ///
+    /// Fallback: attempt the whole string as pure base64 with salt/IV as leading bytes.
+    /// </summary>
+    private static (byte[] salt, byte[] iv, byte[] cipher, string format)?
+        TryParseAnchorV2Blob(string blobStr)
+    {
+        // Find the longest hex prefix (must be even length).
+        int hexLen = 0;
+        for (int i = 0; i < blobStr.Length; i++)
+        {
+            char c = blobStr[i];
+            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))
+                hexLen++;
+            else
+                break;
+        }
+        // Round down to even number (complete hex bytes).
+        hexLen = hexLen % 2 == 0 ? hexLen : hexLen - 1;
+
+        // Try the hex prefix as salt + rest as base64(IV+cipher).
+        if (hexLen >= 32 && hexLen <= 64)
+        {
+            int[] saltLengths = hexLen >= 64 ? [64, 32] : hexLen >= 32 ? [32] : [];
+            foreach (var sLen in saltLengths)
+            {
+                var saltHex = blobStr[..sLen];
+                var b64Part = blobStr[sLen..];
+
+                byte[] saltBytes;
+                try { saltBytes = Convert.FromHexString(saltHex); }
+                catch { continue; }
+
+                var decoded = TryDecodeBase64(b64Part);
+                if (decoded is null || decoded.Length < 32) continue;
+
+                var iv = decoded[..16];
+                var cipher = decoded[16..];
+                return (saltBytes, iv, cipher, $"anchor-v2:hex{sLen}-b64");
+            }
+        }
+
+        // Fallback: entire string is base64; first N bytes = salt, next 16 = IV.
+        var fullBlob = TryDecodeBase64(blobStr);
+        if (fullBlob is not null && fullBlob.Length > 48)
+        {
+            // Try 32-byte salt then 16-byte IV.
+            return (fullBlob[..32], fullBlob[32..48], fullBlob[48..], "anchor-v2:b64-concat-32");
+        }
+        if (fullBlob is not null && fullBlob.Length > 32)
+        {
+            // Try 16-byte salt then 16-byte IV.
+            return (fullBlob[..16], fullBlob[16..32], fullBlob[32..], "anchor-v2:b64-concat-16");
+        }
+
+        return null;
+    }
+
+    private static byte[]? TryDecodeBase64(string s)
+    {
+        // Handle both standard and URL-safe base64, with or without padding.
+        var padded = s.Replace('-', '+').Replace('_', '/');
+        var rem = padded.Length % 4;
+        if (rem == 2) padded += "==";
+        else if (rem == 3) padded += "=";
+        try { return Convert.FromBase64String(padded); }
+        catch { return null; }
     }
 
     private static (byte[] salt, byte[] iv, byte[] cipher)? TryReadFields(JsonElement obj)
@@ -180,9 +270,11 @@ public static class AnchorWalletImporter
         return kdf switch
         {
             "pbkdf2-sha256-100k" => Rfc2898DeriveBytes.Pbkdf2(pw, salt, 100_000, HashAlgorithmName.SHA256, 32),
+            "pbkdf2-sha256-50k" => Rfc2898DeriveBytes.Pbkdf2(pw, salt, 50_000, HashAlgorithmName.SHA256, 32),
             "pbkdf2-sha256-10k" => Rfc2898DeriveBytes.Pbkdf2(pw, salt, 10_000, HashAlgorithmName.SHA256, 32),
             "pbkdf2-sha512-100k" => Rfc2898DeriveBytes.Pbkdf2(pw, salt, 100_000, HashAlgorithmName.SHA512, 32),
             "pbkdf2-sha512-10k" => Rfc2898DeriveBytes.Pbkdf2(pw, salt, 10_000, HashAlgorithmName.SHA512, 32),
+            "pbkdf2-sha1-10k" => Rfc2898DeriveBytes.Pbkdf2(pw, salt, 10_000, HashAlgorithmName.SHA1, 32),
             "scrypt-16384-8-1" => SCrypt.Generate(pw, salt, 16384, 8, 1, 32),
             _ => throw new NotSupportedException(kdf)
         };

@@ -8,21 +8,31 @@ namespace NeoWallet.Backend.Services;
 /// </summary>
 public sealed class WalletStateService : IWalletStateService
 {
-    private static readonly List<NetworkDto> Networks =
+    private static readonly List<(string ChainId, string Name, string Symbol)> NetworkDefs =
     [
-        new("1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4", "WAX Mainnet", "WAX"),
-        new("aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906", "EOS Mainnet", "EOS"),
-        new("4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11", "Telos Mainnet", "TLOS"),
+        ("1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4", "WAX Mainnet", "WAX"),
+        ("aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906", "EOS Mainnet", "EOS"),
+        ("4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11", "Telos Mainnet", "TLOS"),
     ];
 
     private readonly IWalletStorageService _storage;
-    private NetworkDto _activeNetwork = Networks[0];
+    private readonly AppSettingsService _appSettings;
+    private NetworkDto _activeNetwork;
     private AccountDto? _activeAccount;
     private string? _password;
 
-    public WalletStateService(IWalletStorageService storage)
+    public WalletStateService(IWalletStorageService storage, AppSettingsService appSettings)
     {
         _storage = storage;
+        _appSettings = appSettings;
+        _activeNetwork = BuildNetworkDto(NetworkDefs[0]);
+    }
+
+    private NetworkDto BuildNetworkDto((string ChainId, string Name, string Symbol) def)
+    {
+        var node = _appSettings.GetNodeOverride(def.ChainId)
+            ?? (ChainClientFactory.DefaultRpcEndpoints.TryGetValue(def.ChainId, out var d) ? d : "");
+        return new NetworkDto(def.ChainId, def.Name, def.Symbol, node);
     }
 
     public bool WalletLoaded => _storage.WalletFileExists;
@@ -32,7 +42,7 @@ public sealed class WalletStateService : IWalletStateService
     public AccountDto? ActiveAccount => _activeAccount;
 
     public string GetChainName(string chainId) =>
-        Networks.Find(n => n.ChainId == chainId)?.Name ?? "Unknown";
+        NetworkDefs.Find(n => n.ChainId == chainId).Name ?? "Unknown";
 
     public IReadOnlyList<AccountDto> GetAccounts()
     {
@@ -45,7 +55,8 @@ public sealed class WalletStateService : IWalletStateService
             .ToList();
     }
 
-    public IReadOnlyList<NetworkDto> GetNetworks() => Networks;
+    public IReadOnlyList<NetworkDto> GetNetworks() =>
+        NetworkDefs.Select(BuildNetworkDto).ToList();
 
     public void SetActiveAccount(string account, string authority, string chainId)
     {
@@ -61,10 +72,10 @@ public sealed class WalletStateService : IWalletStateService
 
     public void SetActiveNetwork(string chainId)
     {
-        var match = Networks.Find(n => n.ChainId == chainId);
-        if (match is null)
+        var match = NetworkDefs.Find(n => n.ChainId == chainId);
+        if (match == default)
             throw new InvalidOperationException($"Network {chainId} not found.");
-        _activeNetwork = match;
+        _activeNetwork = BuildNetworkDto(match);
 
         // Auto-switch to an account on the new chain if the current one doesn't match
         if (_activeAccount is null || _activeAccount.ChainId != chainId)
@@ -78,6 +89,28 @@ public sealed class WalletStateService : IWalletStateService
         }
 
         System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Active network set to {match.Name}, account: {_activeAccount?.Account ?? "(none)"}");
+    }
+
+    public void SetNetworkNode(string chainId, string nodeUrl)
+    {
+        var match = NetworkDefs.Find(n => n.ChainId == chainId);
+        if (match == default)
+            throw new InvalidOperationException($"Network {chainId} not found.");
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeUrl);
+
+        // Validate that the URL is a proper https/http URL.
+        if (!Uri.TryCreate(nodeUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+            throw new ArgumentException("Node must be a valid http/https URL.", nameof(nodeUrl));
+
+        _appSettings.SetNodeOverride(chainId, nodeUrl.TrimEnd('/'));
+
+        // Refresh active network if it matches.
+        if (_activeNetwork.ChainId == chainId)
+            _activeNetwork = BuildNetworkDto(match);
+
+        System.Diagnostics.Trace.WriteLine($"[WALLETSTATE] Node for {match.Name} set to {nodeUrl}");
     }
 
     public bool CreateWallet(string password)

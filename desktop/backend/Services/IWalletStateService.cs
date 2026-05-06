@@ -18,6 +18,7 @@ public interface IWalletStateService
 
     void SetActiveAccount(string account, string authority, string chainId);
     void SetActiveNetwork(string chainId);
+    void SetNetworkNode(string chainId, string nodeUrl);
 
     /// <summary>Create a new encrypted wallet file.</summary>
     bool CreateWallet(string password);

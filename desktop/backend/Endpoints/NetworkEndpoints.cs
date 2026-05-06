@@ -22,5 +22,22 @@ public static class NetworkEndpoints
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
             }
         });
+
+        app.MapPost("/api/networks/node", (SetNetworkNodeRequest req, IWalletStateService wallet) =>
+        {
+            try
+            {
+                wallet.SetNetworkNode(req.ChainId, req.Node);
+                return Results.Ok();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
+            }
+        });
     }
 }

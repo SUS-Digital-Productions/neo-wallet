@@ -33,6 +33,7 @@ import type {
   ChainAccountInfo,
   ImportAnchorWalletRequest,
   ImportAnchorWalletResponse,
+  SetNetworkNodeRequest,
 } from "./types";
 
 /**
@@ -179,6 +180,12 @@ export const setActiveNetwork = (chainId: string) =>
   request<void>("/api/networks/active", {
     method: "POST",
     body: JSON.stringify({ chainId }),
+  });
+
+export const setNetworkNode = (body: SetNetworkNodeRequest) =>
+  request<void>("/api/networks/node", {
+    method: "POST",
+    body: JSON.stringify(body),
   });
 
 /* ---- Balances ---- */
