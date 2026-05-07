@@ -30,6 +30,8 @@ import type {
   ImportAnchorWalletRequest,
   AddKeyRequest,
   RemoveKeyRequest,
+  LookupStoredKeyAccountsRequest,
+  ImportStoredKeyAccountsRequest,
   KeyInfo,
   SignActionsRequest,
   ChainAccountInfo,
@@ -170,6 +172,7 @@ export function useImportAccounts() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.accounts });
       qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+      qc.invalidateQueries({ queryKey: queryKeys.keys });
     },
   });
 }
@@ -364,6 +367,26 @@ export function useRemoveKey() {
       qc.invalidateQueries({ queryKey: queryKeys.keys });
       qc.invalidateQueries({ queryKey: queryKeys.accounts });
       qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+    },
+  });
+}
+
+export function useLookupStoredKeyAccounts() {
+  return useMutation({
+    mutationFn: (body: LookupStoredKeyAccountsRequest) =>
+      api.lookupStoredKeyAccounts(body),
+  });
+}
+
+export function useImportStoredKeyAccounts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ImportStoredKeyAccountsRequest) =>
+      api.importStoredKeyAccounts(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.accounts });
+      qc.invalidateQueries({ queryKey: queryKeys.walletSummary });
+      qc.invalidateQueries({ queryKey: queryKeys.keys });
     },
   });
 }

@@ -43,9 +43,17 @@ public class EsrService : IEsrService
     {
         try
         {
+            var isIdentityRequest = request.Payload is null
+                || (!request.Payload.IsTransaction && !request.Payload.IsAction);
             ChainInfo chainInfo;
 
-            if (blockchainClient is IAntelopeBlockchainClient client)
+            if (isIdentityRequest)
+            {
+                // Identity ESRs resolve to a local zero-data identity transaction and do not
+                // require TAPOS from a live chain endpoint.
+                chainInfo = CreateOfflineChainInfo(request.ChainId);
+            }
+            else if (blockchainClient is IAntelopeBlockchainClient client)
             {
                 // Get real chain info from blockchain
                 chainInfo = await client.GetInfoAsync(cancellationToken);
@@ -53,63 +61,42 @@ public class EsrService : IEsrService
             else
             {
                 // Fallback to dummy chain info (won't work for real transactions)
-                var chainId =
-                    request.ChainId
-                    ?? throw new InvalidOperationException("Chain ID not specified");
-                chainInfo = new ChainInfo
-                {
-                    ChainId = chainId,
-                    ServerVersion = "unknown",
-                    HeadBlockNum = 0,
-                    LastIrreversibleBlockNum = 0,
-                    LastIrreversibleBlockId = string.Empty,
-                    HeadBlockId = string.Empty,
-                    HeadBlockTime = DateTime.UtcNow,
-                    HeadBlockProducer = string.Empty,
-                    VirtualBlockCpuLimit = 0,
-                    VirtualBlockNetLimit = 0,
-                    BlockCpuLimit = 0,
-                    BlockNetLimit = 0,
-                    RefBlockPrefix = 0,
-                };
+                chainInfo = CreateOfflineChainInfo(request.ChainId);
             }
 
             var response = request.Sign(privateKeyWif, chainInfo, signer, signerPermission);
 
             // Broadcast if requested or if Broadcast flag is set in ESR
-            if (broadcast || request.Flags.HasFlag(EsrFlags.Broadcast))
+            if (
+                !isIdentityRequest
+                && (broadcast || request.Flags.HasFlag(EsrFlags.Broadcast))
+                && response.SerializedTransaction is { Length: > 0 }
+            )
             {
                 if (blockchainClient is not IAntelopeBlockchainClient bcClient)
                     throw new InvalidOperationException(
                         "Blockchain client required for broadcasting"
                     );
 
-                // Only broadcast if there's an actual transaction (not identity requests)
-                if (
-                    response.SerializedTransaction != null
-                    && response.SerializedTransaction.Length > 0
-                )
+                var pushRequest = new
                 {
-                    var pushRequest = new
-                    {
-                        signatures = response.Signatures,
-                        compression = 0,
-                        packed_context_free_data = "",
-                        packed_trx = response.PackedTransaction,
-                    };
+                    signatures = response.Signatures,
+                    compression = 0,
+                    packed_context_free_data = "",
+                    packed_trx = response.PackedTransaction,
+                };
 
-                    var result = await bcClient.PushTransactionAsync(
-                        pushRequest,
-                        cancellationToken
-                    );
+                var result = await bcClient.PushTransactionAsync(
+                    pushRequest,
+                    cancellationToken
+                );
 
-                    // Update response with blockchain data (use direct property access)
-                    response.TransactionId = result.TransactionId;
-                    if (result.Processed != null)
-                    {
-                        response.BlockNum = result.Processed.BlockNum;
-                        response.BlockId = result.Processed.Id;
-                    }
+                // Update response with blockchain data (use direct property access)
+                response.TransactionId = result.TransactionId;
+                if (result.Processed != null)
+                {
+                    response.BlockNum = result.Processed.BlockNum;
+                    response.BlockId = result.Processed.Id;
                 }
             }
 
@@ -119,6 +106,29 @@ public class EsrService : IEsrService
         {
             throw new InvalidOperationException($"Failed to sign ESR: {ex.Message}", ex);
         }
+    }
+
+    private static ChainInfo CreateOfflineChainInfo(string? chainId)
+    {
+        if (string.IsNullOrWhiteSpace(chainId))
+            throw new InvalidOperationException("Chain ID not specified");
+
+        return new ChainInfo
+        {
+            ChainId = chainId,
+            ServerVersion = "unknown",
+            HeadBlockNum = 0,
+            LastIrreversibleBlockNum = 0,
+            LastIrreversibleBlockId = string.Empty,
+            HeadBlockId = string.Empty,
+            HeadBlockTime = DateTime.UtcNow,
+            HeadBlockProducer = string.Empty,
+            VirtualBlockCpuLimit = 0,
+            VirtualBlockNetLimit = 0,
+            BlockCpuLimit = 0,
+            BlockNetLimit = 0,
+            RefBlockPrefix = 0,
+        };
     }
 
     public async Task<EsrCallbackResponse> SignAndBroadcastAsync(

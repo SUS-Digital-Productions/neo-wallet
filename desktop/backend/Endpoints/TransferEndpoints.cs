@@ -15,7 +15,7 @@ public static class TransferEndpoints
 
             // TODO: Retrieve the real private key from secure wallet storage
             // For now, transactions are built + signed but require a valid key
-            var privateKeyWif = wallet.GetPrivateKeyWif(req.From, req.Authority);
+            var privateKeyWif = wallet.GetPrivateKeyWif(req.From, req.Authority, req.ChainId);
             if (string.IsNullOrEmpty(privateKeyWif))
                 return Results.Problem("No private key available for this account.", statusCode: StatusCodes.Status400BadRequest);
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileCheck,
@@ -19,7 +19,11 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import type { EsrParseResponse, SignRawAction } from "@/api/types";
+import {
+  AccountSearchSelect,
+  accountSelectValue,
+} from "@/components/AccountSearchSelect";
+import type { AccountInfo, EsrParseResponse, SignRawAction } from "@/api/types";
 import {
   useParseEsr,
   useApproveEsr,
@@ -27,6 +31,7 @@ import {
   useSignRawTransaction,
   useNetworks,
   useWalletSummary,
+  useAccounts,
 } from "@/api/hooks";
 import { getPendingEsr } from "@/api/client";
 
@@ -43,6 +48,10 @@ const EXAMPLE_ACTIONS = `[
   }
 ]`;
 
+function findAccountByValue(accounts: AccountInfo[], value: string) {
+  return accounts.find((account) => accountSelectValue(account) === value) ?? null;
+}
+
 export default function EsrApproval() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -57,10 +66,12 @@ export default function EsrApproval() {
   // Raw payload tab
   const [actionsJson, setActionsJson] = useState("");
   const [broadcast, setBroadcast] = useState(true);
+  const [selectedEsrAccountKey, setSelectedEsrAccountKey] = useState("");
+  const [selectedRawAccountKey, setSelectedRawAccountKey] = useState("");
   const signRaw = useSignRawTransaction();
   const { data: networks = [] } = useNetworks();
   const { data: summary } = useWalletSummary();
-  const activeChainId = summary?.activeNetwork?.chainId ?? "";
+  const { data: accounts = [], isLoading: accountsLoading } = useAccounts();
 
   function doParse(esrUri: string) {
     if (!esrUri.trim()) return;
@@ -91,11 +102,28 @@ export default function EsrApproval() {
 
   function handleApprove() {
     if (!parsed) return;
+    const selectedAccount = findAccountByValue(accounts, selectedEsrAccountKey);
+    if (!selectedAccount) {
+      toast.error("Select a signing account");
+      return;
+    }
+
+    const isIdentity = parsed.type === "identity";
     approveEsr.mutate(
-      { requestId: parsed.requestId, broadcast: true },
+      {
+        requestId: parsed.requestId,
+        broadcast: !isIdentity,
+        account: selectedAccount.account,
+        authority: selectedAccount.authority,
+        chainId: selectedAccount.chainId,
+      },
       {
         onSuccess: (res) => {
-          toast.success(`Approved – tx ${res.transactionId.slice(0, 12)}…`);
+          toast.success(
+            isIdentity
+              ? "Identity approved"
+              : `Approved – tx ${res.transactionId.slice(0, 12)}…`,
+          );
           navigate("/");
         },
         onError: (err) =>
@@ -121,7 +149,8 @@ export default function EsrApproval() {
 
   function handleSignRaw(e: React.FormEvent) {
     e.preventDefault();
-    if (!actionsJson.trim() || !activeChainId) return;
+    const selectedAccount = findAccountByValue(accounts, selectedRawAccountKey);
+    if (!actionsJson.trim() || !selectedAccount) return;
 
     let actions: SignRawAction[];
     try {
@@ -135,7 +164,13 @@ export default function EsrApproval() {
     }
 
     signRaw.mutate(
-      { chainId: activeChainId, actions, broadcast },
+      {
+        chainId: selectedAccount.chainId,
+        actions,
+        broadcast,
+        account: selectedAccount.account,
+        authority: selectedAccount.authority,
+      },
       {
         onSuccess: (res) => {
           toast.success(`Signed – tx ${res.transactionId.slice(0, 12)}…`);
@@ -175,11 +210,57 @@ export default function EsrApproval() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const activeNet = networks.find((n) => n.chainId === activeChainId);
+  const esrAccounts = useMemo(() => {
+    if (!parsed?.chainId) return accounts;
+    return accounts.filter((account) => account.chainId === parsed.chainId);
+  }, [accounts, parsed?.chainId]);
+  const selectedEsrAccount = findAccountByValue(esrAccounts, selectedEsrAccountKey);
+  const selectedRawAccount = findAccountByValue(accounts, selectedRawAccountKey);
+  const rawChainId = selectedRawAccount?.chainId ?? summary?.activeNetwork?.chainId ?? "";
+  const activeNet = networks.find((n) => n.chainId === rawChainId);
   const esrSubmitting = approveEsr.isPending || rejectEsr.isPending;
 
+  useEffect(() => {
+    if (!parsed) {
+      setSelectedEsrAccountKey("");
+      return;
+    }
+
+    if (esrAccounts.length === 0) {
+      setSelectedEsrAccountKey("");
+      return;
+    }
+
+    if (findAccountByValue(esrAccounts, selectedEsrAccountKey)) return;
+
+    const activeKey = summary?.activeAccount
+      ? accountSelectValue(summary.activeAccount)
+      : "";
+    const nextAccount =
+      esrAccounts.find((account) => accountSelectValue(account) === activeKey) ??
+      esrAccounts[0];
+    setSelectedEsrAccountKey(accountSelectValue(nextAccount));
+  }, [esrAccounts, parsed, selectedEsrAccountKey, summary?.activeAccount]);
+
+  useEffect(() => {
+    if (accounts.length === 0) {
+      setSelectedRawAccountKey("");
+      return;
+    }
+
+    if (findAccountByValue(accounts, selectedRawAccountKey)) return;
+
+    const activeKey = summary?.activeAccount
+      ? accountSelectValue(summary.activeAccount)
+      : "";
+    const nextAccount =
+      accounts.find((account) => accountSelectValue(account) === activeKey) ??
+      accounts[0];
+    setSelectedRawAccountKey(accountSelectValue(nextAccount));
+  }, [accounts, selectedRawAccountKey, summary?.activeAccount]);
+
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className="mx-auto max-w-xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Signing Request</h1>
         <p className="text-sm text-muted-foreground">
@@ -249,7 +330,7 @@ export default function EsrApproval() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <ShieldAlert className="size-4 text-destructive" />
-                  Review Actions
+                  {parsed.type === "identity" ? "Review Identity" : "Review Actions"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -264,19 +345,39 @@ export default function EsrApproval() {
                   </span>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="esr-signing-account">Signing Account</Label>
+                  <AccountSearchSelect
+                    id="esr-signing-account"
+                    accounts={esrAccounts}
+                    value={selectedEsrAccountKey}
+                    onValueChange={setSelectedEsrAccountKey}
+                    disabled={accountsLoading || esrSubmitting}
+                    placeholder="Select signing account"
+                    emptyText="No matching accounts"
+                  />
+                  {parsed.chainId && esrAccounts.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No imported accounts on this request's chain.
+                    </p>
+                  )}
+                </div>
+
                 <Separator />
 
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Actions</p>
-                  {parsed.actions.map((a, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg border px-3 py-2 text-sm font-mono"
-                    >
-                      {a.account}::{a.name}
-                    </div>
-                  ))}
-                </div>
+                {parsed.type !== "identity" && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Actions</p>
+                    {parsed.actions.map((a, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg border px-3 py-2 text-sm font-mono"
+                      >
+                        {a.account}::{a.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <Separator />
 
@@ -284,12 +385,12 @@ export default function EsrApproval() {
                   <Button
                     onClick={handleApprove}
                     className="flex-1"
-                    disabled={esrSubmitting}
+                    disabled={esrSubmitting || !selectedEsrAccount}
                   >
                     {approveEsr.isPending && (
                       <Loader2 className="size-4 animate-spin" />
                     )}
-                    Approve & Broadcast
+                    {parsed.type === "identity" ? "Approve Identity" : "Approve & Broadcast"}
                   </Button>
                   <Button
                     variant="outline"
@@ -317,12 +418,25 @@ export default function EsrApproval() {
             <CardContent>
               <form onSubmit={handleSignRaw} className="space-y-4">
                 {/* Active chain info */}
+                <div className="space-y-2">
+                  <Label htmlFor="raw-signing-account">Signing Account</Label>
+                  <AccountSearchSelect
+                    id="raw-signing-account"
+                    accounts={accounts}
+                    value={selectedRawAccountKey}
+                    onValueChange={setSelectedRawAccountKey}
+                    disabled={accountsLoading || signRaw.isPending}
+                    placeholder="Select signing account"
+                    emptyText="No accounts found"
+                  />
+                </div>
+
                 {activeNet && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span>Signing on</span>
                     <Badge variant="secondary">{activeNet.name}</Badge>
                     <span className="font-mono text-xs">
-                      ({activeChainId.slice(0, 12)}…)
+                      ({rawChainId.slice(0, 12)}…)
                     </span>
                   </div>
                 )}
@@ -362,7 +476,7 @@ export default function EsrApproval() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={signRaw.isPending || !activeChainId}
+                  disabled={signRaw.isPending || !selectedRawAccount}
                 >
                   {signRaw.isPending ? (
                     <Loader2 className="size-4 animate-spin" />

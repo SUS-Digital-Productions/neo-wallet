@@ -28,6 +28,8 @@ import type {
   KeyInfo,
   AddKeyRequest,
   RemoveKeyRequest,
+  LookupStoredKeyAccountsRequest,
+  ImportStoredKeyAccountsRequest,
   SignActionsRequest,
   SignActionsResponse,
   ChainAccountInfo,
@@ -142,6 +144,18 @@ export const addKey = (body: AddKeyRequest) =>
 
 export const removeKey = (body: RemoveKeyRequest) =>
   request<void>("/api/keys/remove", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const lookupStoredKeyAccounts = (body: LookupStoredKeyAccountsRequest) =>
+  request<LookupAccountsResponse>("/api/keys/lookup", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const importStoredKeyAccounts = (body: ImportStoredKeyAccountsRequest) =>
+  request<AccountInfo[]>("/api/keys/import-accounts", {
     method: "POST",
     body: JSON.stringify(body),
   });

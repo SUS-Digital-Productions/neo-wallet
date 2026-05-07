@@ -170,9 +170,14 @@ Response:
 ```json
 {
   "requestId": "req_123",
-  "broadcast": true
+  "broadcast": true,
+  "account": "myaccount",
+  "authority": "active",
+  "chainId": "1064487b..."
 }
 ```
+
+`account`, `authority`, and `chainId` are optional. When omitted, the backend uses the active wallet account.
 
 ### ESR Rejection
 

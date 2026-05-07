@@ -19,7 +19,7 @@ public static class BalanceEndpoints
                 {
                     var parts = raw.Split(' ', 2);
                     _ = decimal.TryParse(parts[0], System.Globalization.CultureInfo.InvariantCulture, out var num);
-                    return new BalanceDto(parts.Length > 1 ? parts[1] : "?", raw, num);
+                    return new BalanceDto(parts.Length > 1 ? parts[1] : "?", "eosio.token", raw, num);
                 }).ToList();
                 return Results.Ok(result);
             }
@@ -30,8 +30,12 @@ public static class BalanceEndpoints
                 {
                     _ = decimal.TryParse(b.Amount, System.Globalization.CultureInfo.InvariantCulture, out var num);
                     var formatted = num.ToString($"F{b.Decimals}", System.Globalization.CultureInfo.InvariantCulture);
-                    return new BalanceDto(b.Currency, $"{formatted} {b.Currency}", num);
+                    var contract = string.IsNullOrWhiteSpace(b.Contract) ? "unknown" : b.Contract;
+                    return new BalanceDto(b.Currency, contract, $"{formatted} {b.Currency}", num);
                 })
+                .OrderByDescending(b => b.NumericAmount)
+                .ThenBy(b => b.Symbol)
+                .ThenBy(b => b.Contract)
                 .ToList();
 
             return Results.Ok(dtos);

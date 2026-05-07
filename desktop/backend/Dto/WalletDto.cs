@@ -44,7 +44,8 @@ public sealed record ImportAccountRequest(
 /// <summary>Request to view a private key.</summary>
 public sealed record GetPrivateKeyRequest(
     [property: JsonPropertyName("account")] string Account,
-    [property: JsonPropertyName("authority")] string Authority
+    [property: JsonPropertyName("authority")] string Authority,
+    [property: JsonPropertyName("chainId")] string? ChainId = null
 );
 
 /// <summary>Response with a private key.</summary>
@@ -94,4 +95,16 @@ public sealed record AddKeyRequest(
 /// <summary>Request to remove a stored key.</summary>
 public sealed record RemoveKeyRequest(
     [property: JsonPropertyName("publicKey")] string PublicKey
+);
+
+/// <summary>Request to look up chain accounts controlled by a stored key.</summary>
+public sealed record LookupStoredKeyAccountsRequest(
+    [property: JsonPropertyName("publicKey")] string PublicKey,
+    [property: JsonPropertyName("chainIds")] string[]? ChainIds = null
+);
+
+/// <summary>Import accounts using a stored key without exposing the private key to the frontend.</summary>
+public sealed record ImportStoredKeyAccountsRequest(
+    [property: JsonPropertyName("publicKey")] string PublicKey,
+    [property: JsonPropertyName("accounts")] ImportAccountEntry[] Accounts
 );

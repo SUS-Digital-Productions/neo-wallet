@@ -83,6 +83,7 @@ export interface RemoveAccountRequest {
 export interface GetPrivateKeyRequest {
   account: string;
   authority: string;
+  chainId?: string;
 }
 
 export interface GetPrivateKeyResponse {
@@ -120,6 +121,16 @@ export interface AddKeyRequest {
 
 export interface RemoveKeyRequest {
   publicKey: string;
+}
+
+export interface LookupStoredKeyAccountsRequest {
+  publicKey: string;
+  chainIds?: string[];
+}
+
+export interface ImportStoredKeyAccountsRequest {
+  publicKey: string;
+  accounts: ImportAccountEntry[];
 }
 
 /* ---- Lookup ---- */
@@ -161,6 +172,7 @@ export interface AppSettings {
 
 export interface BalanceEntry {
   symbol: string;
+  contract: string;
   amount: string;
   numericAmount: number;
 }
@@ -202,6 +214,9 @@ export interface EsrParseResponse {
 export interface EsrApproveRequest {
   requestId: string;
   broadcast: boolean;
+  account?: string;
+  authority?: string;
+  chainId?: string;
 }
 
 export interface EsrRejectRequest {
@@ -221,6 +236,8 @@ export interface SignRawRequest {
   chainId: string;
   actions: SignRawAction[];
   broadcast?: boolean;
+  account?: string;
+  authority?: string;
 }
 
 /* ---- ESR Listener ---- */

@@ -328,13 +328,18 @@ export default function Account() {
             ) : (
               <div className="space-y-2">
                 {bals.data.map((b) => (
-                  <Card key={b.symbol} className="py-3">
+                  <Card key={`${b.contract}:${b.symbol}`} className="py-3">
                     <CardContent className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                           {b.symbol.slice(0, 2)}
                         </div>
-                        <p className="font-medium">{b.symbol}</p>
+                        <div>
+                          <p className="font-medium">{b.symbol}</p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {b.contract}
+                          </p>
+                        </div>
                       </div>
                       <p className="font-mono text-sm">{b.amount}</p>
                     </CardContent>

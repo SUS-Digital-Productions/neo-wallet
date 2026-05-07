@@ -23,7 +23,7 @@ public static class EsrEndpoints
             return Results.Ok(new EsrParseResponse(
                 RequestId: requestId,
                 ChainId: esr.ChainId ?? "",
-                Type: esr.Payload.IsTransaction ? "transaction" : "action",
+                Type: GetRequestType(esr),
                 Actions: actions
             ));
         });
@@ -33,25 +33,33 @@ public static class EsrEndpoints
             if (!wallet.WalletUnlocked)
                 return Results.Problem("Wallet is locked.", statusCode: StatusCodes.Status403Forbidden);
 
-            if (!listener.PendingRequests.TryRemove(req.RequestId, out var pending))
+            if (!listener.PendingRequests.TryGetValue(req.RequestId, out var pending))
                 return Results.Problem("Request not found or already handled.", statusCode: StatusCodes.Status404NotFound);
 
             var (esr, relayCallback) = pending;
 
-            var account = wallet.ActiveAccount;
+            var isIdentityRequest = esr.Payload is null || (!esr.Payload.IsTransaction && !esr.Payload.IsAction);
+            var account = ResolveSignerAccount(wallet, req.Account, req.Authority, req.ChainId, out var signerError);
             if (account is null)
-                return Results.Problem("No active account.", statusCode: StatusCodes.Status400BadRequest);
+                return Results.Problem(signerError ?? "No signing account.", statusCode: StatusCodes.Status400BadRequest);
 
-            var privateKeyWif = wallet.GetPrivateKeyWif(account.Account, account.Authority);
+            var chainId = string.IsNullOrWhiteSpace(esr.ChainId) ? account.ChainId : esr.ChainId!;
+            if (!string.Equals(account.ChainId, chainId, StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Problem(
+                    $"Selected account is on {wallet.GetChainName(account.ChainId)}, but this request is for {wallet.GetChainName(chainId)}.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var privateKeyWif = wallet.GetPrivateKeyWif(account.Account, account.Authority, account.ChainId);
             if (string.IsNullOrEmpty(privateKeyWif))
                 return Results.Problem("No private key available.", statusCode: StatusCodes.Status400BadRequest);
 
-            var chainId = esr.ChainId ?? wallet.ActiveNetwork?.ChainId ?? "";
-            using var rpc = factory.CreateRpcClient(chainId);
+            using var rpc = isIdentityRequest ? null : factory.CreateRpcClient(chainId);
 
             var response = await esrService.SignRequestAsync(
                 esr, privateKeyWif, account.Account, account.Authority,
-                blockchainClient: rpc, broadcast: req.Broadcast,
+                blockchainClient: rpc, broadcast: !isIdentityRequest && req.Broadcast,
                 cancellationToken: cancellationToken);
 
             // Inject Anchor Link session metadata so dApps can establish persistent sessions
@@ -63,6 +71,7 @@ public static class EsrEndpoints
             }
 
             System.Diagnostics.Trace.WriteLine($"[ESR] Approved request {req.RequestId}, txid={response.TransactionId}");
+            listener.PendingRequests.TryRemove(req.RequestId, out _);
 
             // Send callback to dApp so it knows the request was signed.
             // Prefer the relay callback URL (from the envelope) over the ESR's own callback.
@@ -83,7 +92,7 @@ public static class EsrEndpoints
 
             return Results.Ok(new TransferResponse(
                 TransactionId: response.TransactionId ?? "signed-not-broadcast",
-                Broadcast: req.Broadcast
+                Broadcast: !isIdentityRequest && req.Broadcast
             ));
         });
 
@@ -104,11 +113,18 @@ public static class EsrEndpoints
             if (!wallet.WalletUnlocked)
                 return Results.Problem("Wallet is locked.", statusCode: StatusCodes.Status403Forbidden);
 
-            var account = wallet.ActiveAccount;
+            var account = ResolveSignerAccount(wallet, req.Account, req.Authority, req.ChainId, out var signerError);
             if (account is null)
-                return Results.Problem("No active account.", statusCode: StatusCodes.Status400BadRequest);
+                return Results.Problem(signerError ?? "No signing account.", statusCode: StatusCodes.Status400BadRequest);
 
-            var privateKeyWif = wallet.GetPrivateKeyWif(account.Account, account.Authority);
+            if (!string.Equals(account.ChainId, req.ChainId, StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Problem(
+                    $"Selected account is on {wallet.GetChainName(account.ChainId)}, but this transaction is for {wallet.GetChainName(req.ChainId)}.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var privateKeyWif = wallet.GetPrivateKeyWif(account.Account, account.Authority, account.ChainId);
             if (string.IsNullOrEmpty(privateKeyWif))
                 return Results.Problem("No private key available.", statusCode: StatusCodes.Status400BadRequest);
 
@@ -216,7 +232,7 @@ public static class EsrEndpoints
             return Results.Ok(new EsrParseResponse(
                 RequestId: requestId,
                 ChainId: esr.ChainId ?? "",
-                Type: esr.Payload.IsTransaction ? "transaction" : (esr.Payload.IsAction ? "action" : "identity"),
+                Type: GetRequestType(esr),
                 Actions: actions
             ));
         });
@@ -244,7 +260,7 @@ public static class EsrEndpoints
         var result = new List<EsrActionSummary>();
 
         // Single action request
-        if (esr.Payload.IsAction && esr.Payload.Action is not null)
+        if (esr.Payload?.IsAction == true && esr.Payload.Action is not null)
         {
             var (account, name) = ReadActionFields(esr.Payload.Action);
             result.Add(new EsrActionSummary(account, name));
@@ -252,7 +268,7 @@ public static class EsrEndpoints
         }
 
         // Transaction request — try to pull actions array
-        if (esr.Payload.IsTransaction && esr.Payload.Transaction is not null)
+        if (esr.Payload?.IsTransaction == true && esr.Payload.Transaction is not null)
         {
             var tx = esr.Payload.Transaction;
 
@@ -282,6 +298,58 @@ public static class EsrEndpoints
         }
 
         return result;
+    }
+
+    private static string GetRequestType(Esr esr)
+    {
+        if (esr.Payload?.IsTransaction == true) return "transaction";
+        if (esr.Payload?.IsAction == true) return "action";
+        return "identity";
+    }
+
+    private static AccountDto? ResolveSignerAccount(
+        IWalletStateService wallet,
+        string? account,
+        string? authority,
+        string? chainId,
+        out string? error)
+    {
+        error = null;
+
+        var hasExplicitSigner =
+            !string.IsNullOrWhiteSpace(account) ||
+            !string.IsNullOrWhiteSpace(authority) ||
+            !string.IsNullOrWhiteSpace(chainId);
+
+        if (!hasExplicitSigner)
+        {
+            if (wallet.ActiveAccount is not null)
+                return wallet.ActiveAccount;
+
+            error = "No active account.";
+            return null;
+        }
+
+        if (
+            string.IsNullOrWhiteSpace(account) ||
+            string.IsNullOrWhiteSpace(authority) ||
+            string.IsNullOrWhiteSpace(chainId)
+        )
+        {
+            error = "Account, authority, and chainId are required for the signing account.";
+            return null;
+        }
+
+        var match = wallet.GetAccounts().FirstOrDefault(a =>
+            string.Equals(a.Account, account, StringComparison.Ordinal) &&
+            string.Equals(a.Authority, authority, StringComparison.Ordinal) &&
+            string.Equals(a.ChainId, chainId, StringComparison.OrdinalIgnoreCase));
+
+        if (match is not null)
+            return match;
+
+        error = "Selected signing account was not found in this wallet.";
+        return null;
     }
 
     private static (string account, string name) ReadActionFields(object action)

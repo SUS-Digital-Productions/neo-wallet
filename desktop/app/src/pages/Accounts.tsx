@@ -150,7 +150,7 @@ export default function Accounts() {
                             return;
                           }
                           getPrivateKey.mutate(
-                            { account: a.account, authority: a.authority },
+                            { account: a.account, authority: a.authority, chainId: a.chainId },
                             {
                               onSuccess: (res) =>
                                 setRevealedKey({ id, wif: res.privateKey }),

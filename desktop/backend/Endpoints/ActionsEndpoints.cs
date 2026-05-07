@@ -36,7 +36,7 @@ public static class ActionsEndpoints
                 return Results.Problem("At least one action is required.", statusCode: StatusCodes.Status400BadRequest);
 
             var chainId = string.IsNullOrWhiteSpace(req.ChainId) ? account.ChainId : req.ChainId!;
-            var privateKeyWif = wallet.GetPrivateKeyWif(account.Account, account.Authority);
+            var privateKeyWif = wallet.GetPrivateKeyWif(account.Account, account.Authority, account.ChainId);
             if (string.IsNullOrEmpty(privateKeyWif))
                 return Results.Problem("No private key available for active account.", statusCode: StatusCodes.Status400BadRequest);
 

@@ -21,7 +21,10 @@ public sealed record EsrParseResponse(
 
 public sealed record EsrApproveRequest(
     [property: JsonPropertyName("requestId")] string RequestId,
-    [property: JsonPropertyName("broadcast")] bool Broadcast
+    [property: JsonPropertyName("broadcast")] bool Broadcast,
+    [property: JsonPropertyName("account")] string? Account = null,
+    [property: JsonPropertyName("authority")] string? Authority = null,
+    [property: JsonPropertyName("chainId")] string? ChainId = null
 );
 
 public sealed record EsrRejectRequest(
@@ -33,7 +36,9 @@ public sealed record EsrRejectRequest(
 public sealed record SignRawRequest(
     [property: JsonPropertyName("chainId")] string ChainId,
     [property: JsonPropertyName("actions")] JsonElement Actions,
-    [property: JsonPropertyName("broadcast")] bool Broadcast = true
+    [property: JsonPropertyName("broadcast")] bool Broadcast = true,
+    [property: JsonPropertyName("account")] string? Account = null,
+    [property: JsonPropertyName("authority")] string? Authority = null
 );
 
 /// <summary>ESR listener connection status.</summary>

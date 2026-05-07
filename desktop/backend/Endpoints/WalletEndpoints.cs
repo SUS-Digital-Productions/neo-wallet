@@ -128,7 +128,7 @@ public static class WalletEndpoints
             if (!wallet.WalletUnlocked)
                 return Results.Problem("Wallet is locked.", statusCode: StatusCodes.Status403Forbidden);
 
-            var wif = wallet.GetPrivateKeyWif(req.Account, req.Authority);
+            var wif = wallet.GetPrivateKeyWif(req.Account, req.Authority, req.ChainId);
             if (string.IsNullOrEmpty(wif))
                 return Results.Problem("Account not found.", statusCode: StatusCodes.Status404NotFound);
 

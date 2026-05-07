@@ -8,6 +8,10 @@ use tauri::tray::TrayIconBuilder;
 #[cfg(desktop)]
 use tauri_plugin_shell::ShellExt;
 
+/// Holds the .NET sidecar child process so it stays alive for the app lifetime.
+#[cfg(desktop)]
+struct SidecarState(std::sync::Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
+
 #[cfg(not(desktop))]
 mod mobile_backend;
 
@@ -24,6 +28,7 @@ fn start_backend(
     let (mut rx, child) = shell
         .sidecar("NeoWallet.Backend")
         .map_err(|e| format!("failed to create sidecar command: {e}"))?
+        .args(["--headless"])
         .spawn()
         .map_err(|e| format!("failed to spawn sidecar: {e}"))?;
 
@@ -55,7 +60,7 @@ fn setup_desktop(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
         .item(&quit_item)
         .build()?;
 
-    let _tray = TrayIconBuilder::new()
+    let tray = TrayIconBuilder::new()
         .menu(&tray_menu)
         .tooltip("Neo Wallet")
         .on_menu_event(move |app, event| match event.id().as_ref() {
@@ -67,6 +72,14 @@ fn setup_desktop(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
             }
             "quit" => {
                 println!("[tauri] Exit requested from tray — shutting down.");
+                // Kill the sidecar before exiting.
+                if let Some(state) = app.try_state::<SidecarState>() {
+                    if let Ok(mut guard) = state.0.lock() {
+                        if let Some(child) = guard.take() {
+                            let _ = child.kill();
+                        }
+                    }
+                }
                 app.exit(0);
             }
             _ => {}
@@ -82,11 +95,17 @@ fn setup_desktop(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
         })
         .build(app)?;
 
+    // Keep the tray handle alive for the entire app lifetime.
+    // In Tauri 2, dropping TrayIcon removes it from the system tray.
+    std::mem::forget(tray);
     println!("[tauri] System tray icon started");
 
     let handle = app.handle().clone();
     match start_backend(&handle) {
-        Ok(_child) => println!("[tauri] .NET backend sidecar started"),
+        Ok(child) => {
+            app.manage(SidecarState(std::sync::Mutex::new(Some(child))));
+            println!("[tauri] .NET backend sidecar started");
+        }
         Err(e) => eprintln!("[tauri] Failed to start backend: {e}"),
     }
 
@@ -150,6 +169,14 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![show_main_window])
+        .on_window_event(|window, event| {
+            #[cfg(desktop)]
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Hide to tray instead of closing; the tray "Exit" item does the real exit.
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .setup(|app| {
             // Register esr:// scheme at runtime (desktop Linux/Windows)
             #[cfg(any(windows, target_os = "linux"))]

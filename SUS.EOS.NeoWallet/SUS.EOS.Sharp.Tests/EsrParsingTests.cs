@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using SUS.EOS.Sharp.Models;
+using SUS.EOS.Sharp.Services;
 using SUS.EOS.EosioSigningRequest.Services;
 using Xunit;
 
@@ -72,6 +74,36 @@ public class EsrParsingTests
         // Identity requests (type 3) should not have action or transaction
         Assert.Null(request.Payload?.Action);
         Assert.Null(request.Payload?.Transaction);
+    }
+
+    [Fact]
+    public async Task SignWaxIdentityEsr_ShouldNotFetchChainInfo()
+    {
+        var service = new EsrService();
+        var request = new SUS.EOS.EosioSigningRequest.Models.Esr
+        {
+            ChainId = "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4",
+            Payload = new SUS.EOS.EosioSigningRequest.Models.EsrRequestPayload(),
+        };
+        var privateKeyWif = SUS.EOS.Sharp.Cryptography.EosioKey.FromHex(
+            "0000000000000000000000000000000000000000000000000000000000000001"
+        ).PrivateKeyWif;
+        var response = await service.SignRequestAsync(
+            request,
+            privateKeyWif,
+            "eosio",
+            "active",
+            new ThrowingBlockchainClient(),
+            broadcast: true
+        );
+
+        Assert.NotEmpty(response.Signatures);
+        Assert.True(response.SerializedTransaction is { Length: > 0 });
+        Assert.False(string.IsNullOrEmpty(response.PackedTransaction));
+        Assert.Equal(
+            "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4",
+            response.ChainId
+        );
     }
 
     [Fact]
@@ -174,5 +206,80 @@ public class EsrParsingTests
                 Console.WriteLine($"Request type: {requestType}");
             }
         }
+    }
+
+    private sealed class ThrowingBlockchainClient : IAntelopeBlockchainClient
+    {
+        public string Endpoint => "https://example.invalid";
+        public string? ChainId => null;
+
+        public Task<ChainInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Identity signing must not fetch chain info.");
+
+        public Task<Account> GetAccountAsync(
+            string accountName,
+            CancellationToken cancellationToken = default
+        ) => ThrowAsync<Account>();
+
+        public Task<Block> GetBlockAsync(
+            string blockNumOrId,
+            CancellationToken cancellationToken = default
+        ) => ThrowAsync<Block>();
+
+        public Task<TransactionResult> PushTransactionAsync(
+            object signedTransaction,
+            CancellationToken cancellationToken = default
+        ) => throw new InvalidOperationException("Identity signing must not broadcast.");
+
+        public Task<TableRowsResult<T>> GetTableRowsAsync<T>(
+            string contract,
+            string scope,
+            string table,
+            CancellationToken cancellationToken = default
+        ) => ThrowAsync<TableRowsResult<T>>();
+
+        public Task<TableRowsResult<T>> GetTableRowsAsync<T>(
+            string contract,
+            string scope,
+            string table,
+            int limit,
+            string? lowerBound = null,
+            string? upperBound = null,
+            bool reverse = false,
+            CancellationToken cancellationToken = default
+        ) => ThrowAsync<TableRowsResult<T>>();
+
+        public Task<List<string>> GetCurrencyBalanceAsync(
+            string contract,
+            string account,
+            string? symbol = null,
+            CancellationToken cancellationToken = default
+        ) => ThrowAsync<List<string>>();
+
+        public Task<AbiDefinition?> GetAbiAsync(
+            string contractAccount,
+            CancellationToken cancellationToken = default
+        ) => ThrowAsync<AbiDefinition?>();
+
+        public Task<byte[]> AbiJsonToBinAsync(
+            string contract,
+            string action,
+            object data,
+            CancellationToken cancellationToken = default
+        ) => ThrowAsync<byte[]>();
+
+        public Task<object?> AbiBinToJsonAsync(
+            string contract,
+            string action,
+            string binArgs,
+            CancellationToken cancellationToken = default
+        ) => ThrowAsync<object?>();
+
+        public void Dispose()
+        {
+        }
+
+        private static Task<T> ThrowAsync<T>() =>
+            throw new InvalidOperationException("Identity signing must not use chain RPC.");
     }
 }

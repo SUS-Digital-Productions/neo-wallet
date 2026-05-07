@@ -114,18 +114,12 @@ public class Esr
         try
         {
             // Check if this is an identity request (type 3)
-            if (!Payload.IsTransaction && !Payload.IsAction)
+            if (Payload is null || (!Payload.IsTransaction && !Payload.IsAction))
             {
                 System.Diagnostics.Trace.WriteLine("[ESR] Processing identity request - creating identity proof");
                 
-                // Identity request - we need to create an identity proof
-                // This involves signing a message that proves we control the key
                 var key = EosioKey.FromPrivateKey(privateKeyWif);
                 System.Diagnostics.Trace.WriteLine($"[ESR] Public key: {key.PublicKey}");
-                
-                // For identity proofs, we create a minimal transaction with an identity action
-                // The signer and expiration will be set by the caller
-                // We need to sign a digest that proves key ownership
                 
                 // Get scope from info if available
                 var scope = Info?.ContainsKey("scope") == true ? Info["scope"]?.ToString() ?? "" : "";
@@ -136,64 +130,44 @@ public class Esr
                 var expirationStr = expiration.ToString("yyyy-MM-ddTHH:mm:ss");
                 System.Diagnostics.Trace.WriteLine($"[ESR] Expiration: {expirationStr}");
                 
-                // Build identity proof data to sign
-                // Format: chain_id + transaction header + identity action
-                var proofData = new List<byte>();
-                
-                // Add chain ID (32 bytes hex decoded)
-                if (!string.IsNullOrEmpty(chainInfo.ChainId))
+                var identityTransaction = new EosioTransaction<byte[]>
                 {
-                    proofData.AddRange(Convert.FromHexString(chainInfo.ChainId));
-                    System.Diagnostics.Trace.WriteLine($"[ESR] Chain ID: {chainInfo.ChainId}");
-                }
-                
-                // Add zeros for ref_block_num (2 bytes) and ref_block_prefix (4 bytes) 
-                proofData.AddRange(new byte[] { 0, 0 }); // ref_block_num
-                proofData.AddRange(new byte[] { 0, 0, 0, 0 }); // ref_block_prefix
-                
-                // Add expiration (4 bytes)
-                var expSeconds = (uint)((expiration - new DateTime(1970, 1, 1)).TotalSeconds);
-                proofData.AddRange(BitConverter.GetBytes(expSeconds));
-                System.Diagnostics.Trace.WriteLine($"[ESR] Expiration timestamp: {expSeconds}");
-                
-                // Add empty context_free_actions count (varuint = 0)
-                proofData.Add(0);
-                
-                // Add actions count (varuint = 1)
-                proofData.Add(1);
-                
-                // Add identity action
-                // account = 0 (8 bytes)
-                proofData.AddRange(new byte[8]);
-                // name = "identity" encoded as 8 bytes
-                proofData.AddRange(EncodeNameToBytes("identity"));
-                // authorization count = 0 
-                proofData.Add(0);
-                // data length = 0
-                proofData.Add(0);
-                
-                // Add empty transaction_extensions count
-                proofData.Add(0);
-                
-                // Add 32 zero bytes (context free data hash)
-                proofData.AddRange(new byte[32]);
-                
-                System.Diagnostics.Trace.WriteLine($"[ESR] Proof data length: {proofData.Count} bytes");
-                System.Diagnostics.Trace.WriteLine($"[ESR] Proof data hex: {Convert.ToHexString(proofData.ToArray())}");
-                
-                // Compute SHA256 digest and sign
-                using var sha256 = System.Security.Cryptography.SHA256.Create();
-                var digest = sha256.ComputeHash(proofData.ToArray());
-                System.Diagnostics.Trace.WriteLine($"[ESR] Digest: {Convert.ToHexString(digest)}");
-                
-                // Sign the digest
+                    Expiration = expirationStr,
+                    RefBlockNum = 0,
+                    RefBlockPrefix = 0,
+                    MaxNetUsageWords = 0,
+                    MaxCpuUsageMs = 0,
+                    DelaySec = 0,
+                    ContextFreeActions = new List<EosioAction<byte[]>>(),
+                    Actions = new List<EosioAction<byte[]>>
+                    {
+                        new()
+                        {
+                            Account = string.Empty,
+                            Name = "identity",
+                            Authorization = new List<EosioAuthorization>(),
+                            Data = Array.Empty<byte>(),
+                            IsBinaryData = true,
+                        }
+                    },
+                    TransactionExtensions = new List<object>(),
+                };
+
+                var identitySerialized = EosioSerializer.SerializeTransactionWithBinaryData(identityTransaction);
+                var identityPackedTrx = EosioSerializer.BytesToHexString(identitySerialized);
+                System.Diagnostics.Trace.WriteLine($"[ESR] Identity packed transaction: {identityPackedTrx}");
+                System.Diagnostics.Trace.WriteLine($"[ESR] Identity serialized length: {identitySerialized.Length} bytes");
+
                 var identitySigner = new EosioSignatureProvider(privateKeyWif);
-                var identitySignature = identitySigner.SignDigest(digest);
+                var identitySignature = identitySigner.SignTransaction(chainInfo.ChainId, identityTransaction);
                 System.Diagnostics.Trace.WriteLine($"[ESR] Identity signature: {identitySignature}");
 
                 return new EsrCallbackResponse
                 {
                     Signatures = new List<string> { identitySignature },
+                    Transaction = identityTransaction,
+                    SerializedTransaction = identitySerialized,
+                    PackedTransaction = identityPackedTrx,
                     ChainId = chainInfo.ChainId,
                     Signer = signer,
                     SignerPermission = signerPermission,
@@ -905,37 +879,6 @@ public class Esr
 
         // Trim trailing dots
         return result.ToString().TrimEnd('.');
-    }
-
-    private static byte[] EncodeNameToBytes(string name)
-    {
-        const string charmap = ".12345abcdefghijklmnopqrstuvwxyz";
-        
-        if (string.IsNullOrEmpty(name))
-            return new byte[8];
-
-        ulong value = 0;
-        var n = Math.Min(name.Length, 13);
-        
-        for (var i = 0; i < n; i++)
-        {
-            var c = charmap.IndexOf(name[i]);
-            if (c == -1)
-                c = 0; // Unknown char becomes '.'
-            
-            if (i < 12)
-            {
-                // First 12 characters use 5 bits each
-                value |= (ulong)(uint)c << (64 - 5 * (i + 1));
-            }
-            else
-            {
-                // 13th character uses only 4 bits
-                value |= (ulong)(uint)(c & 0x0F);
-            }
-        }
-        
-        return BitConverter.GetBytes(value);
     }
 
     private static string GetChainIdFromAlias(byte alias)

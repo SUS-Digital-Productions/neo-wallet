@@ -11,7 +11,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use tower_http::cors::{Any, CorsLayer};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use super::chain::AsyncChainApi;
 use super::state::AppState;
@@ -43,6 +43,8 @@ pub fn build_router(state: AppState) -> Router {
         // Keys
         .route("/api/keys", get(keys_list).post(keys_add))
         .route("/api/keys/remove", post(keys_remove))
+        .route("/api/keys/lookup", post(keys_lookup))
+        .route("/api/keys/import-accounts", post(keys_import_accounts))
         // Networks
         .route("/api/networks", get(networks_list))
         .route("/api/networks/active", post(networks_set_active))
@@ -127,6 +129,8 @@ struct NetworkDef {
     name: &'static str,
     symbol: &'static str,
     rpc: &'static str,
+    light_api: &'static str,
+    light_name: &'static str,
     /// Token contract for the native token.
     token_contract: &'static str,
 }
@@ -137,6 +141,8 @@ const NETWORKS: &[NetworkDef] = &[
         name: "WAX",
         symbol: "WAX",
         rpc: "https://wax.greymass.com",
+        light_api: "https://wax.light-api.net",
+        light_name: "wax",
         token_contract: "eosio.token",
     },
     NetworkDef {
@@ -144,6 +150,8 @@ const NETWORKS: &[NetworkDef] = &[
         name: "EOS",
         symbol: "EOS",
         rpc: "https://eos.greymass.com",
+        light_api: "https://eos.light-api.net",
+        light_name: "eos",
         token_contract: "eosio.token",
     },
     NetworkDef {
@@ -151,6 +159,8 @@ const NETWORKS: &[NetworkDef] = &[
         name: "Telos",
         symbol: "TLOS",
         rpc: "https://telos.greymass.com",
+        light_api: "https://telos.light-api.net",
+        light_name: "telos",
         token_contract: "eosio.token",
     },
 ];
@@ -307,6 +317,21 @@ struct RemoveKeyBody {
 }
 
 #[derive(Deserialize)]
+struct LookupStoredKeyAccountsBody {
+    #[serde(rename = "publicKey")]
+    public_key: String,
+    #[serde(rename = "chainIds")]
+    chain_ids: Option<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+struct ImportStoredKeyAccountsBody {
+    #[serde(rename = "publicKey")]
+    public_key: String,
+    accounts: Vec<ImportAccountEntry>,
+}
+
+#[derive(Deserialize)]
 struct SetActiveNetworkBody {
     #[serde(rename = "chainId")]
     chain_id: String,
@@ -322,6 +347,7 @@ struct BalanceQuery {
 #[derive(Serialize)]
 struct BalanceEntry {
     symbol: String,
+    contract: String,
     amount: String,
     #[serde(rename = "numericAmount")]
     numeric_amount: f64,
@@ -607,40 +633,72 @@ async fn accounts_import(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(body): Json<ImportAccountBody>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<Json<Vec<AccountDto>>, StatusCode> {
     require_auth!(state, headers, "/api/accounts/import");
 
-    let public_key = derive_public_key(&body.private_key)
-        .map_err(|e| {
-            eprintln!("[mobile-backend] invalid WIF key: {e}");
-            StatusCode::BAD_REQUEST
-        })?;
+    let imported = import_accounts_with_private_key(&state, &body.private_key, &body.accounts)?;
+    Ok(Json(imported))
+}
+
+fn import_accounts_with_private_key(
+    state: &AppState,
+    private_key: &str,
+    accounts: &[ImportAccountEntry],
+) -> Result<Vec<AccountDto>, StatusCode> {
+    let public_key = derive_public_key(private_key).map_err(|e| {
+        eprintln!("[mobile-backend] invalid WIF key: {e}");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    let mut imported = Vec::new();
     {
         let mut inner = state.inner.lock().unwrap();
         let data = inner.wallet_data.as_mut().ok_or(StatusCode::FORBIDDEN)?;
-        for entry in &body.accounts {
-            // Avoid duplicates
+
+        if !data.keys.iter().any(|k| k.public_key == public_key) {
+            data.keys.push(super::crypto::WalletKey {
+                label: String::new(),
+                private_key_wif: private_key.to_string(),
+                public_key: public_key.clone(),
+            });
+        }
+
+        for entry in accounts {
             let exists = data.accounts.iter().any(|a| {
                 a.account == entry.account
                     && a.authority == entry.authority
                     && a.chain_id == entry.chain_id
             });
-            if !exists {
-                data.accounts.push(super::crypto::WalletAccount {
-                    account: entry.account.clone(),
-                    authority: entry.authority.clone(),
-                    private_key_wif: body.private_key.clone(),
-                    public_key: public_key.clone(),
-                    chain_id: entry.chain_id.clone(),
-                });
+            if exists {
+                continue;
             }
+
+            data.accounts.push(super::crypto::WalletAccount {
+                account: entry.account.clone(),
+                authority: entry.authority.clone(),
+                private_key_wif: private_key.to_string(),
+                public_key: public_key.clone(),
+                chain_id: entry.chain_id.clone(),
+            });
+
+            imported.push(AccountDto {
+                account: entry.account.clone(),
+                authority: entry.authority.clone(),
+                public_key: public_key.clone(),
+                chain_id: entry.chain_id.clone(),
+                chain_name: find_network(&entry.chain_id)
+                    .map(|n| n.name.to_string())
+                    .unwrap_or_else(|| "Unknown".to_string()),
+            });
         }
     }
+
     state.save().map_err(|e| {
         eprintln!("[mobile-backend] save after import: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    Ok(StatusCode::OK)
+
+    Ok(imported)
 }
 
 async fn accounts_remove(
@@ -696,16 +754,28 @@ async fn accounts_lookup(
             StatusCode::BAD_REQUEST
         })?;
 
-    let chain_ids: Vec<&str> = match &body.chain_ids {
+    let chains = lookup_accounts_by_public_key(&public_key, body.chain_ids.as_ref()).await;
+
+    Ok(Json(LookupAccountsResponse {
+        public_key,
+        chains,
+    }))
+}
+
+async fn lookup_accounts_by_public_key(
+    public_key: &str,
+    chain_ids: Option<&Vec<String>>,
+) -> Vec<LookupChainResult> {
+    let selected_chain_ids: Vec<&str> = match chain_ids {
         Some(ids) => ids.iter().map(|s| s.as_str()).collect(),
         None => NETWORKS.iter().map(|n| n.chain_id).collect(),
     };
 
     let mut chains = Vec::new();
-    for cid in &chain_ids {
+    for cid in &selected_chain_ids {
         if let Some(net) = find_network(cid) {
             let api = AsyncChainApi::new(net.rpc);
-            let account_names = api.get_key_accounts(&public_key).await.unwrap_or_default();
+            let account_names = api.get_key_accounts(public_key).await.unwrap_or_default();
             let accounts = account_names
                 .into_iter()
                 .map(|name| LookupAccountEntry {
@@ -722,10 +792,28 @@ async fn accounts_lookup(
         }
     }
 
-    Ok(Json(LookupAccountsResponse {
-        public_key,
-        chains,
-    }))
+    chains
+}
+
+async fn keys_lookup(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<LookupStoredKeyAccountsBody>,
+) -> Result<Json<LookupAccountsResponse>, StatusCode> {
+    require_auth!(state, headers, "/api/keys/lookup");
+
+    let public_key = body.public_key.trim().to_string();
+    let is_stored = {
+        let inner = state.inner.lock().unwrap();
+        let data = inner.wallet_data.as_ref().ok_or(StatusCode::FORBIDDEN)?;
+        data.keys.iter().any(|k| k.public_key == public_key)
+    };
+    if !is_stored {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    let chains = lookup_accounts_by_public_key(&public_key, body.chain_ids.as_ref()).await;
+    Ok(Json(LookupAccountsResponse { public_key, chains }))
 }
 
 // -- Keys --
@@ -790,9 +878,31 @@ async fn keys_remove(
         let mut inner = state.inner.lock().unwrap();
         let data = inner.wallet_data.as_mut().ok_or(StatusCode::FORBIDDEN)?;
         data.keys.retain(|k| k.public_key != body.public_key);
+        data.accounts.retain(|a| a.public_key != body.public_key);
     }
     state.save().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(StatusCode::OK)
+}
+
+async fn keys_import_accounts(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<ImportStoredKeyAccountsBody>,
+) -> Result<Json<Vec<AccountDto>>, StatusCode> {
+    require_auth!(state, headers, "/api/keys/import-accounts");
+
+    let private_key = {
+        let inner = state.inner.lock().unwrap();
+        let data = inner.wallet_data.as_ref().ok_or(StatusCode::FORBIDDEN)?;
+        data.keys
+            .iter()
+            .find(|k| k.public_key == body.public_key)
+            .map(|k| k.private_key_wif.clone())
+            .ok_or(StatusCode::NOT_FOUND)?
+    };
+
+    let imported = import_accounts_with_private_key(&state, &private_key, &body.accounts)?;
+    Ok(Json(imported))
 }
 
 // -- Networks --
@@ -846,6 +956,10 @@ async fn balances(
     };
 
     let net = find_network(&chain_id).ok_or(StatusCode::BAD_REQUEST)?;
+    if let Ok(entries) = light_api_balances(net, &account).await {
+        return Ok(Json(entries));
+    }
+
     let api = AsyncChainApi::new(net.rpc);
 
     let balances_raw = api
@@ -864,6 +978,7 @@ async fn balances(
             let numeric: f64 = parts[0].parse().unwrap_or(0.0);
             Some(BalanceEntry {
                 symbol: parts[1].to_string(),
+                contract: net.token_contract.to_string(),
                 amount: s.clone(),
                 numeric_amount: numeric,
             })
@@ -871,6 +986,74 @@ async fn balances(
         .collect();
 
     Ok(Json(entries))
+}
+
+async fn light_api_balances(net: &NetworkDef, account: &str) -> Result<Vec<BalanceEntry>, String> {
+    let url = format!(
+        "{}/api/balances/{}/{}",
+        net.light_api.trim_end_matches('/'),
+        net.light_name,
+        account
+    );
+
+    let value: serde_json::Value = reqwest::Client::new()
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("light-api balances request: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("light-api balances status: {e}"))?
+        .json()
+        .await
+        .map_err(|e| format!("light-api balances parse: {e}"))?;
+
+    let mut entries = Vec::new();
+    if let Some(chains) = value.as_object() {
+        for chain in chains.values() {
+            let Some(balances) = chain.get("balances").and_then(|v| v.as_array()) else {
+                continue;
+            };
+
+            for balance in balances {
+                let symbol = balance
+                    .get("currency")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?")
+                    .to_string();
+                let contract = balance
+                    .get("contract")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let amount_raw = balance
+                    .get("amount")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("0");
+                let numeric_amount = amount_raw.parse::<f64>().unwrap_or(0.0);
+                let decimals = balance
+                    .get("decimals")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(4) as usize;
+
+                entries.push(BalanceEntry {
+                    amount: format!("{:.*} {}", decimals, numeric_amount, symbol),
+                    symbol,
+                    contract,
+                    numeric_amount,
+                });
+            }
+        }
+    }
+
+    entries.sort_by(|a, b| {
+        b.numeric_amount
+            .partial_cmp(&a.numeric_amount)
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| a.symbol.cmp(&b.symbol))
+            .then_with(|| a.contract.cmp(&b.contract))
+    });
+
+    Ok(entries)
 }
 
 // -- Transfers --

@@ -204,6 +204,17 @@ public sealed class WalletStateService : IWalletStateService
         return imported;
     }
 
+    public IReadOnlyList<AccountDto> ImportAccountsByPublicKey(string publicKey, IEnumerable<ImportAccountEntry> accounts)
+    {
+        var data = _storage.CurrentData ?? throw new InvalidOperationException("Wallet is locked.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(publicKey);
+
+        var storedKey = data.Keys.Find(k => k.PublicKey == publicKey)
+            ?? throw new InvalidOperationException("Stored key not found.");
+
+        return ImportAccounts(storedKey.PrivateKeyWif, accounts);
+    }
+
     public bool RemoveAccount(string account, string authority, string chainId)
     {
         var data = _storage.CurrentData ?? throw new InvalidOperationException("Wallet is locked.");
@@ -232,11 +243,14 @@ public sealed class WalletStateService : IWalletStateService
         return true;
     }
 
-    public string? GetPrivateKeyWif(string account, string authority)
+    public string? GetPrivateKeyWif(string account, string authority, string? chainId = null)
     {
         var data = _storage.CurrentData;
         if (data is null) return null;
-        var match = data.Accounts.Find(a => a.Account == account && a.Authority == authority);
+        var match = data.Accounts.Find(a =>
+            a.Account == account &&
+            a.Authority == authority &&
+            (string.IsNullOrWhiteSpace(chainId) || a.ChainId == chainId));
         return match?.PrivateKeyWif;
     }
 
