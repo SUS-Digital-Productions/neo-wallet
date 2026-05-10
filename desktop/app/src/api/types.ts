@@ -14,11 +14,25 @@ export interface NetworkInfo {
   name: string;
   symbol: string;
   node: string;
+  nodeOptions: string[];
 }
 
 export interface SetNetworkNodeRequest {
   chainId: string;
   node: string;
+}
+
+export interface TestNetworkNodeRequest {
+  chainId: string;
+  node: string;
+}
+
+export interface TestNetworkNodeResponse {
+  endpoint: string;
+  chainId: string;
+  headBlockNum: number;
+  serverVersion: string;
+  matchesExpectedChain: boolean;
 }
 
 /* ---- Account ---- */

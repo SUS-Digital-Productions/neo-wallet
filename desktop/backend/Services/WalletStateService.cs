@@ -30,9 +30,11 @@ public sealed class WalletStateService : IWalletStateService
 
     private NetworkDto BuildNetworkDto((string ChainId, string Name, string Symbol) def)
     {
+        var options = ChainClientFactory.GetRecommendedRpcEndpoints(def.ChainId);
         var node = _appSettings.GetNodeOverride(def.ChainId)
-            ?? (ChainClientFactory.DefaultRpcEndpoints.TryGetValue(def.ChainId, out var d) ? d : "");
-        return new NetworkDto(def.ChainId, def.Name, def.Symbol, node);
+            ?? options.FirstOrDefault()
+            ?? "";
+        return new NetworkDto(def.ChainId, def.Name, def.Symbol, node, options);
     }
 
     public bool WalletLoaded => _storage.WalletFileExists;

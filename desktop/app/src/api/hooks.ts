@@ -36,6 +36,7 @@ import type {
   SignActionsRequest,
   ChainAccountInfo,
   SetNetworkNodeRequest,
+  TestNetworkNodeRequest,
 } from "./types";
 // ── Query Keys ──────────────────────────────────────────
 
@@ -215,6 +216,12 @@ export function useSetNetworkNode() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.networks });
     },
+  });
+}
+
+export function useTestNetworkNode() {
+  return useMutation({
+    mutationFn: (body: TestNetworkNodeRequest) => api.testNetworkNode(body),
   });
 }
 

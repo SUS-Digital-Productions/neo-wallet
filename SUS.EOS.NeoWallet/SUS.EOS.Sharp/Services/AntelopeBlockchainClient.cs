@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Net.Sockets;
 using SUS.EOS.Sharp.Models;
 
 namespace SUS.EOS.Sharp.Services;
@@ -116,8 +117,10 @@ public interface IAntelopeBlockchainClient : IDisposable
 /// </summary>
 public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
 {
-    private readonly HttpClient _httpClient;
-    private readonly string _endpoint;
+    private HttpClient _httpClient;
+    private string _endpoint;
+    private readonly List<string> _endpoints;
+    private int _currentEndpointIndex;
     private readonly JsonSerializerOptions _jsonOptions;
     private bool _disposed;
 
@@ -136,13 +139,28 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
     /// </summary>
     /// <param name="endpoint">Base URL for the Antelope node (e.g., https://wax.greymass.com)</param>
     public AntelopeHttpClient(string endpoint)
+        : this([endpoint])
     {
-        _endpoint = endpoint;
-        _httpClient = new HttpClient
-        {
-            BaseAddress = new Uri(endpoint),
-            Timeout = TimeSpan.FromSeconds(30),
-        };
+    }
+
+    /// <summary>
+    /// Creates a new HTTP client with failover endpoints.
+    /// </summary>
+    /// <param name="endpoints">Preferred endpoint first, then fallback endpoints.</param>
+    public AntelopeHttpClient(IEnumerable<string> endpoints)
+    {
+        _endpoints = endpoints
+            .Select(e => e.TrimEnd('/'))
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (_endpoints.Count == 0)
+            throw new ArgumentException("At least one endpoint is required.", nameof(endpoints));
+
+        _endpoint = _endpoints[0];
+        _httpClient = CreateHttpClient(_endpoint);
+        _currentEndpointIndex = 0;
 
         _jsonOptions = new JsonSerializerOptions
         {
@@ -151,12 +169,77 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
         };
     }
 
+    private static HttpClient CreateHttpClient(string endpoint) =>
+        new()
+        {
+            BaseAddress = new Uri(endpoint),
+            Timeout = TimeSpan.FromSeconds(30),
+        };
+
+    private static bool IsTransientFailure(Exception ex, CancellationToken cancellationToken)
+    {
+        if (ex is HttpRequestException) return true;
+        if (ex is SocketException) return true;
+        if (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested) return true;
+        return false;
+    }
+
+    private async Task<HttpResponseMessage> PostWithFailoverAsync(
+        string path,
+        Func<HttpContent?> contentFactory,
+        CancellationToken cancellationToken)
+    {
+        Exception? lastError = null;
+
+        for (var offset = 0; offset < _endpoints.Count; offset++)
+        {
+            var idx = (_currentEndpointIndex + offset) % _endpoints.Count;
+            var endpoint = _endpoints[idx];
+            var useCurrentClient = idx == _currentEndpointIndex;
+            var client = useCurrentClient ? _httpClient : CreateHttpClient(endpoint);
+            var disposeClient = !useCurrentClient;
+
+            try
+            {
+                using var content = contentFactory();
+                var response = await client.PostAsync(path, content, cancellationToken);
+
+                if (!useCurrentClient)
+                {
+                    var oldClient = _httpClient;
+                    _httpClient = client;
+                    _endpoint = endpoint;
+                    _currentEndpointIndex = idx;
+                    disposeClient = false;
+                    oldClient.Dispose();
+                    System.Diagnostics.Trace.WriteLine($"[RPC] Switched endpoint to {endpoint}");
+                }
+
+                return response;
+            }
+            catch (Exception ex) when (offset < _endpoints.Count - 1 && IsTransientFailure(ex, cancellationToken))
+            {
+                lastError = ex;
+                System.Diagnostics.Trace.WriteLine($"[RPC] Endpoint {endpoint} failed ({ex.Message}), trying fallback");
+            }
+            finally
+            {
+                if (disposeClient)
+                    client.Dispose();
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"All configured RPC endpoints failed for path '{path}'. Last error: {lastError?.Message ?? "unknown"}",
+            lastError);
+    }
+
     /// <summary>
     /// Gets blockchain information
     /// </summary>
     public async Task<ChainInfo> GetInfoAsync(CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync("/v1/chain/get_info", null, cancellationToken);
+        var response = await PostWithFailoverAsync("/v1/chain/get_info", () => null, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -206,15 +289,12 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
     )
     {
         var request = new { account_name = accountName };
-        var requestContent = new StringContent(
-            JsonSerializer.Serialize(request, _jsonOptions),
-            System.Text.Encoding.UTF8,
-            "application/json"
-        );
-
-        var response = await _httpClient.PostAsync(
+        var response = await PostWithFailoverAsync(
             "/v1/chain/get_account",
-            requestContent,
+            () => new StringContent(
+                JsonSerializer.Serialize(request, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json"),
             cancellationToken
         );
         response.EnsureSuccessStatusCode();
@@ -234,15 +314,12 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
     )
     {
         var request = new { block_num_or_id = blockNumOrId };
-        var requestContent = new StringContent(
-            JsonSerializer.Serialize(request, _jsonOptions),
-            System.Text.Encoding.UTF8,
-            "application/json"
-        );
-
-        var response = await _httpClient.PostAsync(
+        var response = await PostWithFailoverAsync(
             "/v1/chain/get_block",
-            requestContent,
+            () => new StringContent(
+                JsonSerializer.Serialize(request, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json"),
             cancellationToken
         );
         response.EnsureSuccessStatusCode();
@@ -261,15 +338,12 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
         CancellationToken cancellationToken = default
     )
     {
-        var requestContent = new StringContent(
-            JsonSerializer.Serialize(signedTransaction, _jsonOptions),
-            System.Text.Encoding.UTF8,
-            "application/json"
-        );
-
-        var response = await _httpClient.PostAsync(
+        var response = await PostWithFailoverAsync(
             "/v1/chain/push_transaction",
-            requestContent,
+            () => new StringContent(
+                JsonSerializer.Serialize(signedTransaction, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json"),
             cancellationToken
         );
 
@@ -341,15 +415,12 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
         if (!string.IsNullOrWhiteSpace(upperBound))
             requestDict["upper_bound"] = upperBound;
 
-        var requestContent = new StringContent(
-            JsonSerializer.Serialize(requestDict, _jsonOptions),
-            System.Text.Encoding.UTF8,
-            "application/json"
-        );
-
-        var response = await _httpClient.PostAsync(
+        var response = await PostWithFailoverAsync(
             "/v1/chain/get_table_rows",
-            requestContent,
+            () => new StringContent(
+                JsonSerializer.Serialize(requestDict, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json"),
             cancellationToken
         );
         response.EnsureSuccessStatusCode();
@@ -377,15 +448,12 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             symbol,
         };
 
-        var requestContent = new StringContent(
-            JsonSerializer.Serialize(request, _jsonOptions),
-            System.Text.Encoding.UTF8,
-            "application/json"
-        );
-
-        var response = await _httpClient.PostAsync(
+        var response = await PostWithFailoverAsync(
             "/v1/chain/get_currency_balance",
-            requestContent,
+            () => new StringContent(
+                JsonSerializer.Serialize(request, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json"),
             cancellationToken
         );
         response.EnsureSuccessStatusCode();
@@ -405,15 +473,12 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
     )
     {
         var request = new { account_name = contractAccount };
-        var requestContent = new StringContent(
-            JsonSerializer.Serialize(request, _jsonOptions),
-            System.Text.Encoding.UTF8,
-            "application/json"
-        );
-
-        var response = await _httpClient.PostAsync(
+        var response = await PostWithFailoverAsync(
             "/v1/chain/get_abi",
-            requestContent,
+            () => new StringContent(
+                JsonSerializer.Serialize(request, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json"),
             cancellationToken
         );
         response.EnsureSuccessStatusCode();
@@ -441,15 +506,12 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             args = data,
         };
 
-        var requestContent = new StringContent(
-            JsonSerializer.Serialize(request, _jsonOptions),
-            System.Text.Encoding.UTF8,
-            "application/json"
-        );
-
-        var response = await _httpClient.PostAsync(
+        var response = await PostWithFailoverAsync(
             "/v1/chain/abi_json_to_bin",
-            requestContent,
+            () => new StringContent(
+                JsonSerializer.Serialize(request, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json"),
             cancellationToken
         );
         response.EnsureSuccessStatusCode();
@@ -481,15 +543,12 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
             binargs = binArgs,
         };
 
-        var requestContent = new StringContent(
-            JsonSerializer.Serialize(request, _jsonOptions),
-            System.Text.Encoding.UTF8,
-            "application/json"
-        );
-
-        var response = await _httpClient.PostAsync(
+        var response = await PostWithFailoverAsync(
             "/v1/chain/abi_bin_to_json",
-            requestContent,
+            () => new StringContent(
+                JsonSerializer.Serialize(request, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json"),
             cancellationToken
         );
         response.EnsureSuccessStatusCode();
@@ -521,13 +580,13 @@ public sealed class AntelopeHttpClient : IAntelopeBlockchainClient
         CancellationToken cancellationToken = default
     )
     {
-        var requestContent = new StringContent(
-            JsonSerializer.Serialize(request, _jsonOptions),
-            System.Text.Encoding.UTF8,
-            "application/json"
-        );
-
-        var response = await _httpClient.PostAsync(endpoint, requestContent, cancellationToken);
+        var response = await PostWithFailoverAsync(
+            endpoint,
+            () => new StringContent(
+                JsonSerializer.Serialize(request, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json"),
+            cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);

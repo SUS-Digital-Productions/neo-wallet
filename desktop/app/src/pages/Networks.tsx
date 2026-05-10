@@ -13,13 +13,23 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { EmptyState } from "@/components/EmptyState";
 import {
   useNetworks,
   useWalletSummary,
   useSetActiveNetwork,
   useSetNetworkNode,
+  useTestNetworkNode,
 } from "@/api/hooks";
+
+const CUSTOM_NODE_OPTION = "__custom__";
 
 const CHAIN_COLORS: Record<string, string> = {
   WAX: "bg-sus-wax/15 text-sus-wax border-sus-wax/30",
@@ -43,9 +53,11 @@ export default function Networks() {
   const { data: summary } = useWalletSummary();
   const setNetwork = useSetActiveNetwork();
   const setNode = useSetNetworkNode();
+  const testNode = useTestNetworkNode();
   const [switching, setSwitching] = useState<string | null>(null);
   const [editingNode, setEditingNode] = useState<string | null>(null);
   const [nodeInput, setNodeInput] = useState("");
+  const [selectedNodeOption, setSelectedNodeOption] = useState(CUSTOM_NODE_OPTION);
 
   const activeNet = summary?.activeNetwork?.chainId ?? null;
 
@@ -59,14 +71,19 @@ export default function Networks() {
     });
   }
 
-  function startEditNode(chainId: string, currentNode: string) {
+  function startEditNode(chainId: string, currentNode: string, nodeOptions: string[]) {
     setEditingNode(chainId);
     setNodeInput(currentNode);
+    const knownOption = nodeOptions.find(
+      (option) => option.toLowerCase() === currentNode.toLowerCase(),
+    );
+    setSelectedNodeOption(knownOption ?? CUSTOM_NODE_OPTION);
   }
 
   function cancelEditNode() {
     setEditingNode(null);
     setNodeInput("");
+    setSelectedNodeOption(CUSTOM_NODE_OPTION);
   }
 
   function saveNode(chainId: string) {
@@ -79,9 +96,31 @@ export default function Networks() {
           toast.success("Node updated");
           setEditingNode(null);
           setNodeInput("");
+          setSelectedNodeOption(CUSTOM_NODE_OPTION);
         },
         onError: (err) =>
           toast.error(err instanceof Error ? err.message : "Failed to update node"),
+      },
+    );
+  }
+
+  function testCurrentNode(chainId: string) {
+    const url = nodeInput.trim();
+    if (!url) {
+      toast.error("Enter an RPC endpoint first");
+      return;
+    }
+
+    testNode.mutate(
+      { chainId, node: url },
+      {
+        onSuccess: (result) => {
+          toast.success(
+            `Node OK · head ${result.headBlockNum.toLocaleString()} · ${result.serverVersion}`,
+          );
+        },
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Node test failed"),
       },
     );
   }
@@ -120,6 +159,8 @@ export default function Networks() {
               const isActive = n.chainId === activeNet;
               const isSwitching = switching === n.chainId;
               const isEditingThisNode = editingNode === n.chainId;
+              const isTestingThisNode = testNode.isPending && editingNode === n.chainId;
+              const recommendedNodes = n.nodeOptions ?? [];
               return (
                 <div
                   key={n.chainId}
@@ -154,38 +195,78 @@ export default function Networks() {
 
                   {/* Node row */}
                   {isEditingThisNode ? (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        className="h-7 flex-1 font-mono text-xs"
-                        value={nodeInput}
-                        onChange={(e) => setNodeInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") saveNode(n.chainId);
-                          if (e.key === "Escape") cancelEditNode();
+                    <div className="space-y-2">
+                      <Select
+                        value={selectedNodeOption}
+                        onValueChange={(value) => {
+                          setSelectedNodeOption(value);
+                          if (value !== CUSTOM_NODE_OPTION) {
+                            setNodeInput(value);
+                          }
                         }}
-                        autoFocus
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        disabled={setNode.isPending}
-                        onClick={() => saveNode(n.chainId)}
                       >
-                        {setNode.isPending ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : (
-                          <Check className="size-3 text-green-500" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        onClick={cancelEditNode}
-                      >
-                        <X className="size-3" />
-                      </Button>
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue placeholder="Select RPC endpoint" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {recommendedNodes.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value={CUSTOM_NODE_OPTION}>Custom endpoint…</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {selectedNodeOption === CUSTOM_NODE_OPTION && (
+                        <Input
+                          className="h-7 flex-1 font-mono text-xs"
+                          value={nodeInput}
+                          onChange={(e) => setNodeInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveNode(n.chainId);
+                            if (e.key === "Escape") cancelEditNode();
+                          }}
+                          autoFocus
+                        />
+                      )}
+
+                      <div className="flex items-center gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={isTestingThisNode}
+                          onClick={() => testCurrentNode(n.chainId)}
+                        >
+                          {isTestingThisNode ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : null}
+                          Test node
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          disabled={setNode.isPending || isTestingThisNode}
+                          onClick={() => saveNode(n.chainId)}
+                        >
+                          {setNode.isPending ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            <Check className="size-3 text-green-500" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          disabled={isTestingThisNode}
+                          onClick={cancelEditNode}
+                        >
+                          <X className="size-3" />
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
@@ -196,7 +277,7 @@ export default function Networks() {
                         variant="ghost"
                         size="icon"
                         className="size-7"
-                        onClick={() => startEditNode(n.chainId, n.node)}
+                        onClick={() => startEditNode(n.chainId, n.node, recommendedNodes)}
                       >
                         <Pencil className="size-3" />
                       </Button>

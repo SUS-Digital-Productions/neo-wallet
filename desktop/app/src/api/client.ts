@@ -36,6 +36,8 @@ import type {
   ImportAnchorWalletRequest,
   ImportAnchorWalletResponse,
   SetNetworkNodeRequest,
+  TestNetworkNodeRequest,
+  TestNetworkNodeResponse,
 } from "./types";
 
 /**
@@ -198,6 +200,12 @@ export const setActiveNetwork = (chainId: string) =>
 
 export const setNetworkNode = (body: SetNetworkNodeRequest) =>
   request<void>("/api/networks/node", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const testNetworkNode = (body: TestNetworkNodeRequest) =>
+  request<TestNetworkNodeResponse>("/api/networks/test-node", {
     method: "POST",
     body: JSON.stringify(body),
   });
