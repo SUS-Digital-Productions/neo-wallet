@@ -19,10 +19,7 @@ public sealed class EosioTransactionBuilder<T>
     public EosioTransactionBuilder(ChainInfo chainInfo)
     {
         _chainInfo = chainInfo;
-        // Use blockchain time, not local system time
-        // Ensure we're working in UTC
-        var blockchainTime = DateTime.SpecifyKind(chainInfo.HeadBlockTime, DateTimeKind.Utc);
-        _expiration = blockchainTime.AddSeconds(30);
+        _expiration = GetExpirationBaseTime().AddSeconds(30);
     }
 
     /// <summary>
@@ -30,10 +27,15 @@ public sealed class EosioTransactionBuilder<T>
     /// </summary>
     public EosioTransactionBuilder<T> SetExpiration(TimeSpan expiresIn)
     {
-        // Use blockchain time as base, not local system time
-        var blockchainTime = DateTime.SpecifyKind(_chainInfo.HeadBlockTime, DateTimeKind.Utc);
-        _expiration = blockchainTime.Add(expiresIn);
+        _expiration = GetExpirationBaseTime().Add(expiresIn);
         return this;
+    }
+
+    private DateTime GetExpirationBaseTime()
+    {
+        var blockchainTime = DateTime.SpecifyKind(_chainInfo.HeadBlockTime, DateTimeKind.Utc);
+        var utcNow = DateTime.UtcNow;
+        return blockchainTime > utcNow ? blockchainTime : utcNow;
     }
 
     /// <summary>

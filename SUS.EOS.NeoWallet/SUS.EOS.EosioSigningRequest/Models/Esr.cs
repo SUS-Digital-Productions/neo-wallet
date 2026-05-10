@@ -258,13 +258,15 @@ public class Esr
                 PackedTransaction = packedTrx,
                 TransactionId = transactionId,
                 ChainId = chainInfo.ChainId,
-                // Include TAPOS values for callback validation
-                RefBlockNum = (uint)(chainInfo.LastIrreversibleBlockNum & 0xFFFF),
-                RefBlockPrefix = chainInfo.RefBlockPrefix,
+                RefBlockNum = transaction.RefBlockNum,
+                RefBlockPrefix = transaction.RefBlockPrefix,
                 RefBlockId = chainInfo.LastIrreversibleBlockId,
                 Signer = signer,
                 SignerPermission = signerPermission,
-                Expiration = DateTime.Parse(transaction.Expiration, null, System.Globalization.DateTimeStyles.AssumeUniversal),
+                Expiration = DateTime.Parse(
+                    transaction.Expiration,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal),
             };
         }
         catch (Exception ex)
@@ -297,7 +299,9 @@ public class Esr
                 ["sp"] = response.SignerPermission,
                 ["rbn"] = response.RefBlockNum?.ToString(),
                 ["rid"] = response.RefBlockPrefix?.ToString(),
-                ["ex"] = (response.Expiration ?? DateTime.UtcNow.AddMinutes(5)).ToString("yyyy-MM-ddTHH:mm:ss"),
+                ["ex"] = (response.Expiration ?? DateTime.UtcNow.AddMinutes(5)).ToUniversalTime().ToString(
+                    "yyyy-MM-ddTHH:mm:ss.fff",
+                    System.Globalization.CultureInfo.InvariantCulture),
                 ["req"] = ToUri(),
                 ["cid"] = response.ChainId,
             };

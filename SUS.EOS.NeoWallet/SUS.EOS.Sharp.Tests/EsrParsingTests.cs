@@ -143,6 +143,7 @@ public class EsrParsingTests
         Assert.Equal(response.TransactionId, root.GetProperty("tx").GetString());
         Assert.Equal("1234", root.GetProperty("rbn").GetString());
         Assert.Equal("56789", root.GetProperty("rid").GetString());
+        Assert.Equal("2026-05-10T12:00:00.000", root.GetProperty("ex").GetString());
         Assert.NotEqual(response.PackedTransaction, root.GetProperty("tx").GetString());
         Assert.NotEqual(response.RefBlockId, root.GetProperty("rid").GetString());
     }
