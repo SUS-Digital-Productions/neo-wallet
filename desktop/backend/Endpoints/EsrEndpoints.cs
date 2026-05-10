@@ -39,6 +39,11 @@ public static class EsrEndpoints
             var (esr, relayCallback) = pending;
 
             var isIdentityRequest = esr.Payload is null || (!esr.Payload.IsTransaction && !esr.Payload.IsAction);
+            var callbackUrl = relayCallback ?? esr.Callback;
+            var shouldBroadcast = !isIdentityRequest
+                && req.Broadcast
+                && esr.Flags.HasFlag(EsrFlags.Broadcast)
+                && string.IsNullOrWhiteSpace(callbackUrl);
             var account = ResolveSignerAccount(wallet, req.Account, req.Authority, req.ChainId, out var signerError);
             if (account is null)
                 return Results.Problem(signerError ?? "No signing account.", statusCode: StatusCodes.Status400BadRequest);
@@ -59,7 +64,7 @@ public static class EsrEndpoints
 
             var response = await esrService.SignRequestAsync(
                 esr, privateKeyWif, account.Account, account.Authority,
-                blockchainClient: rpc, broadcast: !isIdentityRequest && req.Broadcast,
+                blockchainClient: rpc, broadcast: shouldBroadcast,
                 cancellationToken: cancellationToken);
 
             // Inject Anchor Link session metadata so dApps can establish persistent sessions
@@ -75,7 +80,6 @@ public static class EsrEndpoints
 
             // Send callback to dApp so it knows the request was signed.
             // Prefer the relay callback URL (from the envelope) over the ESR's own callback.
-            var callbackUrl = relayCallback ?? esr.Callback;
             if (!string.IsNullOrEmpty(callbackUrl))
             {
                 esr.Callback = callbackUrl;
@@ -92,7 +96,7 @@ public static class EsrEndpoints
 
             return Results.Ok(new TransferResponse(
                 TransactionId: response.TransactionId ?? "signed-not-broadcast",
-                Broadcast: !isIdentityRequest && req.Broadcast
+                Broadcast: shouldBroadcast
             ));
         });
 

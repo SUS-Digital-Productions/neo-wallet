@@ -112,7 +112,7 @@ export default function EsrApproval() {
     approveEsr.mutate(
       {
         requestId: parsed.requestId,
-        broadcast: !isIdentity,
+        broadcast: false,
         account: selectedAccount.account,
         authority: selectedAccount.authority,
         chainId: selectedAccount.chainId,
@@ -122,7 +122,7 @@ export default function EsrApproval() {
           toast.success(
             isIdentity
               ? "Identity approved"
-              : `Approved – tx ${res.transactionId.slice(0, 12)}…`,
+              : `Signed – tx ${res.transactionId.slice(0, 12)}…`,
           );
           navigate("/");
         },
@@ -390,7 +390,7 @@ export default function EsrApproval() {
                     {approveEsr.isPending && (
                       <Loader2 className="size-4 animate-spin" />
                     )}
-                    {parsed.type === "identity" ? "Approve Identity" : "Approve & Broadcast"}
+                    {parsed.type === "identity" ? "Approve Identity" : "Sign & Return"}
                   </Button>
                   <Button
                     variant="outline"

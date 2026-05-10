@@ -149,6 +149,41 @@ public class EsrParsingTests
     }
 
     [Fact]
+    public async Task SignRequestAsync_ShouldNotBroadcastFromEsrFlagAlone()
+    {
+        var service = new EsrService();
+        var client = new BroadcastTrackingClient();
+        var request = new SUS.EOS.EosioSigningRequest.Models.Esr
+        {
+            ChainId = "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4",
+            Flags = EsrFlags.Broadcast,
+            Payload = new SUS.EOS.EosioSigningRequest.Models.EsrRequestPayload
+            {
+                Action = new
+                {
+                    account = "warsaken",
+                    name = "claim",
+                    authorization = Array.Empty<object>(),
+                    data = "000000000000000000",
+                },
+            },
+        };
+        var privateKeyWif = SUS.EOS.Sharp.Cryptography.EosioKey.FromHex(
+            "0000000000000000000000000000000000000000000000000000000000000001"
+        ).PrivateKeyWif;
+
+        await service.SignRequestAsync(
+            request,
+            privateKeyWif,
+            "alice",
+            "active",
+            client,
+            broadcast: false);
+
+        Assert.False(client.PushCalled);
+    }
+
+    [Fact]
     public void DebugDecompressEsr()
     {
         // Test the base64url decoding and decompression
@@ -338,6 +373,93 @@ public class EsrParsingTests
                 : await request.Content.ReadAsStringAsync(cancellationToken);
 
             return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
+    private sealed class BroadcastTrackingClient : IAntelopeBlockchainClient
+    {
+        public bool PushCalled { get; private set; }
+        public string Endpoint => "https://example.test";
+        public string? ChainId => "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4";
+
+        public Task<ChainInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ChainInfo
+            {
+                ServerVersion = "test",
+                ChainId = ChainId!,
+                HeadBlockNum = 100,
+                LastIrreversibleBlockNum = 90,
+                LastIrreversibleBlockId = "0000005a00000000000000000000000000000000000000000000000000000000",
+                HeadBlockId = "0000006400000000000000000000000000000000000000000000000000000000",
+                HeadBlockTime = DateTime.UtcNow,
+                HeadBlockProducer = "eosio",
+                VirtualBlockCpuLimit = 0,
+                VirtualBlockNetLimit = 0,
+                BlockCpuLimit = 0,
+                BlockNetLimit = 0,
+                RefBlockPrefix = 0,
+            });
+
+        public Task<TransactionResult> PushTransactionAsync(
+            object signedTransaction,
+            CancellationToken cancellationToken = default)
+        {
+            PushCalled = true;
+            return Task.FromResult(new TransactionResult { TransactionId = "pushed" });
+        }
+
+        public Task<Account> GetAccountAsync(string accountName, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<Block> GetBlockAsync(string blockNumOrId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<TableRowsResult<T>> GetTableRowsAsync<T>(
+            string contract,
+            string scope,
+            string table,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<TableRowsResult<T>> GetTableRowsAsync<T>(
+            string contract,
+            string scope,
+            string table,
+            int limit,
+            string? lowerBound = null,
+            string? upperBound = null,
+            bool reverse = false,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<List<string>> GetCurrencyBalanceAsync(
+            string contract,
+            string account,
+            string? symbol = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AbiDefinition?> GetAbiAsync(
+            string contractAccount,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<byte[]> AbiJsonToBinAsync(
+            string contract,
+            string action,
+            object data,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<object?> AbiBinToJsonAsync(
+            string contract,
+            string action,
+            string binArgs,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void Dispose()
+        {
         }
     }
 }

@@ -66,10 +66,12 @@ public class EsrService : IEsrService
 
             var response = request.Sign(privateKeyWif, chainInfo, signer, signerPermission);
 
-            // Broadcast if requested or if Broadcast flag is set in ESR
+            // Broadcast only when the caller explicitly requests it. ESRs with
+            // callbacks often hand the signed transaction back to the dApp,
+            // and broadcasting here as well can duplicate the same transaction.
             if (
                 !isIdentityRequest
-                && (broadcast || request.Flags.HasFlag(EsrFlags.Broadcast))
+                && broadcast
                 && response.SerializedTransaction is { Length: > 0 }
             )
             {
