@@ -1,7 +1,10 @@
 using System.IO.Compression;
+using System.Net;
+using System.Text.Json;
 using SUS.EOS.Sharp.Models;
 using SUS.EOS.Sharp.Services;
 using SUS.EOS.EosioSigningRequest.Services;
+using SUS.EOS.EosioSigningRequest.Models;
 using Xunit;
 
 namespace SUS.EOS.Sharp.Tests;
@@ -104,6 +107,44 @@ public class EsrParsingTests
             "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4",
             response.ChainId
         );
+    }
+
+    [Fact]
+    public async Task SendCallbackAsync_ShouldUseTransactionIdAndRefBlockPrefix()
+    {
+        var handler = new CapturingHttpMessageHandler();
+        using var httpClient = new HttpClient(handler);
+        var request = new SUS.EOS.EosioSigningRequest.Models.Esr
+        {
+            Callback = "https://example.test/callback",
+            OriginalUri = "esr://abc123",
+        };
+
+        var response = new EsrCallbackResponse
+        {
+            Signatures = ["SIG_K1_test"],
+            TransactionId = "308d206c51c5dd6c02e0417e44560cdc2e76db7765cea19dfa8f9f94922f928a",
+            PackedTransaction = "deadbeef",
+            Signer = "alice",
+            SignerPermission = "active",
+            RefBlockNum = 1234,
+            RefBlockPrefix = 56789,
+            RefBlockId = "00000000000004d2ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            Expiration = new DateTime(2026, 5, 10, 12, 0, 0, DateTimeKind.Utc),
+            ChainId = "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4",
+        };
+
+        await request.SendCallbackAsync(response, httpClient);
+
+        Assert.NotNull(handler.Body);
+        using var doc = JsonDocument.Parse(handler.Body!);
+        var root = doc.RootElement;
+
+        Assert.Equal(response.TransactionId, root.GetProperty("tx").GetString());
+        Assert.Equal("1234", root.GetProperty("rbn").GetString());
+        Assert.Equal("56789", root.GetProperty("rid").GetString());
+        Assert.NotEqual(response.PackedTransaction, root.GetProperty("tx").GetString());
+        Assert.NotEqual(response.RefBlockId, root.GetProperty("rid").GetString());
     }
 
     [Fact]
@@ -281,5 +322,21 @@ public class EsrParsingTests
 
         private static Task<T> ThrowAsync<T>() =>
             throw new InvalidOperationException("Identity signing must not use chain RPC.");
+    }
+
+    private sealed class CapturingHttpMessageHandler : HttpMessageHandler
+    {
+        public string? Body { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Body = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
     }
 }

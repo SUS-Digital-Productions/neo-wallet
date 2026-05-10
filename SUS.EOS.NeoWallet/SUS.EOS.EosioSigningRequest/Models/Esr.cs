@@ -155,6 +155,7 @@ public class Esr
 
                 var identitySerialized = EosioSerializer.SerializeTransactionWithBinaryData(identityTransaction);
                 var identityPackedTrx = EosioSerializer.BytesToHexString(identitySerialized);
+                var identityTransactionId = EosioSerializer.BytesToHexString(EosioSerializer.Sha256(identitySerialized));
                 System.Diagnostics.Trace.WriteLine($"[ESR] Identity packed transaction: {identityPackedTrx}");
                 System.Diagnostics.Trace.WriteLine($"[ESR] Identity serialized length: {identitySerialized.Length} bytes");
 
@@ -168,6 +169,7 @@ public class Esr
                     Transaction = identityTransaction,
                     SerializedTransaction = identitySerialized,
                     PackedTransaction = identityPackedTrx,
+                    TransactionId = identityTransactionId,
                     ChainId = chainInfo.ChainId,
                     Signer = signer,
                     SignerPermission = signerPermission,
@@ -244,6 +246,7 @@ public class Esr
             // Serialize transaction
             var serialized = EosioSerializer.SerializeTransactionWithBinaryData(transaction);
             var packedTrx = EosioSerializer.BytesToHexString(serialized);
+            var transactionId = EosioSerializer.BytesToHexString(EosioSerializer.Sha256(serialized));
             System.Diagnostics.Trace.WriteLine($"[ESR] Packed transaction: {packedTrx}");
             System.Diagnostics.Trace.WriteLine($"[ESR] Serialized length: {serialized.Length} bytes");
 
@@ -253,6 +256,7 @@ public class Esr
                 Transaction = transactionData,
                 SerializedTransaction = serialized,
                 PackedTransaction = packedTrx,
+                TransactionId = transactionId,
                 ChainId = chainInfo.ChainId,
                 // Include TAPOS values for callback validation
                 RefBlockNum = (uint)(chainInfo.LastIrreversibleBlockNum & 0xFFFF),
@@ -288,15 +292,18 @@ public class Esr
             var callbackDict = new Dictionary<string, object?>
             {
                 ["sig"] = response.Signatures.First(),
-                ["tx"] = response.PackedTransaction,
+                ["tx"] = response.TransactionId,
                 ["sa"] = response.Signer,
                 ["sp"] = response.SignerPermission,
                 ["rbn"] = response.RefBlockNum?.ToString(),
-                ["rid"] = response.RefBlockId,
+                ["rid"] = response.RefBlockPrefix?.ToString(),
                 ["ex"] = (response.Expiration ?? DateTime.UtcNow.AddMinutes(5)).ToString("yyyy-MM-ddTHH:mm:ss"),
                 ["req"] = ToUri(),
                 ["cid"] = response.ChainId,
             };
+
+            if (response.BlockNum is not null)
+                callbackDict["bn"] = response.BlockNum.Value.ToString();
 
             // Include Anchor Link session metadata for identity request callbacks
             // This allows the dApp to establish a persistent session with this wallet
